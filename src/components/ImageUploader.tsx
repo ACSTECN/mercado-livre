@@ -8,9 +8,10 @@ import { Button } from './ui/Button';
 type Props = {
   onSelecionado: (dataUrl: string, file: File) => void;
   className?: string;
+  compacto?: boolean;
 };
 
-export function ImageUploader({ onSelecionado, className }: Props) {
+export function ImageUploader({ onSelecionado, className, compacto }: Props) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [drag, setDrag] = React.useState(false);
 
@@ -22,25 +23,43 @@ export function ImageUploader({ onSelecionado, className }: Props) {
     onSelecionado(url, f);
   };
 
+  if (compacto) {
+    return (
+      <>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => aoSelecionar(e.target.files)}
+        />
+        <Button variant="secondary" onClick={() => inputRef.current?.click()} className="!h-12 min-w-[200px]">
+          <Upload className="h-4 w-4" /> Escolher foto da galeria
+        </Button>
+      </>
+    );
+  }
+
   return (
     <div
       className={cn(
-        'relative w-full rounded-2xl border-2 border-dashed p-6 text-center transition',
+        'relative w-full rounded-2xl border-2 border-dashed p-6 text-center transition cursor-pointer',
         drag
           ? 'border-ml-blue bg-blue-50/60'
           : 'border-neutral-300 bg-white hover:border-neutral-400 hover:bg-neutral-50',
         className,
       )}
+      onClick={() => inputRef.current?.click()}
       onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
+        e.preventDefault();
+        setDrag(true);
+      }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          aoSelecionar(e.dataTransfer.files);
-        }}
+        e.preventDefault();
+        setDrag(false);
+        aoSelecionar(e.dataTransfer.files);
+      }}
     >
       <input
         ref={inputRef}
@@ -59,7 +78,7 @@ export function ImageUploader({ onSelecionado, className }: Props) {
           </p>
           <p className="text-xs text-neutral-500">PNG, JPG, WEBP — boa qualidade e foco</p>
         </div>
-        <Button variant="primary" size="sm" onClick={() => inputRef.current?.click()}>
+        <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
           <ImgIcon className="h-4 w-4" /> Escolher imagem
         </Button>
       </div>

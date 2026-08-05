@@ -258,7 +258,22 @@ export default function EscanearPage() {
       )}
 
       {etapa === 'escolha' && modo === 'camera' && (
-        <CameraScanner onFoto={aoCapturarImagem} onClose={() => setModo(null)} />
+        <div className="space-y-3">
+          <CameraScanner onFoto={aoCapturarImagem} onClose={() => setModo(null)} />
+          <Card>
+            <CardContent className="!p-4 flex flex-col sm:flex-row items-center sm:justify-between gap-3">
+              <div className="min-w-0 text-center sm:text-left">
+                <p className="font-bold text-neutral-900 text-[14.5px]">
+                  Não deu pra usar a câmera agora?
+                </p>
+                <p className="text-sm text-neutral-600">
+                  Escolha uma foto já tirada da galeria do celular ou computador.
+                </p>
+              </div>
+              <ImageUploader onSelecionado={aoCapturarImagem} compacto />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {etapa === 'processando' && ocrProgresso && (

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Camera, RotateCw, FlipVertical, X, CheckCircle2, Camera as CamIcon } from 'lucide-react';
+import { Camera, RotateCw, FlipVertical, X, CheckCircle2, Camera as CamIcon, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,15 @@ type Props = {
   onClose?: () => void;
   className?: string;
 };
+
+function isLocalhost(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '[::1]'
+  );
+}
 
 export function CameraScanner({ onFoto, onClose, className }: Props) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -22,10 +31,19 @@ export function CameraScanner({ onFoto, onClose, className }: Props) {
 
   const parar = React.useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* noop */
+      }
       streamRef.current = null;
     }
     if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch {
+        /* noop */
+      }
       videoRef.current.srcObject = null;
     }
     setAtivo(false);
@@ -36,37 +54,59 @@ export function CameraScanner({ onFoto, onClose, className }: Props) {
     setInicializando(true);
     try {
       parar();
-      const videoConstraints: MediaTrackConstraints = {
-        facingMode: { ideal: facing },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+      if (typeof navigator === 'undefined' || !navigator?.mediaDevices?.getUserMedia) {
+        setErro('Câmera indisponível neste navegador. Use "Escolher foto" abaixo.');
+        return;
+      }
+      if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && !isLocalhost()) {
+        setErro('Câmera requer HTTPS. Acesse a URL com https:// ou envie uma foto abaixo.');
+        return;
+      }
+
+      const tentarAbrir = async (comAdvanced: boolean) => {
+        const videoConstraints: MediaTrackConstraints = {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        };
+        if (comAdvanced) {
+          try {
+            (videoConstraints as MediaTrackConstraints & { advanced?: unknown[] }).advanced = [
+              { torch: true },
+            ];
+          } catch {
+            /* noop */
+          }
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: false,
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => void 0);
+        }
+        setAtivo(true);
       };
+
       try {
-        (videoConstraints as unknown as { advanced: unknown[] }).advanced = [
-          { torch: true },
-        ];
+        await tentarAbrir(true);
       } catch {
-        /* noop */
+        // fallback: sem torch/advanced (alguns celulares crasham com advanced)
+        await tentarAbrir(false);
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => void 0);
-      }
-      setAtivo(true);
     } catch (e: unknown) {
-      const msg =
-        e instanceof Error ? e.message : 'Erro desconhecido';
-      if (msg.includes('Permission')) {
-        setErro('Permissão da câmera negada. Autorize o acesso ou escolha "Fazer upload'.slice(0,90));
-      } else if (msg.includes('NotFound') || msg.includes('not found')) {
-        setErro('Nenhuma câmera encontrada no dispositivo');
+      const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+      const msgL = msg.toLowerCase();
+      if (msgL.includes('permission') || msgL.includes('denied') || msgL.includes('permiss')) {
+        setErro('Permissão da câmera negada. Autorize no navegador ou use "Escolher foto" abaixo.');
+      } else if (msgL.includes('notfound') || msgL.includes('not found') || msgL.includes('device')) {
+        setErro('Nenhuma câmera detectada no dispositivo. Envie uma foto abaixo.');
+      } else if (msgL.includes('secure') || msgL.includes('https') || msgL.includes('insecure')) {
+        setErro('A conexão precisa ser HTTPS. Use a foto abaixo.');
       } else {
-          setErro('Não foi possível abrir a câmera. Tente fazer upload da imagem.');
+        setErro('Não foi possível abrir a câmera. Escolha uma foto abaixo.');
       }
     } finally {
       setInicializando(false);
@@ -77,13 +117,17 @@ export function CameraScanner({ onFoto, onClose, className }: Props) {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !streamRef.current) return;
-    const w = video.videoWidth;
-    const h = video.videoHeight;
+    const w = video.videoWidth || 1920;
+    const h = video.videoHeight || 1080;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, w, h);
+    try {
+      ctx.drawImage(video, 0, 0, w, h);
+    } catch {
+      /* noop */
+    }
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
@@ -110,30 +154,35 @@ export function CameraScanner({ onFoto, onClose, className }: Props) {
           ref={videoRef}
           playsInline
           muted
+          autoPlay={false}
           className={cn('h-full w-full object-cover', ativo ? 'animate-fade-in' : 'opacity-0')}
         />
         <canvas ref={canvasRef} className="hidden" />
 
         {!ativo && !erro && !inicializando && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-white">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 backdrop-blur">
-            <CamIcon className="h-8 w-8" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 backdrop-blur">
+              <CamIcon className="h-8 w-8" />
+            </div>
+            <p className="max-w-xs text-[14px] font-medium text-white/80">
+              Clique em "Ligar câmera" para apontar para a etiqueta
+            </p>
           </div>
-          <p className="max-w-xs text-[14px] font-medium text-white/80">
-            Clique em "Ligar câmera" para apontar para a etiqueta
-          </p>
-        </div>
         )}
         {inicializando && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-          <p className="text-sm">Inicializando câmera...</p>
-        </div>
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <p className="text-sm">Inicializando câmera...</p>
+          </div>
         )}
         {erro && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-5 text-center text-white">
-          <p className="text-[14px] font-medium text-red-200">{erro}</p>
-        </div>
+            <AlertTriangle className="h-8 w-8 text-amber-300" />
+            <p className="text-[14px] font-medium text-red-100 max-w-xs">{erro}</p>
+            <p className="text-[12px] text-white/60 max-w-xs pt-1">
+              Dica: clica em "Escolher foto da galeria" abaixo para enviar a imagem direto.
+            </p>
+          </div>
         )}
         {ativo && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -163,17 +212,35 @@ export function CameraScanner({ onFoto, onClose, className }: Props) {
       <div className="flex flex-wrap items-center justify-center gap-2 p-3 bg-neutral-950">
         {!ativo ? (
           <Button variant="primary" onClick={iniciar} className="h-12 min-w-[180px]">
-            <Camera className="h-4.5 h-4 w-4" /> Ligar câmera
+            <Camera className="h-4 w-4" /> Ligar câmera
           </Button>
         ) : (
           <>
-            <Button variant="ghost" size="icon" className="!bg-white/10 !text-white hover:!bg-white/20" onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="!bg-white/10 !text-white hover:!bg-white/20"
+              onClick={() => {
+                setFacing((f) => (f === 'environment' ? 'user' : 'environment'));
+                setTimeout(iniciar, 200);
+              }}
+              title="Trocar câmera"
+            >
               <FlipVertical className="h-4 w-4" />
             </Button>
             <Button variant="success" size="lg" onClick={capturar} disabled={!ativo} className="min-w-[200px]">
               <CheckCircle2 className="h-5 w-5" /> Capturar foto
             </Button>
-            <Button variant="ghost" size="icon" className="!bg-white/10 !text-white hover:!bg-white/20" onClick={parar}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="!bg-white/10 !text-white hover:!bg-white/20"
+              onClick={() => {
+                parar();
+                setTimeout(iniciar, 200);
+              }}
+              title="Reiniciar câmera"
+            >
               <RotateCw className="h-4 w-4" />
             </Button>
           </>

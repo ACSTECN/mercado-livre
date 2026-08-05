@@ -21,7 +21,7 @@ type Props = {
 };
 
 const OPCOES_COLUNAS: Array<{ key: ColunaPlanilha; label: string; obrigatorio?: boolean; ajuda?: string }> = [
-  { key: 'codigo', label: 'Número / Código (coluna B do Excel)', obrigatorio: true, ajuda: 'Este número será exibido em destaque no resultado' },
+  { key: 'codigo', label: 'Número / Posição (coluna B)', obrigatorio: true, ajuda: 'Este NÚMERO aparece em destaque GIGANTE no resultado' },
   { key: 'enderecoCompleto', label: 'Endereço completo (coluna A)', ajuda: 'Rua, nº, bairro — tudo numa coluna só' },
   { key: 'logradouro', label: 'Apenas logradouro (Rua/Av...)' },
   { key: 'numero', label: 'Número do imóvel (separado)' },
@@ -51,11 +51,11 @@ export function ColumnMapper({
     const col1 = cabecalhos[0];
     const col2 = cabecalhos[1];
     if (!col1 || !col2) return;
-    const candidatosEndereco = [col1, col2].find((c) =>
-      /endere|rua|av\.|aven|logradouro|estrada|rodovia|cep/i.test(c),
+    const candidatosEndereco = cabecalhos.find((c) =>
+      /endere|rua|av\.|aven|logradouro|estrada|rodovia|cep|local/i.test(c),
     );
-    const candidatosCodigo = [col2, col1].find((c) =>
-      /nume|cod|código|codigo|id|rota|nº|ordem|seq/i.test(c),
+    const candidatosCodigo = cabecalhos.find((c) =>
+      /nume|cod|código|codigo|id|rota|nº|ordem|seq|posi[çc][aã]o/i.test(c),
     );
     onChange({
       enderecoCompleto: candidatosEndereco ?? col1,
@@ -96,10 +96,10 @@ export function ColumnMapper({
               </div>
               <div>
                 <p className="text-[13.5px] font-bold text-neutral-900 leading-snug">
-                  Mapeamento padrão: endereço = coluna A · número = coluna B
+                  Formato recomendado: A=Endereço · B=Posição · C=Quantidade (opcional)
                 </p>
                 <p className="text-[12px] text-neutral-700 mt-0.5 leading-relaxed">
-                  O sistema já detecta automaticamente quando o <b>número está 1 linha ACIMA</b> do endereço (formato trio: nº → endereço → "1 unidades") e também quando estão na mesma linha. Linhas com "unidades" são ignoradas.
+                  O sistema já detecta automaticamente colunas <b>Endereço</b> e <b>Posição</b>. Também suporta o formato antigo onde o número fica 1 linha ACIMA do endereço + linha "X unidades". Coluna Quantidade é ignorada.
                 </p>
               </div>
             </div>
