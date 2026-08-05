@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
 import { Badge, BadgeConfianca, BadgeLoading } from '@/components/ui/Badge';
-import { CameraScanner } from '@/components/CameraScanner';
 import { ImageUploader, ImagemPreview } from '@/components/ImageUploader';
 import { AddressForm } from '@/components/AddressForm';
 import { MatchCard } from '@/components/MatchCard';
@@ -68,18 +67,35 @@ export default function EscanearPage() {
   const [etapa, setEtapa] = React.useState<Etapa>('escolha');
   const [erro, setErro] = React.useState<string | null>(null);
   const [copiado, setCopiado] = React.useState(false);
-  const [modo, setModo] = React.useState<'camera' | 'upload' | null>(null);
   const [validParse, setValidParse] = React.useState<{ valido: boolean; camposFaltando: string[] }>({
     valido: true,
     camposFaltando: [],
   });
+  const inputCameraRef = React.useRef<HTMLInputElement>(null);
+  const inputUploadRef = React.useRef<HTMLInputElement>(null);
 
   const planilhaValida = planilha && planilha.registros.length > 0;
+
+  const aoSelecionarArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+      await aoCapturarImagem(dataUrl, file);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro ao ler arquivo');
+    }
+  };
 
   const aoCapturarImagem = async (dataUrl: string, file: File) => {
     setImagem(dataUrl, file);
     setErro(null);
-    setModo(null);
     await executarOcr(dataUrl, file);
   };
 
@@ -219,61 +235,92 @@ export default function EscanearPage() {
         </Card>
       )}
 
-      {etapa === 'escolha' && !modo && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="!p-5 flex flex-col gap-4 h-full">
-              <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-ml-blue shadow-sm">
-                  <CamIcon className="h-6 w-6" />
+      {etapa === 'escolha' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Card>
+              <CardContent className="!p-5 flex flex-col gap-4 h-full">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-ml-blue shadow-sm">
+                    <CamIcon className="h-6 w-6" />
+                  </div>
+                  <Badge variant="info">Recomendado</Badge>
                 </div>
-                <Badge variant="info">Recomendado</Badge>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-neutral-900">Abrir câmera</h3>
-                <p className="text-sm text-neutral-600 mt-1">
-                  Use a câmera traseira do celular com foco e iluminação boas.
-                </p>
-              </div>
-              <Button size="lg" variant="primary" className="mt-auto" onClick={() => setModo('camera')}>
-                <CamIcon className="h-4.5 w-4.5" /> Ligar câmera
-              </Button>
-            </CardContent>
-          </Card>
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-900">Abrir câmera</h3>
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Abre a câmera TRASEIRA do celular direto (sem instalar nada). Fotografa a etiqueta e já envia para leitura.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  variant="primary"
+                  className="mt-auto"
+                  onClick={() => inputCameraRef.current?.click()}
+                >
+                  <CamIcon className="h-4.5 w-4.5" /> Usar câmera do celular
+                </Button>
+                <input
+                  ref={inputCameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={aoSelecionarArquivo}
+                />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="!p-5 flex flex-col gap-4 h-full">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
-                <Upload className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-neutral-900">Fazer upload</h3>
-                <p className="text-sm text-neutral-600 mt-1">
-                  Já tem uma foto da etiqueta? Carregue do arquivo.
-                </p>
-              </div>
-              <div className="mt-auto">
-                <ImageUploader onSelecionado={aoCapturarImagem} />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            <Card>
+              <CardContent className="!p-5 flex flex-col gap-4 h-full">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
+                  <Upload className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-900">Fazer upload</h3>
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Já tem a foto? Envie da galeria, downloads ou arquivos do computador.
+                  </p>
+                </div>
+                <div className="mt-auto">
+                  <ImageUploader onSelecionado={aoCapturarImagem} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-      {etapa === 'escolha' && modo === 'camera' && (
-        <div className="space-y-3">
-          <CameraScanner onFoto={aoCapturarImagem} onClose={() => setModo(null)} />
-          <Card>
-            <CardContent className="!p-4 flex flex-col sm:flex-row items-center sm:justify-between gap-3">
-              <div className="min-w-0 text-center sm:text-left">
-                <p className="font-bold text-neutral-900 text-[14.5px]">
-                  Não deu pra usar a câmera agora?
+          <Card className="border-neutral-200 bg-white">
+            <CardContent className="!p-4 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-bold text-neutral-900 text-[14.5px] flex items-center gap-1.5">
+                  <ListChecks className="h-4 w-4 text-blue-600" />
+                  Dicas para a foto / etiqueta
                 </p>
-                <p className="text-sm text-neutral-600">
-                  Escolha uma foto já tirada da galeria do celular ou computador.
-                </p>
+                <ul className="mt-1.5 text-sm text-neutral-600 list-disc list-inside space-y-0.5 pl-0.5">
+                  <li>Boa iluminação (preferência luz natural)</li>
+                  <li>Foco nítido na área do endereço / CEP</li>
+                  <li>Procure enquadrar TODO o endereço (evite cortes)</li>
+                </ul>
               </div>
-              <ImageUploader onSelecionado={aoCapturarImagem} compacto />
+              <div className="flex gap-2 shrink-0">
+                <Button variant="secondary" size="sm" onClick={() => inputCameraRef.current?.click()}>
+                  <CamIcon className="h-4 w-4" /> Câmera rápida
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => inputUploadRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" /> Galeria
+                </Button>
+                <input
+                  ref={inputUploadRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={aoSelecionarArquivo}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -347,7 +394,7 @@ export default function EscanearPage() {
           </Card>
 
           {imagem && etapa === 'corrigir' && (
-            <ImagemPreview src={imagem} onRefazer={() => { reset(); setEtapa('escolha'); setModo(null); setErro(null); }} />
+            <ImagemPreview src={imagem} onRefazer={() => { reset(); setEtapa('escolha'); setErro(null); }} />
           )}
 
           {etapa === 'corrigir' && (

@@ -11,7 +11,7 @@ import { Badge, BadgeLoading } from '@/components/ui/Badge';
 import { ColumnMapper } from '@/components/ColumnMapper';
 import { ImageUploader } from '@/components/ImageUploader';
 import { SpreadsheetStatus } from '@/components/SpreadsheetStatus';
-import { importarPlanilha, lerPlanilha, type PlanilhaPreview } from '@/services/spreadsheet/ExcelService';
+import { processarRegistros, lerPlanilha, type PlanilhaPreview } from '@/services/spreadsheet/ExcelService';
 import { useSpreadsheetStore } from '@/stores/spreadsheetStore';
 import type { MapeamentoColunas } from '@/types';
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Trash2, Upload } from 'lucide-react';
@@ -70,10 +70,15 @@ export default function ImportarPage() {
     setProgresso(10);
     try {
       setProgresso(40);
-      const registros = await importarPlanilha(preview, mapeamento);
+      const registros = processarRegistros(preview, mapeamento);
+      if (!registros.length) {
+        throw new Error(
+          'Nenhum endereço válido encontrado. Verifique o mapeamento de colunas (é preciso Endereço + Posição / Número).',
+        );
+      }
       setProgresso(80);
       const payload = {
-        nomeArquivo: preview.arquivo.name,
+        nomeArquivo: preview.arquivoNome,
         hash: preview.hash,
         cabecalhos: preview.cabecalhos,
         mapeamento,
@@ -233,7 +238,7 @@ export default function ImportarPage() {
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-neutral-900">{preview.arquivo.name}</p>
+                  <p className="truncate font-semibold text-neutral-900">{preview.arquivoNome}</p>
                   <p className="text-xs text-neutral-500">
                     {preview.totalLinhas} linhas · {preview.cabecalhos.length} colunas
                   </p>
@@ -257,7 +262,7 @@ export default function ImportarPage() {
             onChange={setMapeamento}
             onConfirmar={onConfirmar}
             totalLinhas={preview.totalLinhas}
-            nomeArquivo={preview.arquivo.name}
+            nomeArquivo={preview.arquivoNome}
             disabled={processando}
           />
         </>

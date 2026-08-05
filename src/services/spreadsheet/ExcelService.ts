@@ -4,12 +4,16 @@ import { normalizarEndereco } from '../address/AddressNormalizer';
 import { gerarId, hashArquivo } from '@/lib/utils';
 import { REGEX_PREFIXOS_LOGRADOURO } from '@/lib/regex';
 
+type LinhaRaw = Record<string, unknown>;
+
 export type PlanilhaPreview = {
-  arquivo: File;
+  arquivoNome: string;
+  arquivoTamanho: number;
   hash: string;
   cabecalhos: string[];
   amostra: Record<string, string>[];
   totalLinhas: number;
+  linhasJson: LinhaRaw[];
 };
 
 const REGEX_RUIDO_LINHAS = /(unidades|und|qtd|quantidade|total|assinatura|observacao|obs)/i;
@@ -33,8 +37,6 @@ function linhaPareceCodigoValor(valor: string): boolean {
   return /^\s*\d{1,8}\s*$/.test(valor);
 }
 
-type LinhaRaw = Record<string, unknown>;
-
 function montarParesEnderecoCodigo(
   linhas: LinhaRaw[],
   colEndereco: string,
@@ -56,20 +58,24 @@ function montarParesEnderecoCodigo(
 
     let codigoFinal: string = valCodigoMesmaLinha;
     let idxCodigo = i;
+
     if (!linhaPareceCodigoValor(codigoFinal)) {
+      // 1. Tentar linha ACIMA na coluna do CÓDIGO (col B nº acima de endereço na col A)
       if (i - 1 >= 0) {
-        const acima = extrairValor(linhas[i - 1], colCodigo);
-        if (linhaPareceCodigoValor(acima)) {
-          codigoFinal = acima;
+        const acimaB = extrairValor(linhas[i - 1], colCodigo);
+        if (linhaPareceCodigoValor(acimaB)) {
+          codigoFinal = acimaB;
           idxCodigo = i - 1;
         } else {
-          const acimaAcima = extrairValor(linhas[i - 1], colEndereco);
-          if (linhaPareceCodigoValor(acimaAcima)) {
-            codigoFinal = acimaAcima;
+          // 2. Tentar linha ACIMA na coluna ENDEREÇO (caso o nº tenha caído na col A da linha de cima)
+          const acimaA = extrairValor(linhas[i - 1], colEndereco);
+          if (linhaPareceCodigoValor(acimaA)) {
+            codigoFinal = acimaA;
             idxCodigo = i - 1;
           }
         }
       }
+      // 3. Tentar 2 linhas acima
       if (!linhaPareceCodigoValor(codigoFinal) && i - 2 >= 0) {
         const d = extrairValor(linhas[i - 2], colCodigo);
         if (linhaPareceCodigoValor(d)) {
@@ -85,10 +91,11 @@ function montarParesEnderecoCodigo(
       }
     }
 
-    if (!codigoFinal) continue;
+    if (!linhaPareceCodigoValor(codigoFinal)) continue;
 
     const virtualEndereco: LinhaRaw = { ...linha };
     virtualEndereco[colCodigo] = codigoFinal;
+
     pares.push({
       endereco: virtualEndereco,
       codigo: linhas[idxCodigo] ?? linha,
@@ -112,66 +119,57 @@ export async function lerPlanilha(file: File): Promise<PlanilhaPreview> {
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) throw new Error('Planilha vazia');
 
-  const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+  const linhasJson = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
     defval: '',
     raw: false,
   });
 
-  if (!json.length) throw new Error('A planilha não possui dados');
+  if (!linhasJson.length) throw new Error('A planilha não possui dados');
 
-  const cabecalhos = Object.keys(json[0]).filter((c) => String(c).trim() !== '');
+  const cabecalhos = Object.keys(linhasJson[0]).filter((c) => String(c).trim() !== '');
   if (!cabecalhos.length) throw new Error('Não foi possível identificar cabeçalhos');
 
+  // Chute inicial para colunas (mesmo que usuário mude depois, só para amostra)
   const colEnderecoGuess =
     cabecalhos.find((c) => /endere|rua|av|lograd|cidade|bairro|cep|local/i.test(c)) ??
     cabecalhos[0];
   const colCodigoGuess =
-    cabecalhos.find((c) => /nume|cod|id|rota|ordem|seq/i.test(c)) ??
+    cabecalhos.find((c) => /posi[çc][aã]o|nume|cod|id|rota|ordem|seq/i.test(c)) ??
     (cabecalhos[1] ?? cabecalhos[0]);
 
-  const pares = montarParesEnderecoCodigo(json, colEnderecoGuess, colCodigoGuess);
+  const pares = montarParesEnderecoCodigo(linhasJson, colEnderecoGuess, colCodigoGuess);
   const amostraRaw = pares.slice(0, 5);
-  const amostra: Record<string, string>[] = amostraRaw.map((p) => {
-    const out: Record<string, string> = {};
-    for (const h of cabecalhos) {
-      const vEnd = extrairValor(p.endereco, h);
-      const vCod = extrairValor(p.codigo, h);
-      out[h] = vEnd || vCod;
-    }
-    return out;
-  });
+  const amostra: Record<string, string>[] = amostraRaw.length
+    ? amostraRaw.map((p) => {
+        const out: Record<string, string> = {};
+        for (const h of cabecalhos) {
+          const vEnd = extrairValor(p.endereco, h);
+          const vCod = extrairValor(p.codigo, h);
+          out[h] = vEnd || vCod;
+        }
+        return out;
+      })
+    : linhasJson.slice(0, 5).map((linha) => {
+        const out: Record<string, string> = {};
+        for (const h of cabecalhos) out[h] = String(linha[h] ?? '').trim();
+        return out;
+      });
 
   return {
-    arquivo: file,
+    arquivoNome: file.name,
+    arquivoTamanho: file.size,
     hash,
     cabecalhos,
-    amostra: amostra.length ? amostra : json.slice(0, 5).map((linha) => {
-      const out: Record<string, string> = {};
-      for (const h of cabecalhos) out[h] = String(linha[h] ?? '').trim();
-      return out;
-    }),
-    totalLinhas: pares.length || json.length,
+    amostra,
+    totalLinhas: pares.length || linhasJson.length,
+    linhasJson, // ← CHAVE: NÃO precisamos reabrir o File nunca mais!
   };
 }
 
-export function processarRegistros(
-  preview: PlanilhaPreview,
+function processarLinhasJson(
+  json: LinhaRaw[],
   mapeamento: MapeamentoColunas,
 ): RegistroPlanilha[] {
-  return processarRegistrosFromFile(preview.arquivo, mapeamento);
-}
-
-function processarRegistrosFromFile(
-  file: File,
-  mapeamento: MapeamentoColunas,
-): RegistroPlanilha[] {
-  const wb = XLSX.read(file, { type: 'file' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-    defval: '',
-    raw: false,
-  });
-
   const colEndereco = mapeamento.enderecoCompleto ?? '';
   const colCodigo = mapeamento.codigo ?? '';
 
@@ -248,7 +246,11 @@ function processarRegistrosFromFile(
         estado,
         cep,
         enderecoCompleto,
-        linhaOriginal: { endereco: par.idxEndereco, codigo: par.idxCodigo, dados: linha },
+        linhaOriginal: {
+          endereco: par.idxEndereco,
+          codigo: par.idxCodigo,
+          dados: linha,
+        },
       };
       r.normalizado = normalizarEndereco(r);
 
@@ -262,56 +264,24 @@ function processarRegistrosFromFile(
     return saida;
   }
 
+  // Fallback: sem endereçoCompleto ou sem codigo (raro)
   for (const linha of json) {
     const get = (campo: keyof MapeamentoColunas) => {
       const col = mapeamento[campo];
       return col ? String(linha[col] ?? '').trim() : '';
     };
 
-    let logradouro = '';
-    let numero = '';
-    let complemento = '';
-    let bairro = '';
-    let cidade = '';
-    let estado = '';
-    let cep = '';
-    let enderecoCompleto = '';
-
-    if (mapeamento.enderecoCompleto) {
-      enderecoCompleto = get('enderecoCompleto');
-      const partes = enderecoCompleto.split(/[,;\-–]/).map((p) => p.trim());
-      if (partes[0]) {
-        const mRua = partes[0].match(/^(.+?)(?:\s+)(\d+.*)?$/);
-        if (mRua) {
-          logradouro = mRua[1].trim();
-          if (mRua[2]) numero = mRua[2].trim();
-        } else {
-          logradouro = partes[0];
-        }
-      }
-      if (partes[1] && !numero) {
-        const mn = partes[1].match(/\d+/);
-        if (mn) numero = mn[0];
-        else complemento = partes[1];
-      }
-      if (partes[2]) {
-        if (!bairro) bairro = partes[2];
-        else if (!cidade) cidade = partes[2];
-      }
-      const mCep = enderecoCompleto.match(/\d{5}[-\s]?\d{3}/);
-      if (mCep) cep = mCep[0];
-    }
-
-    if (mapeamento.logradouro) logradouro = get('logradouro') || logradouro;
-    if (mapeamento.numero) numero = get('numero') || numero;
-    if (mapeamento.complemento) complemento = get('complemento') || complemento;
-    if (mapeamento.bairro) bairro = get('bairro') || bairro;
-    if (mapeamento.cidade) cidade = get('cidade') || cidade;
-    if (mapeamento.estado) estado = get('estado') || estado;
-    if (mapeamento.cep) cep = get('cep') || cep;
-
+    const logradouro = get('logradouro');
+    const numero = get('numero');
+    const complemento = get('complemento');
+    const bairro = get('bairro');
+    const cidade = get('cidade');
+    const estado = get('estado');
+    const cep = get('cep');
     const codigo = get('codigo');
+
     if (!codigo) continue;
+    if (!logradouro) continue;
 
     const r: RegistroPlanilha = {
       id: gerarId(),
@@ -323,43 +293,92 @@ function processarRegistrosFromFile(
       cidade,
       estado,
       cep,
-      enderecoCompleto,
-      linhaOriginal: linha as Record<string, unknown>,
+      enderecoCompleto: [
+        [logradouro, numero].filter((x): x is string => Boolean(x)).join(', '),
+        bairro,
+        cidade,
+        estado,
+        cep,
+      ]
+        .filter((x): x is string => Boolean(x))
+        .join(' - '),
+      linhaOriginal: { endereco: -1, codigo: -1, dados: linha },
     };
     r.normalizado = normalizarEndereco(r);
-
-    const chave = `${r.normalizado.logradouro}|${r.normalizado.numero}|${r.normalizado.cep}|${r.codigo}`;
-    if (vistos.has(chave)) continue;
-    vistos.add(chave);
-
     saida.push(r);
   }
 
   return saida;
 }
 
-export async function importarPlanilha(
+export function processarRegistros(
   preview: PlanilhaPreview,
   mapeamento: MapeamentoColunas,
-): Promise<RegistroPlanilha[]> {
-  const colCodigo = mapeamento.codigo;
-  if (!colCodigo) throw new Error('Selecione a coluna do código/número');
-  const temEndereco =
-    mapeamento.enderecoCompleto ||
-    (mapeamento.logradouro && (mapeamento.numero || mapeamento.cep));
-  if (!temEndereco) {
-    throw new Error(
-      'Selecione a coluna do endereço completo, ou então logradouro + número/CEP',
-    );
+): RegistroPlanilha[] {
+  // ✅ USA O JSON JÁ PARSEADO NA FASE DE PREVIEW — NUNCA MAIS TOCA NO FILE!
+  // Resolve "Cannot access file [object File]" para SEMPRE.
+  if (!preview.linhasJson || !preview.linhasJson.length) {
+    try {
+      // fallback impossível (preview já tem que ter salvo)
+      return [];
+    } catch {
+      return [];
+    }
   }
-
-  return processarRegistrosFromFile(preview.arquivo, mapeamento);
+  return processarLinhasJson(preview.linhasJson, mapeamento);
 }
 
-export async function exportarParaCsv(linhas: Record<string, unknown>[], nomeArquivo: string) {
-  if (!linhas.length) return;
-  const ws = XLSX.utils.json_to_sheet(linhas);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Dados');
-  XLSX.writeFile(wb, nomeArquivo);
+export function exportarParaCsv(
+  registros: RegistroPlanilha[] | Array<Record<string, unknown>>,
+  nomeArquivoSugestao?: string,
+): string {
+  const nomeArquivo = nomeArquivoSugestao ?? `enderecos_${Date.now()}.csv`;
+  if (!registros || !registros.length) {
+    // cria arquivo vazio para não crashar a UI
+    const vazios = '\uFEFF';
+    // salvamos arquivo se possível
+    if (typeof window !== 'undefined') {
+      try {
+        const blob = new Blob([vazios], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nomeArquivo;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } catch {
+        /* noop */
+      }
+    }
+    return vazios;
+  }
+  // Inferindo cabeçalhos dos campos da PRIMEIRA linha
+  const cabecalhos = Object.keys(registros[0]);
+  const escapar = (v: unknown) => {
+    if (v === undefined || v === null) return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[;"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const linhasCsv: string[] = [cabecalhos.join(';')];
+  for (const r of registros) {
+    const row = r as Record<string, unknown>;
+    linhasCsv.push(cabecalhos.map((h) => escapar(row[h])).join(';'));
+  }
+  const csvContent = '\uFEFF' + linhasCsv.join('\n');
+
+  // Faz download automático se estiver no browser
+  if (typeof window !== 'undefined') {
+    try {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArquivo;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      /* noop */
+    }
+  }
+  return csvContent;
 }

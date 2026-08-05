@@ -15,7 +15,6 @@ import { Loader2 } from 'lucide-react';
 export function PersistGateProvider({ children }: { children: React.ReactNode }) {
   const rehydrated = useSpreadsheetStore((s) => s.__rehydrated);
   const [ok, setOk] = React.useState(false);
-  const startTs = React.useRef<number>(typeof performance !== 'undefined' ? performance.now() : 0);
 
   React.useEffect(() => {
     let cancelled = false;
