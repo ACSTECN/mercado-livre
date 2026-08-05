@@ -1,26 +1,88 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import type { MapeamentoColunas, PlanilhaImportada, RegistroPlanilha } from '@/types';
 import { gerarId } from '@/lib/utils';
 
-function safeLocalStorage(): Storage | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const _ = window.localStorage;
-    if (!_) return null;
-    // teste rápido se é acessível (modo privado as vezes bloqueia)
-    const k = '__ml_test__';
-    window.localStorage.setItem(k, '1');
-    window.localStorage.removeItem(k);
-    return window.localStorage;
-  } catch {
-    return null;
-  }
+/**
+ * Storage wrapper 100% seguro SSR / client side
+ *
+ * - Nunca toca em window/localStorage do lado do servidor
+ * - No 1o acesso no cliente: tenta localStorage
+ *   - Se falhar (bloqueado / modo privado): fallback para MEMÓRIA (Map em singleton)
+ * - Todos os erros são engolidos silenciosamente (não crasha hydration)
+ */
+function createSafeStorage(): StateStorage {
+  const inMemory = new Map<string, unknown>();
+  let isBrowser = false;
+  let canUseLocalStorage = false;
+
+  const check = () => {
+    if (typeof window === 'undefined') {
+      isBrowser = false;
+      canUseLocalStorage = false;
+      return;
+    }
+    isBrowser = true;
+    try {
+      const k = '__ml_safe_check__';
+      window.localStorage.setItem(k, '1');
+      window.localStorage.removeItem(k);
+      canUseLocalStorage = true;
+    } catch {
+      canUseLocalStorage = false;
+    }
+  };
+
+  check();
+
+  const storage: StateStorage = {
+    getItem: (name: string): string | null | Promise<string | null> => {
+      if (!isBrowser) return null;
+      check();
+      if (canUseLocalStorage) {
+        try {
+          return window.localStorage.getItem(name);
+        } catch {
+          // fallback para memória
+        }
+      }
+      const v = inMemory.get(name);
+      return v === undefined ? null : (typeof v === 'string' ? v : JSON.stringify(v));
+    },
+    setItem: (name: string, value: string): void | Promise<void> => {
+      if (!isBrowser) return;
+      check();
+      if (canUseLocalStorage) {
+        try {
+          window.localStorage.setItem(name, value);
+          return;
+        } catch {
+          // fallback para memória abaixo
+        }
+      }
+      inMemory.set(name, value);
+    },
+    removeItem: (name: string): void | Promise<void> => {
+      if (!isBrowser) return;
+      check();
+      if (canUseLocalStorage) {
+        try {
+          window.localStorage.removeItem(name);
+        } catch {
+          /* noop */
+        }
+      }
+      inMemory.delete(name);
+    },
+  };
+
+  return storage;
 }
 
 type SpreadsheetState = {
   planilha: PlanilhaImportada | null;
   mapeamento: MapeamentoColunas;
+  __rehydrated: boolean;
   set: (updater: Partial<SpreadsheetState>) => void;
   importar: (args: {
     nomeArquivo: string;
@@ -45,6 +107,7 @@ export const useSpreadsheetStore = create<SpreadsheetState>()(
     (set, get) => ({
       planilha: null,
       mapeamento: {},
+      __rehydrated: false,
       set: (u) => set((s) => ({ ...s, ...u })),
       importar: (args) => {
         const p: PlanilhaImportada = {
@@ -78,15 +141,12 @@ export const useSpreadsheetStore = create<SpreadsheetState>()(
     }),
     {
       name: 'ml_planilha_v1',
-      storage: createJSONStorage(() => safeLocalStorage() ?? new Map<string, unknown>() as unknown as Storage),
+      storage: createJSONStorage(() => createSafeStorage()),
       partialize: (s) => ({ planilha: s.planilha, mapeamento: s.mapeamento }),
-      skipHydration: true,
       onRehydrateStorage: () => {
-        // reidrata assim que o store for usado pela 1a vez no browser
-        return (_state, version) => {
+        return (_state) => {
           try {
-            // usa o hidratador nativo do zustand após reidratar
-            if (version !== undefined) void 0;
+            useSpreadsheetStore.setState({ __rehydrated: true } as Partial<SpreadsheetState>);
           } catch {
             /* noop */
           }
@@ -95,14 +155,3 @@ export const useSpreadsheetStore = create<SpreadsheetState>()(
     },
   ),
 );
-
-// Dispara reidratação segura somente após componente montar (hydration)
-if (typeof window !== 'undefined') {
-  Promise.resolve().then(() => {
-    try {
-      void useSpreadsheetStore.persist.rehydrate?.();
-    } catch {
-      /* noop */
-    }
-  });
-}
