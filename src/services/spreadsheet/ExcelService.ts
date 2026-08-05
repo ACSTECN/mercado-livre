@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import type { MapeamentoColunas, RegistroPlanilha } from '@/types';
 import { normalizarEndereco } from '../address/AddressNormalizer';
 import { gerarId, hashArquivo } from '@/lib/utils';
-import { REGEX_PREFIXOS_LOGRADOURO, REGEX_LIMPEZA_OCR } from '@/lib/regex';
+import { REGEX_PREFIXOS_LOGRADOURO } from '@/lib/regex';
 
 export type PlanilhaPreview = {
   arquivo: File;
