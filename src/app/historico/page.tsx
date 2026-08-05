@@ -1,6 +1,9 @@
 'use client';
 
 import * as React from 'react';
+
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';

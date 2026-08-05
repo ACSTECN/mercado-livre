@@ -3,6 +3,21 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { MapeamentoColunas, PlanilhaImportada, RegistroPlanilha } from '@/types';
 import { gerarId } from '@/lib/utils';
 
+function safeLocalStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const _ = window.localStorage;
+    if (!_) return null;
+    // teste rápido se é acessível (modo privado as vezes bloqueia)
+    const k = '__ml_test__';
+    window.localStorage.setItem(k, '1');
+    window.localStorage.removeItem(k);
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 type SpreadsheetState = {
   planilha: PlanilhaImportada | null;
   mapeamento: MapeamentoColunas;
@@ -63,8 +78,31 @@ export const useSpreadsheetStore = create<SpreadsheetState>()(
     }),
     {
       name: 'ml_planilha_v1',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeLocalStorage() ?? new Map<string, unknown>() as unknown as Storage),
       partialize: (s) => ({ planilha: s.planilha, mapeamento: s.mapeamento }),
+      skipHydration: true,
+      onRehydrateStorage: () => {
+        // reidrata assim que o store for usado pela 1a vez no browser
+        return (_state, version) => {
+          try {
+            // usa o hidratador nativo do zustand após reidratar
+            if (version !== undefined) void 0;
+          } catch {
+            /* noop */
+          }
+        };
+      },
     },
   ),
 );
+
+// Dispara reidratação segura somente após componente montar (hydration)
+if (typeof window !== 'undefined') {
+  Promise.resolve().then(() => {
+    try {
+      void useSpreadsheetStore.persist.rehydrate?.();
+    } catch {
+      /* noop */
+    }
+  });
+}
