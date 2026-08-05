@@ -96,10 +96,10 @@ export function ColumnMapper({
               </div>
               <div>
                 <p className="text-[13.5px] font-bold text-neutral-900 leading-snug">
-                  Mapeamento padrão: coluna A = endereço · coluna B = número
+                  Mapeamento padrão: endereço = coluna A · número = coluna B
                 </p>
-                <p className="text-[12px] text-neutral-700 mt-0.5">
-                  O sistema já tentou detectar automaticamente. Confira abaixo.
+                <p className="text-[12px] text-neutral-700 mt-0.5 leading-relaxed">
+                  O sistema já detecta automaticamente quando o <b>número está 1 linha ACIMA</b> do endereço (formato trio: nº → endereço → "1 unidades") e também quando estão na mesma linha. Linhas com "unidades" são ignoradas.
                 </p>
               </div>
             </div>
