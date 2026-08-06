@@ -65,6 +65,7 @@ export default function EscanearPage() {
   const reset = useScanStore((s) => s.reset);
 
   const [etapa, setEtapa] = React.useState<Etapa>('escolha');
+  const [origemBusca, setOrigemBusca] = React.useState<'ocr' | 'manual' | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
   const [copiado, setCopiado] = React.useState(false);
   const [validParse, setValidParse] = React.useState<{ valido: boolean; camposFaltando: string[] }>({
@@ -75,6 +76,24 @@ export default function EscanearPage() {
   const inputUploadRef = React.useRef<HTMLInputElement>(null);
 
   const planilhaValida = planilha && planilha.registros.length > 0;
+
+  const iniciarBuscaManual = () => {
+    reset();
+    setEndereco({
+      logradouro: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+    });
+    setOcrTexto('');
+    setValidParse({ valido: true, camposFaltando: [] });
+    setErro(null);
+    setOrigemBusca('manual');
+    setEtapa('corrigir');
+  };
 
   const aoSelecionarArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -237,7 +256,7 @@ export default function EscanearPage() {
 
       {etapa === 'escolha' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Card>
               <CardContent className="!p-5 flex flex-col gap-4 h-full">
                 <div className="flex items-center justify-between">
@@ -256,7 +275,7 @@ export default function EscanearPage() {
                   size="lg"
                   variant="primary"
                   className="mt-auto"
-                  onClick={() => inputCameraRef.current?.click()}
+                  onClick={() => { setOrigemBusca('ocr'); inputCameraRef.current?.click(); }}
                 >
                   <CamIcon className="h-4.5 w-4.5" /> Usar câmera do celular
                 </Button>
@@ -283,8 +302,30 @@ export default function EscanearPage() {
                   </p>
                 </div>
                 <div className="mt-auto">
-                  <ImageUploader onSelecionado={aoCapturarImagem} />
+                  <ImageUploader onSelecionado={(d, f) => { setOrigemBusca('ocr'); aoCapturarImagem(d, f); }} />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="sm:col-span-2 lg:col-span-1">
+              <CardContent className="!p-5 flex flex-col gap-4 h-full">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 shadow-sm">
+                  <Search className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-900">Busca manual</h3>
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Digite ou cole o endereço direto (Rua, nº, Bairro, CEP, Cidade/UF). Sem câmera, sem OCR, bem rápido.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="mt-auto"
+                  onClick={iniciarBuscaManual}
+                >
+                  <PencilLine className="h-4.5 w-4.5" /> Digitar endereço
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -302,16 +343,19 @@ export default function EscanearPage() {
                   <li>Procure enquadrar TODO o endereço (evite cortes)</li>
                 </ul>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <Button variant="secondary" size="sm" onClick={() => inputCameraRef.current?.click()}>
+              <div className="flex gap-2 shrink-0 flex-wrap">
+                <Button variant="secondary" size="sm" onClick={() => { setOrigemBusca('ocr'); inputCameraRef.current?.click(); }}>
                   <CamIcon className="h-4 w-4" /> Câmera rápida
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => inputUploadRef.current?.click()}
+                  onClick={() => { setOrigemBusca('ocr'); inputUploadRef.current?.click(); }}
                 >
                   <Upload className="h-4 w-4" /> Galeria
+                </Button>
+                <Button variant="outline" size="sm" onClick={iniciarBuscaManual}>
+                  <Search className="h-4 w-4" /> Busca manual
                 </Button>
                 <input
                   ref={inputUploadRef}
@@ -372,26 +416,28 @@ export default function EscanearPage() {
 
       {(etapa === 'corrigir' || etapa === 'resultado') && (
         <div className="space-y-4">
-          <Card>
-            <CardHeader className="!pb-2">
-              <CardTitle className="text-[16px] flex items-center gap-2">
-                <FileText className="h-4.5 w-4.5 text-neutral-700" />
-                Texto extraído via OCR
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap rounded-xl bg-neutral-50 border border-neutral-200 p-3.5 text-[13px] leading-relaxed text-neutral-800 min-h-[72px] max-h-[200px] overflow-auto scrollbar-thin">
-                {ocrTexto || <span className="text-neutral-400">(sem texto)</span>}
-              </p>
-              {etapa === 'resultado' && (
-                <div className="mt-3 flex justify-end">
-                  <Button size="sm" variant="ghost" onClick={() => setEtapa('corrigir')}>
-                    <PencilLine className="h-3.5 w-3.5" /> Corrigir manualmente
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {origemBusca !== 'manual' && ocrTexto !== null && (
+            <Card>
+              <CardHeader className="!pb-2">
+                <CardTitle className="text-[16px] flex items-center gap-2">
+                  <FileText className="h-4.5 w-4.5 text-neutral-700" />
+                  Texto extraído via OCR
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap rounded-xl bg-neutral-50 border border-neutral-200 p-3.5 text-[13px] leading-relaxed text-neutral-800 min-h-[72px] max-h-[200px] overflow-auto scrollbar-thin">
+                  {ocrTexto || <span className="text-neutral-400">(sem texto)</span>}
+                </p>
+                {etapa === 'resultado' && (
+                  <div className="mt-3 flex justify-end">
+                    <Button size="sm" variant="ghost" onClick={() => setEtapa('corrigir')}>
+                      <PencilLine className="h-3.5 w-3.5" /> Corrigir manualmente
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {imagem && etapa === 'corrigir' && (
             <ImagemPreview src={imagem} onRefazer={() => { reset(); setEtapa('escolha'); setErro(null); }} />
@@ -399,6 +445,21 @@ export default function EscanearPage() {
 
           {etapa === 'corrigir' && (
             <>
+              {origemBusca === 'manual' && (
+                <Card className="border-violet-200 bg-violet-50/40">
+                  <CardContent className="!p-4 flex items-start gap-3">
+                    <Search className="mt-0.5 h-5 w-5 text-violet-600 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-violet-900">
+                        Busca manual · digite os dados do endereço
+                      </p>
+                      <p className="text-sm text-violet-800 mt-0.5">
+                        Quanto mais campos preencher (CEP + nº + rua), melhor a busca.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {!validParse.valido && (
                 <Card className="border-amber-200 bg-amber-50/40">
                   <CardContent className="!p-4 flex items-start gap-3">
@@ -423,10 +484,16 @@ export default function EscanearPage() {
                 <Button
                   variant="primary"
                   size="lg"
-                  onClick={() => pesquisarEndereco(endereco, ocrTexto, imagem)}
+                  onClick={() =>
+                    pesquisarEndereco(
+                      endereco,
+                      origemBusca === 'manual' ? 'Busca manual' : ocrTexto,
+                      origemBusca === 'manual' ? null : imagem,
+                    )
+                  }
                 >
                   <Search className="h-4.5 w-4.5" />
-                  Buscar novamente
+                  {origemBusca === 'manual' ? 'Buscar endereço' : 'Buscar novamente'}
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
