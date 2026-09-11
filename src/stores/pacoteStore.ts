@@ -3,7 +3,7 @@ import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, Resum
 import { PacoteService, adicionarEntregador, listarEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 
-type ContagemEntregador = { nome: string; qtd: number };
+type ContagemEntregador = { nome: string; qtd: number; retornos: number };
 
 type PacoteState = {
   pacotes: PacoteLidoLocal[];
@@ -62,12 +62,16 @@ const CHAVE_CACHE_ENTREGADOR_ATIVO = 'ml_entregador_ativo_v1';
 
 function recalcular(pacotes: PacoteLidoLocal[]): { entregadoresSaca: string[]; contagens: ContagemEntregador[] } {
   const mapaQtd = new Map<string, number>();
+  const mapaRetornos = new Map<string, number>();
   for (const p of pacotes) {
     const k = p.entregador ?? 'Sem entregador';
     mapaQtd.set(k, (mapaQtd.get(k) ?? 0) + 1);
+    if (p.status === 'retorno') mapaRetornos.set(k, (mapaRetornos.get(k) ?? 0) + 1);
   }
   const contagens: ContagemEntregador[] = [];
-  for (const [nome, qtd] of mapaQtd.entries()) contagens.push({ nome, qtd });
+  for (const [nome, qtd] of mapaQtd.entries()) {
+    contagens.push({ nome, qtd, retornos: mapaRetornos.get(nome) ?? 0 });
+  }
   contagens.sort((a, b) => b.qtd - a.qtd);
 
   const nomes = new Set<string>();

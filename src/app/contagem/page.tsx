@@ -450,13 +450,27 @@ function SeletorEntregador() {
 
   const entregadoresStore = store.entregadores;
   const entregadoresDaSaca = store.entregadoresSaca;
+  const contagensEntregadores = store.contagensEntregadores;
+
+  const mapaContagem = React.useMemo(() => {
+    const m = new Map<string, { qtd: number; retornos: number }>();
+    for (const c of contagensEntregadores) m.set(c.nome, { qtd: c.qtd, retornos: c.retornos });
+    return m;
+  }, [contagensEntregadores]);
 
   const todos = React.useMemo(() => {
     const s = new Set<string>();
     for (const e of entregadoresDaSaca) s.add(e);
     for (const e of entregadoresStore) s.add(e);
-    return Array.from(s);
-  }, [entregadoresStore, entregadoresDaSaca]);
+    const arr = Array.from(s);
+    arr.sort((a, b) => {
+      const ca = mapaContagem.get(a) ?? { qtd: 0, retornos: 0 };
+      const cb = mapaContagem.get(b) ?? { qtd: 0, retornos: 0 };
+      if (cb.qtd !== ca.qtd) return cb.qtd - ca.qtd;
+      return a.localeCompare(b, 'pt-BR');
+    });
+    return arr;
+  }, [entregadoresStore, entregadoresDaSaca, mapaContagem]);
 
   const q = query.trim();
   const qLow = q.toLowerCase();
@@ -538,10 +552,32 @@ function SeletorEntregador() {
           }`}>
             Entregador ativo
           </div>
-          <div className={`text-[14px] font-black tracking-tight truncate max-w-[180px] ${
-            ativo ? 'text-neutral-900' : 'text-amber-800'
-          }`}>
-            {ativo ?? 'Selecione ou crie'}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className={`text-[14px] font-black tracking-tight truncate max-w-[180px] ${
+              ativo ? 'text-neutral-900' : 'text-amber-800'
+            }`}>
+              {ativo ?? 'Selecione ou crie'}
+            </div>
+            {ativo && (() => {
+              const c = mapaContagem.get(ativo);
+              if (!c || c.qtd === 0) return null;
+              return (
+                <div className="inline-flex items-center gap-1 shrink-0">
+                  <span className="text-[10.5px] font-black tabular-nums bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-md">
+                    {c.qtd}
+                  </span>
+                  {c.retornos > 0 && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10.5px] font-black tabular-nums bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-md ring-1 ring-orange-200/60"
+                      title={`${c.retornos} retorno(s)`}
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      {c.retornos}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
         <ChevronDown className={`h-4 w-4 shrink-0 ${ativo ? 'text-indigo-400' : 'text-amber-500'} ${aberto ? 'rotate-180' : ''} transition`} />
@@ -619,6 +655,7 @@ function SeletorEntregador() {
               ) : (
                 filtrados.map((nome) => {
                   const selecionado = ativo === nome;
+                  const counts = mapaContagem.get(nome);
                   return (
                     <button
                       key={nome}
@@ -630,8 +667,36 @@ function SeletorEntregador() {
                           : 'hover:bg-neutral-50 text-neutral-800'
                       }`}
                     >
-                      <span className="text-[13.5px] font-bold truncate">{nome}</span>
-                      {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-[13.5px] font-bold truncate">{nome}</span>
+                      </div>
+                      <div className="shrink-0 inline-flex items-center gap-1.5">
+                        {counts && counts.qtd > 0 && (
+                          <span
+                            className={`text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
+                              selecionado
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'bg-violet-50 text-violet-700'
+                            }`}
+                          >
+                            {counts.qtd}
+                          </span>
+                        )}
+                        {counts && counts.retornos > 0 && (
+                          <span
+                            className={`inline-flex items-center gap-0.5 text-[10.5px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
+                              selecionado
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/60'
+                            }`}
+                            title={`${counts.retornos} retorno(s)`}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            {counts.retornos}
+                          </span>
+                        )}
+                        {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />}
+                      </div>
                     </button>
                   );
                 })
@@ -1358,7 +1423,7 @@ export default function ContagemPage() {
                 >
                   Todos
                 </button>
-                {contagemEntregadores.map(({ nome, qtd }) => {
+                {contagemEntregadores.map(({ nome, qtd, retornos }) => {
                   const selecionado =
                     filtroEntregador === (nome === 'Sem entregador' ? '__sem__' : nome);
                   return (
@@ -1378,11 +1443,21 @@ export default function ContagemPage() {
                     >
                       <span className="truncate max-w-[120px]">{nome}</span>
                       <span
-                        className={`tabular-nums ${
-                          selecionado ? 'text-white/90' : 'opacity-75'
+                        className={`tabular-nums inline-flex items-center gap-0.5 ${
+                          selecionado ? 'text-white/90' : 'opacity-90'
                         }`}
                       >
-                        {qtd}
+                        <span>{qtd}</span>
+                        {retornos > 0 && (
+                          <span
+                            className={`inline-flex items-center gap-0.5 px-1 rounded ${
+                              selecionado ? 'bg-white/15' : 'bg-orange-100 text-orange-700'
+                            }`}
+                          >
+                            <RefreshCw className="h-2.5 w-2.5" />
+                            {retornos}
+                          </span>
+                        )}
                       </span>
                     </button>
                   );
@@ -1390,8 +1465,9 @@ export default function ContagemPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {contagemEntregadores.slice(0, 12).map(({ nome, qtd }) => {
+              {contagemEntregadores.slice(0, 12).map(({ nome, qtd, retornos }) => {
                 const pct = pacotes.length ? Math.round((qtd / pacotes.length) * 100) : 0;
+                const pctRetorno = qtd ? Math.round((retornos / qtd) * 100) : 0;
                 const sem = nome === 'Sem entregador';
                 return (
                   <div
@@ -1410,6 +1486,19 @@ export default function ContagemPage() {
                       >
                         {nome}
                       </span>
+                      {retornos > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                            sem
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-orange-500/15 text-orange-700 ring-1 ring-orange-500/20'
+                          }`}
+                          title={`${retornos} retorno(s)`}
+                        >
+                          <RefreshCw className="h-2.5 w-2.5" />
+                          {retornos}
+                        </span>
+                      )}
                     </div>
                     <div
                       className={`text-[22px] font-black tabular-nums leading-none ${
@@ -1417,17 +1506,43 @@ export default function ContagemPage() {
                       }`}
                     >
                       {qtd}
+                      <span
+                        className={`text-[12px] font-bold ml-1 align-baseline ${
+                          sem ? 'text-neutral-500' : 'text-violet-500/80'
+                        }`}
+                      >
+                        tot.
+                      </span>
                     </div>
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+                    {retornos > 0 && (
+                      <div className="mt-1 text-[12.5px] font-black tabular-nums text-orange-700 leading-tight">
+                        {retornos}
+                        <span className="text-[10.5px] font-bold text-orange-600/80 ml-0.5">
+                          ret. · {pctRetorno}%
+                        </span>
+                      </div>
+                    )}
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-white/70 overflow-hidden relative">
                       <div
-                        className={`h-full rounded-full ${
+                        className={`absolute inset-y-0 left-0 h-full rounded-full ${
                           sem ? 'bg-neutral-400' : 'bg-violet-500'
                         }`}
                         style={{ width: `${pct}%` }}
                       />
+                      {retornos > 0 && pct > 0 && (
+                        <div
+                          className="absolute inset-y-0 right-0 h-full rounded-full bg-orange-500"
+                          style={{
+                            width: `calc(${pct}% * ${retornos / qtd})`,
+                            right: `calc(100% - ${pct}%)`,
+                            clipPath: 'inset(0 100% - right 0 round 9999px 0 0 9999px)',
+                          }}
+                        />
+                      )}
                     </div>
-                    <div className={`mt-1 text-[10px] font-bold ${sem ? 'text-neutral-500' : 'text-violet-600/80'}`}>
-                      {pct}%
+                    <div className={`mt-1 text-[10px] font-bold flex items-center justify-between ${sem ? 'text-neutral-500' : 'text-violet-600/80'}`}>
+                      <span>{pct}% da saca</span>
+                      {retornos > 0 && <span className="text-orange-600">{pctRetorno}% ret.</span>}
                     </div>
                   </div>
                 );
