@@ -10,6 +10,8 @@ const CHAVE_ENTREGADORES = 'ml_entregadores_v1';
 let _realtimeInscrito = false;
 let _realtimeCallback: ((tipo: 'pacotes' | 'sacas') => void) | null = null;
 let _realtimeRef = 0;
+let _ultimoSyncAllTs = 0;
+let forcarSyncAllRef = false;
 
 export function inscreverRealtimePacotes(
   onMudouPacotes: () => void,
@@ -26,14 +28,12 @@ export function inscreverRealtimePacotes(
     if (tipo === 'pacotes') {
       try {
         sessionStorage.removeItem('ml_pacote_store_v1');
-        localStorage.removeItem('ml_pacotes_lidos_v1');
       } catch {
         /* noop */
       }
       onMudouPacotes();
     } else {
       try {
-        localStorage.removeItem('ml_sacas_v1');
         localStorage.removeItem('ml_sacas_store_v1');
       } catch {
         /* noop */
@@ -258,7 +258,17 @@ export const PacoteService = {
       return lerLocal().sort((a, b) => b.created_at.localeCompare(a.created_at));
     }
     try {
-      await sincronizarComSupabase();
+      const agora = Date.now();
+      const forcarSync = forcarSyncAllRef;
+      if (forcarSync || agora - _ultimoSyncAllTs > 40000) {
+        forcarSyncAllRef = false;
+        _ultimoSyncAllTs = agora;
+        try {
+          await sincronizarComSupabase();
+        } catch {
+          /* noop - ainda tenta pegar do banco abaixo */
+        }
+      }
       const sb = getSupabase();
       if (!sb) return lerLocal();
 
@@ -284,17 +294,7 @@ export const PacoteService = {
         idsVistos.add(item.id);
         chavesVistas.add(k);
         const local = mapaLocal.get(item.id);
-        if (local) {
-          if (local.sincronizado === false) {
-            todos.push({ ...item, ...local, sincronizado: false });
-          } else {
-            const merged = { ...local, ...item, sincronizado: true } as PacoteLidoLocal;
-            merged.status = ((item as { status?: PacoteLidoLocal['status'] }).status ?? local.status ?? null) as PacoteLidoLocal['status'];
-            todos.push(merged);
-          }
-        } else {
-          todos.push({ ...item, sincronizado: true });
-        }
+        todos.push({ ...item, sincronizado: true });
       }
 
       for (const local of locais) {
@@ -589,6 +589,8 @@ export const PacoteService = {
   },
 
   async sincronizarAgora(): Promise<{ sincronizados: number; falhas: number; total: number; primeiroErro: string | null }> {
+    forcarSyncAllRef = true;
+    _ultimoSyncAllTs = 0;
     const r = await sincronizarComSupabase();
     console.log('[sincronia] resultado pacotes:', r);
     return r;

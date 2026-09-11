@@ -393,34 +393,78 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   },
 
   moverPacote: async (id, novoEntregador, origemMovimento = 'manual') => {
-    const resultado = await PacoteService.mover(id, novoEntregador, origemMovimento);
-    if (resultado.sucesso && resultado.pacote) {
-      const atual = get().pacotes;
-      const idx = atual.findIndex((p) => p.id === id);
-      if (idx >= 0) {
-        const nova = [...atual];
-        nova[idx] = resultado.pacote;
-        salvarCache(nova);
-        const r = recalcular(nova);
-        const patch: Partial<PacoteState> = {
-          pacotes: nova,
-          entregadoresSaca: r.entregadoresSaca,
-          contagensEntregadores: r.contagens,
-          ultimoResultadoMover: resultado,
-        };
-        if (resultado.movido) patch.ultimoMovido = resultado.pacote;
-        const cadastradosAntigos = get().entregadores;
-        if (!cadastradosAntigos.includes(novoEntregador.trim())) {
-          patch.entregadores = listarEntregadores();
-        }
-        set(patch as PacoteState);
-      } else {
-        set({ ultimoResultadoMover: resultado });
-      }
-    } else {
-      set({ ultimoResultadoMover: resultado });
+    const limpo = novoEntregador.trim();
+    if (!limpo) {
+      const r = { sucesso: false, movido: false, mensagem: 'Entregador inválido' } as const;
+      set({ ultimoResultadoMover: r });
+      return r;
     }
-    return resultado;
+    const atualPacotes = get().pacotes;
+    const idx = atualPacotes.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      const r = { sucesso: false, movido: false, mensagem: 'Pacote não encontrado' } as const;
+      set({ ultimoResultadoMover: r });
+      return r;
+    }
+    const anterior = atualPacotes[idx];
+    if (anterior.entregador === limpo) {
+      const r: ResultadoMoverPacote = {
+        sucesso: true,
+        movido: false,
+        pacote: anterior,
+        mensagem: 'Já está neste entregador',
+      };
+      set({ ultimoResultadoMover: r });
+      return r;
+    }
+    const atualizado: PacoteLidoLocal = {
+      ...anterior,
+      entregador: limpo,
+      sincronizado: false,
+    };
+    const nova = [...atualPacotes];
+    nova[idx] = atualizado;
+    salvarCache(nova);
+    const r = recalcular(nova);
+    const patch: Partial<PacoteState> = {
+      pacotes: nova,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+      ultimoMovido: atualizado,
+      ultimoResultadoMover: {
+        sucesso: true,
+        movido: true,
+        pacote: atualizado,
+        mensagem: origemMovimento === 're_scan'
+          ? `${anterior.codigo_pacote} movido para "${limpo}"`
+          : `Pacote movido para "${limpo}"`,
+      },
+    };
+    const cadastradosAntigos = get().entregadores;
+    if (!cadastradosAntigos.includes(limpo)) patch.entregadores = listarEntregadores();
+    set(patch as PacoteState);
+
+    void (async () => {
+      try {
+        await PacoteService.mover(id, limpo, origemMovimento);
+        const re = get().pacotes;
+        const i2 = re.findIndex((p) => p.id === id);
+        if (i2 >= 0) {
+          const att = { ...re[i2], sincronizado: true };
+          const nova2 = [...re];
+          nova2[i2] = att;
+          salvarCache(nova2);
+          const r2 = recalcular(nova2);
+          set({
+            pacotes: nova2,
+            entregadoresSaca: r2.entregadoresSaca,
+            contagensEntregadores: r2.contagens,
+          });
+        }
+      } catch { /* noop */ }
+    })();
+
+    return patch.ultimoResultadoMover as ResultadoMoverPacote;
   },
 
   adicionarOuMover: async (codigo, origem, extra = {}) => {
@@ -460,11 +504,15 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   },
 
   definirStatus: async (id, status) => {
-    const atualizado = await PacoteService.definirStatus(id, status);
-    if (!atualizado) return;
     const atual = get().pacotes;
     const idx = atual.findIndex((p) => p.id === id);
     if (idx < 0) return;
+    const anterior = atual[idx];
+    const atualizado: PacoteLidoLocal = {
+      ...anterior,
+      status,
+      sincronizado: false,
+    };
     const nova = [...atual];
     nova[idx] = atualizado;
     salvarCache(nova);
@@ -475,6 +523,27 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       contagensEntregadores: r.contagens,
       ultimoAlteradoStatus: { id, status, ts: Date.now() },
     });
+
+    void (async () => {
+      try {
+        const confirmado = await PacoteService.definirStatus(id, status);
+        if (!confirmado) return;
+        const re = get().pacotes;
+        const i2 = re.findIndex((p) => p.id === id);
+        if (i2 >= 0) {
+          const att = { ...re[i2], sincronizado: confirmado.sincronizado ?? true, status: confirmado.status ?? null };
+          const nova2 = [...re];
+          nova2[i2] = att;
+          salvarCache(nova2);
+          const r2 = recalcular(nova2);
+          set({
+            pacotes: nova2,
+            entregadoresSaca: r2.entregadoresSaca,
+            contagensEntregadores: r2.contagens,
+          });
+        }
+      } catch { /* noop */ }
+    })();
   },
 
   alternarStatusRetorno: async (id) => {
