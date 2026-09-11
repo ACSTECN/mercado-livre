@@ -52,7 +52,6 @@ import {
   Database,
   FileJson,
   Upload,
-  Settings2,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 import {
@@ -73,9 +72,9 @@ const MODO_META: Record<
   manual: { label: 'Digitar ID', icon: PencilLine, origem: 'manual' },
 };
 
-type TipoFeedback = 'sucesso' | 'duplicado' | 'erro' | 'movido' | 'retorno' | null;
+type TipoFeedback = 'sucesso' | 'duplicado' | 'erro' | 'movido' | null;
 
-function beep(tipo: 'sucesso' | 'erro' | 'movido' | 'retorno') {
+function beep(tipo: 'sucesso' | 'erro' | 'movido') {
   try {
     if (typeof window === 'undefined' || !(window as unknown as { AudioContext?: unknown }).AudioContext) return;
     const AC = (window as unknown as { AudioContext: typeof AudioContext }).AudioContext ||
@@ -99,13 +98,6 @@ function beep(tipo: 'sucesso' | 'erro' | 'movido' | 'retorno') {
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
       osc.start();
       osc.stop(ctx.currentTime + 0.22);
-    } else if (tipo === 'retorno') {
-      osc.frequency.value = 523;
-      osc.type = 'triangle';
-      gain.gain.setValueAtTime(0.22, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
     } else {
       osc.frequency.value = 220;
       osc.type = 'square';
@@ -872,6 +864,7 @@ function ModalMoverPacote({
                 <div className="relative flex-1">
                   <UserRound className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <Input
+                    id="modal-mover-input"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => {
@@ -882,6 +875,10 @@ function ModalMoverPacote({
                     }}
                     placeholder="Ou crie um novo entregador..."
                     className="!h-11 !pl-9"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                   />
                 </div>
               </div>
@@ -948,7 +945,6 @@ export default function ContagemPage() {
   const unicos = usePacoteStore((s) => s.unicos());
   const exportar = usePacoteStore((s) => s.exportar);
   const limparFeedback = usePacoteStore((s) => s.limparFeedback);
-  const ultimoAlteradoStatus = usePacoteStore((s) => s.ultimoAlteradoStatus);
   const abrirModalSaca = usePacoteStore((s) => s.abrirModalSaca);
   const abrirHistoricoSacas = usePacoteStore((s) => s.abrirHistoricoSacas);
   const fecharSacaAtiva = usePacoteStore((s) => s.fecharSacaAtiva);
@@ -993,23 +989,59 @@ export default function ContagemPage() {
   const [feedback, setFeedback] = React.useState<{ tipo: TipoFeedback; mensagem: string; codigo?: string } | null>(null);
   const inputLeitorRef = React.useRef<HTMLInputElement>(null);
   const inputManualRef = React.useRef<HTMLInputElement>(null);
-  const [mostrarMenuOperacoes, setMostrarMenuOperacoes] = React.useState(false);
-
-  const focarLeitor = React.useCallback(() => {
-    try {
-      if (document.activeElement === inputLeitorRef.current) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
-        if (el !== inputLeitorRef.current) return;
-      }
-    } catch { /* noop */ }
-    inputLeitorRef.current?.focus();
-  }, []);
 
   const pacoteParaMover = React.useMemo(() => {
     if (!moverId) return null;
     return pacotes.find((p) => p.id === moverId) ?? null;
   }, [moverId, pacotes]);
+
+  const focarLeitor = React.useCallback(() => {
+    if (modo === 'leitor') {
+      try {
+        inputLeitorRef.current?.focus({ preventScroll: true });
+      } catch {
+        try { inputLeitorRef.current?.focus(); } catch { /* noop */ }
+      }
+    }
+  }, [modo]);
+
+  const clicandoModalMoverRef = React.useRef(false);
+  React.useEffect(() => {
+    clicandoModalMoverRef.current = !!moverId;
+  }, [moverId]);
+
+  React.useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (clicandoModalMoverRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.tagName === 'TEXTAREA' || target.closest('textarea')) return;
+      if (target.id === 'filtro-busca') return;
+      if (target.id === 'leitor-input' || target.closest('#leitor-input')) return;
+      if (target.id === 'modal-mover-input' || target.closest('#modal-mover-input')) return;
+      setTimeout(() => focarLeitor(), 300);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [focarLeitor]);
+
+  const onBlurLeitorCondicional = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const rel = (e.relatedTarget ?? document.activeElement) as HTMLElement | null;
+    if (rel) {
+      if (
+        rel.tagName === 'BUTTON' ||
+        rel.tagName === 'A' ||
+        rel.tagName === 'INPUT' ||
+        rel.tagName === 'SELECT' ||
+        rel.tagName === 'TEXTAREA' ||
+        rel.tagName === 'LABEL' ||
+        rel.closest('button,a,input,select,textarea,label,[role="button"],[role="tabindex"],[tabindex]')
+      ) {
+        return;
+      }
+    }
+    setTimeout(() => focarLeitor(), 50);
+  }, [focarLeitor]);
 
   React.useEffect(() => {
     try {
@@ -1033,43 +1065,9 @@ export default function ContagemPage() {
   }, [inscreverRealtime]);
 
   React.useEffect(() => {
-    const t = setTimeout(() => {
-      if (modo === 'leitor') focarLeitor();
-      else if (modo === 'manual') inputManualRef.current?.focus();
-    }, 0);
-    return () => {};
+    focarLeitor();
+    if (modo === 'manual' && inputManualRef.current) inputManualRef.current.focus();
   }, [modo, sacaAtiva, focarLeitor]);
-
-  React.useEffect(() => {
-    const input = inputLeitorRef.current;
-    if (!input) return;
-    const onBlur = (e: FocusEvent) => {
-      try {
-        const target = e.relatedTarget as HTMLElement | null;
-        if (target && typeof target.closest === 'function') {
-          const interativo = target.closest('button, a, input, select, textarea, label, option, [role="button"], [role="dialog"], [tabindex]');
-          if (interativo) return;
-        }
-      } catch { /* noop */ }
-      setTimeout(() => focarLeitor(), 60);
-    };
-    input.addEventListener('blur', onBlur);
-    return () => input.removeEventListener('blur', onBlur);
-  }, [focarLeitor]);
-
-  React.useEffect(() => {
-    const onClickGlobal = (e: MouseEvent) => {
-      if (modo !== 'leitor') return;
-      const target = e.target as HTMLElement | null;
-      if (!target || typeof target.closest !== 'function') return;
-      if (target.closest('#leitor-input')) return;
-      const digitacao = target.closest('input[type="text"], input:not([type]), textarea, select, [role="combobox"], [contenteditable="true"]');
-      if (digitacao) return;
-      setTimeout(() => focarLeitor(), 300);
-    };
-    document.addEventListener('click', onClickGlobal, true);
-    return () => document.removeEventListener('click', onClickGlobal, true);
-  }, [modo, focarLeitor]);
 
   React.useEffect(() => {
     if (ultimoLido) {
@@ -1141,27 +1139,6 @@ export default function ContagemPage() {
     }, 2600);
     return () => clearTimeout(t);
   }, [ultimoResultadoMover, som, limparFeedback]);
-
-  const ultimoAltStatusTs = ultimoAlteradoStatus?.ts ?? null;
-  React.useEffect(() => {
-    if (!ultimoAlteradoStatus || !ultimoAltStatusTs) return;
-    const p = pacotes.find((x) => x.id === ultimoAlteradoStatus.id);
-    const mensagem = ultimoAlteradoStatus.status === 'retorno'
-      ? 'Marcado como retorno'
-      : 'Removido de retorno';
-    const fb: { tipo: TipoFeedback; mensagem: string; codigo?: string } = {
-      tipo: 'retorno',
-      mensagem,
-      codigo: p?.codigo_pacote,
-    };
-    if (som) beep('retorno');
-    setFeedback(fb);
-    const t = setTimeout(() => {
-      setFeedback(null);
-    }, 1900);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ultimoAltStatusTs, som, pacotes]);
 
   const processarCodigo = async (raw: string, origem: OrigemLeitura) => {
     if (!sacaAtiva) {
@@ -1277,8 +1254,6 @@ export default function ContagemPage() {
       ? 'bg-red-500 text-white'
       : feedback?.tipo === 'movido'
       ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
-      : feedback?.tipo === 'retorno'
-      ? 'bg-gradient-to-r from-orange-500 to-rose-500 text-white'
       : feedback?.tipo === 'erro'
       ? 'bg-amber-500 text-white'
       : 'bg-neutral-800 text-white';
@@ -1347,8 +1322,6 @@ export default function ContagemPage() {
                 ? 'Rota alterada 🔄'
                 : feedback.tipo === 'duplicado'
                 ? 'Duplicado ❌'
-                : feedback.tipo === 'retorno'
-                ? 'Status atualizado 📌'
                 : 'Aviso'}
               {feedback.codigo && (
                 <span className="ml-2 tabular-nums font-black opacity-95">#{feedback.codigo}</span>
@@ -1428,7 +1401,7 @@ export default function ContagemPage() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {sacas.slice(0, 24).map((s) => {
                     const r = resumos.find((x) => x.saca.id === s.id);
                     const d = new Date(s.created_at);
@@ -1440,7 +1413,7 @@ export default function ContagemPage() {
                         type="button"
                         key={s.id}
                         onClick={() => void definirSacaAtiva(s.id)}
-                        className={`group text-left rounded-2xl p-3 border transition hover:shadow-md ${
+                        className={`group text-left rounded-2xl p-3.5 border transition hover:shadow-md ${
                           ehHoje
                             ? 'bg-gradient-to-br from-blue-50 to-emerald-50 border-blue-200/60 hover:border-blue-300'
                             : 'bg-white border-neutral-200 hover:border-indigo-200'
@@ -1629,10 +1602,10 @@ export default function ContagemPage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2">
+      <section className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <Card className="relative overflow-hidden gradient-card border-emerald-200">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-ml-yellow to-ml-blue" />
-          <CardContent className="!p-3.5">
+          <CardContent className="!p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
@@ -1689,7 +1662,7 @@ export default function ContagemPage() {
         </Card>
 
         <Card>
-          <CardContent className="!p-3.5">
+          <CardContent className="!p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
@@ -1720,7 +1693,7 @@ export default function ContagemPage() {
         </Card>
 
         <Card>
-          <CardContent className="!p-3.5">
+          <CardContent className="!p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
@@ -1767,7 +1740,7 @@ export default function ContagemPage() {
         </Card>
 
         <Card>
-          <CardContent className="!p-3.5">
+          <CardContent className="!p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
@@ -1806,7 +1779,7 @@ export default function ContagemPage() {
 
       {contagemEntregadores.length > 0 && (
         <Card>
-          <CardContent className="!p-3 space-y-2.5">
+          <CardContent className="!p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Truck className="h-4 w-4 text-violet-600" />
@@ -1994,12 +1967,12 @@ export default function ContagemPage() {
                   placeholder="Aponte o leitor..."
                   value={codigoLeitor}
                   onChange={(e) => setCodigoLeitor(e.target.value)}
+                  onBlur={onBlurLeitorCondicional}
                   className="!h-14 text-lg font-bold tabular-nums tracking-wide"
                   autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  autoFocus
                 />
                 <Button
                   type="submit"
@@ -2187,7 +2160,7 @@ export default function ContagemPage() {
                     : 'hover:shadow-sm'
                 }`}
               >
-                <CardContent className="!p-3 !pl-3.5 flex items-center gap-2.5">
+                <CardContent className="!p-3.5 !pl-4 flex items-center gap-3">
                   <div className="flex w-12 shrink-0 flex-col items-center justify-center">
                     <div className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
                       #{pacotes.length - idx}
@@ -2255,12 +2228,7 @@ export default function ContagemPage() {
                   <div className="shrink-0 flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        try {
-                          if (som) beep(p.status === 'retorno' ? 'retorno' : 'retorno');
-                        } catch { /* noop */ }
-                        void alternarStatusRetorno(p.id);
-                      }}
+                      onClick={() => void alternarStatusRetorno(p.id)}
                       className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
                         p.status === 'retorno'
                           ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200 hover:bg-orange-200'
@@ -2322,90 +2290,54 @@ export default function ContagemPage() {
         {sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}
       </button>
 
-      <div className="fixed bottom-4 left-4 z-[90] flex flex-col gap-2 items-start">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setMostrarMenuOperacoes((v) => !v)}
-            className={`inline-flex h-11 items-center gap-2 rounded-full px-3 text-[13px] font-black shadow-xl ring-1 transition-all active:scale-95 ${
-              mostrarMenuOperacoes
-                ? 'bg-neutral-900 text-white ring-neutral-800'
-                : 'bg-white text-neutral-800 ring-neutral-200 hover:bg-neutral-50'
-            }`}
-            aria-label="Operações"
-          >
-            <Settings2 className={`h-4 w-4 ${mostrarMenuOperacoes ? 'animate-spin-once' : ''}`} />
-            <span className="hidden sm:inline">Operações</span>
-          </button>
+      <div className="fixed bottom-4 left-4 z-[90] flex flex-col gap-2 items-end sm:items-start">
+        <button
+          type="button"
+          onClick={async () => {
+            setDiagnostico({ etapa: 'Testando conexão com Supabase…', ok: false, detalhe: '…' });
+            try {
+              const conn = await PacoteService.testarConexaoBanco();
+              if (!conn.ok) {
+                const extraInfo = [
+                  `URL carregada: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
+                  `Anon Key: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? '✅ carregada (' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…)' : '❌ NÃO ENCONTRADA'}`,
+                ].join('\n');
+                setDiagnostico({
+                  etapa: '❌ Supabase NÃO está conectado nesse deploy',
+                  ok: false,
+                  detalhe: (conn.erro ?? 'erro desconhecido') + '\n\n' + extraInfo,
+                });
+                return;
+              }
+              setDiagnostico({
+                etapa: '✅ Supabase conectado',
+                ok: true,
+                detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}`,
+                tabelasBanco: conn.tabelas,
+              });
+              setTimeout(() => setDiagnostico(null), 12000);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              setDiagnostico({ etapa: '❌ Exceção', ok: false, detalhe: msg });
+            }
+          }}
+          className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-[13px] font-black text-neutral-800 shadow-xl ring-1 ring-neutral-200 active:scale-95 transition-all hover:bg-neutral-50"
+        >
+          <Database className="h-4 w-4 text-sky-600" />
+          Diagnóstico banco
+        </button>
 
-          {mostrarMenuOperacoes && (
-            <div className="absolute bottom-14 left-0 w-[310px] sm:w-[340px] rounded-3xl bg-white ring-1 ring-neutral-200 shadow-2xl p-2.5 animate-slide-up">
-              <button
-                type="button"
-                onClick={async () => {
-                  setDiagnostico({ etapa: 'Testando conexão com Supabase…', ok: false, detalhe: '…' });
-                  try {
-                    const conn = await PacoteService.testarConexaoBanco();
-                    if (!conn.ok) {
-                      const extraInfo = [
-                        `URL carregada: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
-                        `Anon Key: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? '✅ carregada (' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…)' : '❌ NÃO ENCONTRADA'}`,
-                      ].join('\n');
-                      setDiagnostico({
-                        etapa: '❌ Supabase NÃO está conectado nesse deploy',
-                        ok: false,
-                        detalhe: (conn.erro ?? 'erro desconhecido') + '\n\n' + extraInfo,
-                      });
-                      return;
-                    }
-                    setDiagnostico({
-                      etapa: '✅ Supabase conectado',
-                      ok: true,
-                      detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}`,
-                      tabelasBanco: conn.tabelas,
-                    });
-                    setTimeout(() => setDiagnostico(null), 12000);
-                  } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    setDiagnostico({ etapa: '❌ Exceção', ok: false, detalhe: msg });
-                  } finally {
-                    setMostrarMenuOperacoes(false);
-                  }
-                }}
-                className="w-full inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-[12.5px] font-black text-neutral-800 hover:bg-sky-50 hover:text-sky-700 transition"
-              >
-                <Database className="h-4 w-4 text-sky-600" />
-                Diagnóstico banco
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setMostrarBackup(true); setMostrarMenuOperacoes(false); }}
-                className="w-full inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-[12.5px] font-black text-neutral-800 hover:bg-amber-50 hover:text-amber-700 transition"
-              >
-                <HardDrive className="h-4 w-4 text-amber-600" />
-                Backup / Recuperar
-              </button>
-
-              <div className="my-1.5 h-px bg-neutral-100" />
-
-              <button
-                type="button"
-                onClick={() => {
-                  PacoteService.baixarArquivoBackup();
-                  setMostrarMenuOperacoes(false);
-                }}
-                className="w-full inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-[12.5px] font-black text-neutral-800 hover:bg-emerald-50 hover:text-emerald-700 transition"
-              >
-                <FileJson className="h-4 w-4 text-emerald-600" />
-                Exportar JSON rápido
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setMostrarBackup(true)}
+          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 px-4 py-3 text-[13px] font-black text-white shadow-xl shadow-amber-900/20 ring-1 ring-orange-700/10 active:scale-95 transition-all hover:brightness-110"
+        >
+          <HardDrive className="h-4 w-4" />
+          Backup / Recuperar
+        </button>
 
         {diagnostico && (
-          <div className={`w-[300px] sm:w-[400px] rounded-2xl p-3.5 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
+          <div className={`w-[300px] sm:w-[400px] rounded-2xl p-4 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
             <div className="flex items-center gap-2">
               {diagnostico.ok ? (
                 <Database className="h-5 w-5 text-sky-600" />
@@ -2420,17 +2352,19 @@ export default function ContagemPage() {
                 <p className="text-[10.5px] font-black uppercase tracking-wider text-amber-800">Como consertar em 2 minutos:</p>
                 <ol className="list-decimal list-inside space-y-0.5 mt-1 text-[10.5px] text-amber-950 leading-snug">
                   <li>Vercel → seu projeto → Settings → Environment Variables.</li>
-                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_URL</b>.</li>
-                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b>.</li>
-                  <li>Marque a checkbox <b>Production</b> ao salvar.</li>
-                  <li>Deployments → Redeploy no último deploy.</li>
-                  <li>Local: crie <code className="bg-white/60 px-1 rounded">.env.local</code> na raiz com as mesmas variáveis.</li>
+                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_URL</b> (ex: <code className="bg-white/60 px-1 rounded">https://xxxx.supabase.co</code>).</li>
+                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b> (a chave pública &quot;anon public&quot; do Supabase Project Settings → API).</li>
+                  <li>Importante: marque a checkbox <b>Production</b> ao salvar (e Preview se quiser).</li>
+                  <li>Vercel menu Deployments → clique &quot;Redeploy&quot; no último deploy (ou faça qualquer novo commit).</li>
+                  <li>Se estiver rodando LOCALMENTE (npm run dev), crie um arquivo <code className="bg-white/60 px-1 rounded">.env.local</code> na pasta do projeto com as mesmas 2 linhas.</li>
                 </ol>
               </div>
             )}
             {diagnostico.tabelasBanco && (
-              <p className="mt-2 text-[10.5px] text-neutral-500 leading-snug">
-                Se aparecerem zeros aqui e sua tela mostrar pacotes → use Backup / Recuperar → Exportar JSON para salvar antes de tudo.
+              <p className="mt-2 text-[10.5px] text-neutral-500">
+                Se aparecerem zeros aqui e sua tela mostrar 274 pacotes → os dados estão só LOCAL. Use o botão
+                laranja &quot;Backup / Recuperar&quot; e clique em &quot;Exportar JSON (BAIXAR AGORA)&quot; para
+                salvar um arquivo com tudo ANTES de qualquer coisa.
               </p>
             )}
           </div>
@@ -2451,18 +2385,19 @@ export default function ContagemPage() {
               </button>
             </div>
             <p className="text-[11.5px] text-neutral-600 mt-2 leading-snug">
-              Os registros de hoje estão vivos no armazenamento do navegador. Baixe um arquivo JSON agora para recuperar mesmo se o cache for limpo.
+              Os seus registros de hoje estão &quot;vivos&quot; no armazenamento do seu navegador. Baixe um
+              arquivo JSON AGORA para recuperar os 274 pacotes e a saca mesmo se o navegador limpar o cache.
             </p>
             <div className="grid grid-cols-2 gap-2 mt-3">
               <button
                 onClick={() => {
                   PacoteService.baixarArquivoBackup();
-                  setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo — ele é a cópia de segurança dos seus pacotes!' });
+                  setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo — ele é a cópia de segurança dos seus 274 pacotes!' });
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 px-3 py-2.5 text-[12px] font-black text-white shadow-lg active:scale-95 transition"
               >
                 <FileJson className="h-4 w-4" />
-                Exportar JSON (BAIXAR)
+                Exportar JSON (BAIXAR AGORA)
               </button>
               <button
                 onClick={() => inputArquivoRef.current?.click()}
