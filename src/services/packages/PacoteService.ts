@@ -284,7 +284,17 @@ export const PacoteService = {
         idsVistos.add(item.id);
         chavesVistas.add(k);
         const local = mapaLocal.get(item.id);
-        todos.push({ ...item, sincronizado: true });
+        if (local) {
+          if (local.sincronizado === false) {
+            todos.push({ ...item, ...local, sincronizado: false });
+          } else {
+            const merged = { ...local, ...item, sincronizado: true } as PacoteLidoLocal;
+            merged.status = ((item as { status?: PacoteLidoLocal['status'] }).status ?? local.status ?? null) as PacoteLidoLocal['status'];
+            todos.push(merged);
+          }
+        } else {
+          todos.push({ ...item, sincronizado: true });
+        }
       }
 
       for (const local of locais) {
