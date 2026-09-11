@@ -448,7 +448,7 @@ function SeletorEntregador() {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const entregadoresStore = store.entregadores;
-  const entregadoresDaSaca = store.listarEntregadoresDaSaca();
+  const entregadoresDaSaca = store.entregadoresSaca;
 
   const todos = React.useMemo(() => {
     const s = new Set<string>();
@@ -622,7 +622,7 @@ function ModalMoverPacote({
   const [movendo, setMovendo] = React.useState(false);
 
   const entregadoresStore = store.entregadores;
-  const entregadoresDaSaca = store.listarEntregadoresDaSaca();
+  const entregadoresDaSaca = store.entregadoresSaca;
 
   const opcoes = React.useMemo(() => {
     const s = new Set<string>();
@@ -800,7 +800,7 @@ export default function ContagemPage() {
   const abrirHistoricoSacas = usePacoteStore((s) => s.abrirHistoricoSacas);
   const fecharSacaAtiva = usePacoteStore((s) => s.fecharSacaAtiva);
   const entregadorAtivo = usePacoteStore((s) => s.entregadorAtivo);
-  const contagemPorEntregador = usePacoteStore((s) => s.contagemPorEntregador());
+  const contagensEntregadoresStore = usePacoteStore((s) => s.contagensEntregadores);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
@@ -974,13 +974,9 @@ export default function ContagemPage() {
   };
 
   const contagemEntregadores = React.useMemo(() => {
-    const arr: Array<{ nome: string; qtd: number }> = [];
-    for (const [nome, qtd] of contagemPorEntregador.entries()) {
-      arr.push({ nome, qtd });
-    }
-    arr.sort((a, b) => b.qtd - a.qtd);
-    return arr;
-  }, [contagemPorEntregador]);
+    if (!contagensEntregadoresStore.length) return [];
+    return [...contagensEntregadoresStore].sort((a, b) => b.qtd - a.qtd);
+  }, [contagensEntregadoresStore]);
 
   const filtrados = React.useMemo(() => {
     let lista = pacotes;
