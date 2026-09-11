@@ -1,10 +1,11 @@
-import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote } from '@/types';
+import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
 import { exportarParaCsv } from '../spreadsheet/ExcelService';
 import { pegarIdSacaAtiva } from './SacaService';
 
 const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
+const CHAVE_ENTREGADORES = 'ml_entregadores_v1';
 
 function lerLocal(): PacoteLidoLocal[] {
   try {
@@ -19,6 +20,35 @@ function lerLocal(): PacoteLidoLocal[] {
 
 function salvarLocal(lista: PacoteLidoLocal[]) {
   localStorage.setItem(CHAVE_LOCAL, JSON.stringify(lista));
+}
+
+export function listarEntregadores(): string[] {
+  try {
+    const raw = localStorage.getItem(CHAVE_ENTREGADORES);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as string[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+export function salvarEntregadores(lista: string[]) {
+  try {
+    localStorage.setItem(CHAVE_ENTREGADORES, JSON.stringify(lista));
+  } catch {
+    /* noop */
+  }
+}
+
+export function adicionarEntregador(nome: string): string[] {
+  const limpo = nome.trim();
+  if (!limpo) return listarEntregadores();
+  const atual = listarEntregadores();
+  if (atual.includes(limpo)) return atual;
+  const nova = [limpo, ...atual].slice(0, 100);
+  salvarEntregadores(nova);
+  return nova;
 }
 
 function encontrarPorCodigo(lista: PacoteLidoLocal[], codigo: string, sacaId: string | null): PacoteLidoLocal | undefined {
@@ -44,6 +74,7 @@ async function sincronizarComSupabase(): Promise<void> {
         created_at: p.created_at,
         user_id: p.user_id ?? null,
         saca_id: p.saca_id ?? null,
+        entregador: p.entregador ?? null,
       };
       const { error } = await sb
         .from('pacotes_lidos')
@@ -144,6 +175,7 @@ export const PacoteService = {
     }
 
     const saca_id = extra.saca_id ?? pegarIdSacaAtiva() ?? null;
+    const entregador = extra.entregador ?? null;
     const locais = lerLocal();
     const jaExisteLocal = encontrarPorCodigo(locais, trimmed, saca_id);
     if (jaExisteLocal) {
@@ -178,6 +210,7 @@ export const PacoteService = {
       created_at: extra.created_at ?? new Date().toISOString(),
       user_id: extra.user_id ?? null,
       saca_id,
+      entregador,
       sincronizado: false,
     };
 
@@ -197,6 +230,7 @@ export const PacoteService = {
             created_at: novo.created_at,
             user_id: novo.user_id,
             saca_id: novo.saca_id,
+            entregador: novo.entregador ?? null,
           };
           const { error } = await sb.from('pacotes_lidos').insert(payload);
           if (error && /duplicate|unique|23505/i.test(error.message ?? error.code ?? '')) {
@@ -233,6 +267,69 @@ export const PacoteService = {
       duplicado: false,
       pacote: novo,
       mensagem: `ID ${trimmed} contado com sucesso`,
+    };
+  },
+
+  async mover(
+    id: string,
+    novoEntregador: string,
+    origemMovimento: 're_scan' | 'manual' = 'manual',
+  ): Promise<ResultadoMoverPacote> {
+    const entregadorLimpo = novoEntregador.trim();
+    if (!entregadorLimpo) {
+      return { sucesso: false, movido: false, mensagem: 'Entregador inválido' };
+    }
+    const locais = lerLocal();
+    const idx = locais.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      return { sucesso: false, movido: false, mensagem: 'Pacote não encontrado localmente' };
+    }
+
+    const anterior = locais[idx];
+    if (anterior.entregador === entregadorLimpo) {
+      return { sucesso: true, movido: false, pacote: anterior, mensagem: 'Já está neste entregador' };
+    }
+
+    const atualizado: PacoteLidoLocal = {
+      ...anterior,
+      entregador: entregadorLimpo,
+      sincronizado: false,
+    };
+    locais[idx] = atualizado;
+    salvarLocal(locais);
+
+    if (isSupabaseConfigurado) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { error } = await sb
+            .from('pacotes_lidos')
+            .update({ entregador: entregadorLimpo })
+            .eq('id', id);
+          if (!error) {
+            const locais2 = lerLocal();
+            const idx2 = locais2.findIndex((p) => p.id === id);
+            if (idx2 >= 0) {
+              locais2[idx2] = { ...locais2[idx2], sincronizado: true };
+              salvarLocal(locais2);
+              atualizado.sincronizado = true;
+            }
+          }
+        }
+      } catch {
+        /* noop - marca como não sincronizado e sincroniza depois */
+      }
+    }
+
+    adicionarEntregador(entregadorLimpo);
+
+    return {
+      sucesso: true,
+      movido: true,
+      pacote: atualizado,
+      mensagem: origemMovimento === 're_scan'
+        ? `${anterior.codigo_pacote} movido para "${entregadorLimpo}"`
+        : `Pacote movido para "${entregadorLimpo}"`,
     };
   },
 
@@ -287,6 +384,7 @@ export const PacoteService = {
         ID: h.id,
         Codigo: h.codigo_pacote,
         Tipo: h.tipo ?? '',
+        Entregador: h.entregador ?? '',
         Origem: h.origem === 'camera' ? 'Câmera' : h.origem === 'leitor_externo' ? 'Leitor externo' : 'Manual',
         Data: d.toLocaleDateString('pt-BR'),
         Hora: d.toLocaleTimeString('pt-BR'),

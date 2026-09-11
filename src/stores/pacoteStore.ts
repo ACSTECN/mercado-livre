@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca } from '@/types';
-import { PacoteService } from '@/services/packages/PacoteService';
+import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote } from '@/types';
+import { PacoteService, adicionarEntregador, listarEntregadores } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 
 type PacoteState = {
@@ -13,8 +13,13 @@ type PacoteState = {
   ultimoLido: PacoteLidoLocal | null;
   ultimoDuplicado: PacoteLidoLocal | null;
   ultimoResultado: ResultadoAdicaoPacote | null;
+  ultimoMovido: PacoteLidoLocal | null;
+  ultimoResultadoMover: ResultadoMoverPacote | null;
   mostrarModalSaca: boolean;
   mostrarHistoricoSacas: boolean;
+
+  entregadorAtivo: string | null;
+  entregadores: string[];
 
   carregar: () => Promise<void>;
   carregarSacas: () => Promise<void>;
@@ -29,7 +34,14 @@ type PacoteState = {
   abrirHistoricoSacas: () => void;
   fecharHistoricoSacas: () => void;
 
+  definirEntregador: (nome: string | null) => void;
+  cadastrarEntregador: (nome: string) => string[];
+  listarEntregadoresDaSaca: () => string[];
+  contagemPorEntregador: () => Map<string, number>;
+
   adicionar: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<ResultadoAdicaoPacote>;
+  moverPacote: (id: string, novoEntregador: string, origemMovimento?: 'manual' | 're_scan') => Promise<ResultadoMoverPacote>;
+  adicionarOuMover: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<{ tipo: 'adicao' | 'movimento' | 'duplicado_mesmo_entregador' | 'erro'; resultado: ResultadoAdicaoPacote | ResultadoMoverPacote }>;
   remover: (id: string) => Promise<void>;
   limpar: () => Promise<void>;
   total: () => number;
@@ -41,6 +53,7 @@ type PacoteState = {
 const CHAVE_CACHE = 'ml_pacote_store_v1';
 const CHAVE_CACHE_SACAS = 'ml_sacas_store_v1';
 const CHAVE_CACHE_SACA_ATIVA = 'ml_saca_ativa_store_v1';
+const CHAVE_CACHE_ENTREGADOR_ATIVO = 'ml_entregador_ativo_v1';
 
 function carregarDoCache(): PacoteLidoLocal[] {
   try {
@@ -74,6 +87,16 @@ function carregarSacaAtivaDoCache(): Saca | null {
   }
 }
 
+function carregarEntregadorAtivoDoCache(): string | null {
+  try {
+    const raw = localStorage.getItem(CHAVE_CACHE_ENTREGADOR_ATIVO);
+    if (!raw) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
 function salvarCache(lista: PacoteLidoLocal[]) {
   try {
     sessionStorage.setItem(CHAVE_CACHE, JSON.stringify(lista));
@@ -99,6 +122,15 @@ function salvarCacheSacaAtiva(s: Saca | null) {
   }
 }
 
+function salvarCacheEntregadorAtivo(nome: string | null) {
+  try {
+    if (nome) localStorage.setItem(CHAVE_CACHE_ENTREGADOR_ATIVO, nome);
+    else localStorage.removeItem(CHAVE_CACHE_ENTREGADOR_ATIVO);
+  } catch {
+    /* noop */
+  }
+}
+
 export const usePacoteStore = create<PacoteState>((set, get) => ({
   pacotes: carregarDoCache(),
   sacas: carregarSacasDoCache(),
@@ -109,8 +141,13 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   ultimoLido: null,
   ultimoDuplicado: null,
   ultimoResultado: null,
+  ultimoMovido: null,
+  ultimoResultadoMover: null,
   mostrarModalSaca: false,
   mostrarHistoricoSacas: false,
+
+  entregadorAtivo: carregarEntregadorAtivoDoCache(),
+  entregadores: listarEntregadores(),
 
   carregarSacas: async () => {
     set({ carregandoSacas: true });
@@ -120,7 +157,14 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       const ativa = await SacaService.pegarAtiva();
       salvarCacheSacas(sacas);
       salvarCacheSacaAtiva(ativa);
-      set({ sacas, resumos, sacaAtiva: ativa, carregandoSacas: false, mostrarModalSaca: !ativa });
+      set({
+        sacas,
+        resumos,
+        sacaAtiva: ativa,
+        carregandoSacas: false,
+        mostrarModalSaca: !ativa,
+        entregadores: listarEntregadores(),
+      });
     } catch {
       set({ carregandoSacas: false });
     }
@@ -175,13 +219,45 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   abrirHistoricoSacas: () => set({ mostrarHistoricoSacas: true }),
   fecharHistoricoSacas: () => set({ mostrarHistoricoSacas: false }),
 
+  definirEntregador: (nome) => {
+    const limpo = nome ? nome.trim() : null;
+    salvarCacheEntregadorAtivo(limpo);
+    if (limpo) adicionarEntregador(limpo);
+    set({ entregadorAtivo: limpo, entregadores: listarEntregadores() });
+  },
+
+  cadastrarEntregador: (nome) => {
+    const arr = adicionarEntregador(nome);
+    set({ entregadores: arr });
+    return arr;
+  },
+
+  listarEntregadoresDaSaca: () => {
+    const pacotes = get().pacotes;
+    const nomes = new Set<string>();
+    for (const p of pacotes) {
+      if (p.entregador) nomes.add(p.entregador);
+    }
+    return Array.from(nomes);
+  },
+
+  contagemPorEntregador: () => {
+    const pacotes = get().pacotes;
+    const m = new Map<string, number>();
+    for (const p of pacotes) {
+      const k = p.entregador ?? 'Sem entregador';
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  },
+
   carregar: async () => {
     set({ carregando: true });
     try {
       if (!get().sacas.length || !get().sacaAtiva) await get().carregarSacas();
       const lista = await PacoteService.listar(get().sacaAtiva?.id ?? null);
       salvarCache(lista);
-      set({ pacotes: lista, carregando: false });
+      set({ pacotes: lista, carregando: false, entregadores: listarEntregadores() });
     } catch {
       set({ carregando: false });
     }
@@ -195,7 +271,12 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     }
     try {
       const sacaAtual = get().sacaAtiva;
-      const resultado = await PacoteService.adicionar(codigo, origem, { ...extra, saca_id: sacaAtual?.id ?? undefined });
+      const entregadorAtual = get().entregadorAtivo;
+      const resultado = await PacoteService.adicionar(codigo, origem, {
+        ...extra,
+        saca_id: sacaAtual?.id ?? undefined,
+        entregador: entregadorAtual ?? extra.entregador ?? undefined,
+      });
       if (resultado.sucesso && resultado.pacote) {
         const atual = get().pacotes;
         const jaTem = atual.some((p) => p.codigo_pacote === resultado.pacote!.codigo_pacote && p.saca_id === (sacaAtual?.id ?? null));
@@ -203,11 +284,13 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
           ? atual
           : [resultado.pacote, ...atual.filter((p) => !(p.codigo_pacote === resultado.pacote!.codigo_pacote && p.saca_id === (sacaAtual?.id ?? null)))];
         salvarCache(nova);
+        if (entregadorAtual) adicionarEntregador(entregadorAtual);
         set({
           pacotes: nova,
           ultimoLido: resultado.pacote,
           ultimoDuplicado: null,
           ultimoResultado: resultado,
+          entregadores: listarEntregadores(),
         });
       } else if (resultado.duplicado && resultado.existente) {
         const atual = get().pacotes;
@@ -237,6 +320,51 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     }
   },
 
+  moverPacote: async (id, novoEntregador, origemMovimento = 'manual') => {
+    const resultado = await PacoteService.mover(id, novoEntregador, origemMovimento);
+    if (resultado.sucesso && resultado.pacote) {
+      const atual = get().pacotes;
+      const idx = atual.findIndex((p) => p.id === id);
+      if (idx >= 0) {
+        const nova = [...atual];
+        nova[idx] = resultado.pacote;
+        salvarCache(nova);
+        set({
+          pacotes: nova,
+          ultimoMovido: resultado.movido ? resultado.pacote : null,
+          ultimoResultadoMover: resultado,
+          entregadores: listarEntregadores(),
+        });
+      }
+    }
+    return resultado;
+  },
+
+  adicionarOuMover: async (codigo, origem, extra = {}) => {
+    const sacaAtual = get().sacaAtiva;
+    const entregadorAtual = get().entregadorAtivo;
+
+    const tentativaAdicao = await get().adicionar(codigo, origem, extra);
+
+    if (tentativaAdicao.sucesso) {
+      return { tipo: 'adicao', resultado: tentativaAdicao };
+    }
+
+    if (tentativaAdicao.duplicado && tentativaAdicao.existente && entregadorAtual) {
+      const existente = tentativaAdicao.existente;
+      const entregadorDoExistente = existente.entregador ?? null;
+
+      if (entregadorDoExistente === entregadorAtual) {
+        return { tipo: 'duplicado_mesmo_entregador', resultado: tentativaAdicao };
+      }
+
+      const resultadoMover = await get().moverPacote(existente.id, entregadorAtual, 're_scan');
+      return { tipo: 'movimento', resultado: resultadoMover };
+    }
+
+    return { tipo: 'erro', resultado: tentativaAdicao };
+  },
+
   remover: async (id) => {
     await PacoteService.remover(id);
     const atual = get().pacotes.filter((p) => p.id !== id);
@@ -248,7 +376,14 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     const sacaAtual = get().sacaAtiva;
     await PacoteService.limpar(sacaAtual?.id ?? null);
     salvarCache([]);
-    set({ pacotes: [], ultimoLido: null, ultimoDuplicado: null, ultimoResultado: null });
+    set({
+      pacotes: [],
+      ultimoLido: null,
+      ultimoDuplicado: null,
+      ultimoResultado: null,
+      ultimoMovido: null,
+      ultimoResultadoMover: null,
+    });
   },
 
   total: () => get().pacotes.length,
@@ -264,6 +399,12 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   },
 
   limparFeedback: () => {
-    set({ ultimoLido: null, ultimoDuplicado: null, ultimoResultado: null });
+    set({
+      ultimoLido: null,
+      ultimoDuplicado: null,
+      ultimoResultado: null,
+      ultimoMovido: null,
+      ultimoResultadoMover: null,
+    });
   },
 }));

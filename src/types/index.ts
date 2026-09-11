@@ -137,6 +137,25 @@ export type PacoteLido = {
   created_at: string;
   user_id?: string | null;
   saca_id?: string | null;
+  entregador?: string | null;
+};
+
+export type MovimentacaoPacote = {
+  id: string;
+  pacote_id: string;
+  codigo_pacote: string;
+  saca_id: string | null;
+  entregador_anterior: string | null;
+  entregador_novo: string | null;
+  origem_movimento: 're_scan' | 'manual';
+  created_at: string;
+};
+
+export type ResultadoMoverPacote = {
+  sucesso: boolean;
+  movido: boolean;
+  pacote?: PacoteLidoLocal;
+  mensagem?: string;
 };
 
 export type PacoteLidoLocal = PacoteLido & {

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { QrCodeScanner, extrairCodigoDoJson } from '@/components/QrCodeScanner';
 import { usePacoteStore } from '@/stores/pacoteStore';
-import type { OrigemLeitura, ResultadoAdicaoPacote, Saca } from '@/types';
+import type { OrigemLeitura, ResultadoAdicaoPacote, Saca, PacoteLidoLocal, ResultadoMoverPacote } from '@/types';
 import {
   Package,
   QrCode,
@@ -42,6 +42,10 @@ import {
   Unlock,
   ListTodo,
   Plus,
+  UserRound,
+  Truck,
+  ArrowRightLeft,
+  Users,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 
@@ -56,9 +60,9 @@ const MODO_META: Record<
   manual: { label: 'Digitar ID', icon: PencilLine, origem: 'manual' },
 };
 
-type TipoFeedback = 'sucesso' | 'duplicado' | 'erro' | null;
+type TipoFeedback = 'sucesso' | 'duplicado' | 'erro' | 'movido' | null;
 
-function beep(tipo: 'sucesso' | 'erro') {
+function beep(tipo: 'sucesso' | 'erro' | 'movido') {
   try {
     if (typeof window === 'undefined' || !(window as unknown as { AudioContext?: unknown }).AudioContext) return;
     const AC = (window as unknown as { AudioContext: typeof AudioContext }).AudioContext ||
@@ -75,6 +79,13 @@ function beep(tipo: 'sucesso' | 'erro') {
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
+    } else if (tipo === 'movido') {
+      osc.frequency.value = 660;
+      osc.type = 'triangle';
+      gain.gain.setValueAtTime(0.22, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.22);
     } else {
       osc.frequency.value = 220;
       osc.type = 'square';
@@ -429,17 +440,356 @@ function ModalHistoricoSacas() {
   );
 }
 
+function SeletorEntregador() {
+  const store = usePacoteStore();
+  const [aberto, setAberto] = React.useState(false);
+  const [novo, setNovo] = React.useState('');
+  const [filtro, setFiltro] = React.useState('');
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const entregadoresStore = store.entregadores;
+  const entregadoresDaSaca = store.listarEntregadoresDaSaca();
+
+  const todos = React.useMemo(() => {
+    const s = new Set<string>();
+    for (const e of entregadoresDaSaca) s.add(e);
+    for (const e of entregadoresStore) s.add(e);
+    return Array.from(s);
+  }, [entregadoresStore, entregadoresDaSaca]);
+
+  const filtrados = React.useMemo(() => {
+    if (!filtro.trim()) return todos;
+    const q = filtro.toLowerCase();
+    return todos.filter((t) => t.toLowerCase().includes(q));
+  }, [todos, filtro]);
+
+  React.useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setAberto(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  const ativo = store.entregadorAtivo;
+
+  const escolher = (nome: string) => {
+    store.definirEntregador(nome);
+    setAberto(false);
+    setFiltro('');
+    setNovo('');
+  };
+
+  const adicionarNovo = () => {
+    const v = (novo.trim() || filtro.trim()).trim();
+    if (!v) return;
+    store.definirEntregador(v);
+    setAberto(false);
+    setFiltro('');
+    setNovo('');
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full sm:w-auto">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        className={`w-full sm:w-auto inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 transition ${
+          ativo
+            ? 'bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-200/70 hover:shadow-sm'
+            : 'bg-amber-50 border-amber-200 hover:shadow-sm'
+        }`}
+      >
+        <div
+          className={`h-8 w-8 rounded-xl flex items-center justify-center ${
+            ativo ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'
+          }`}
+        >
+          {ativo ? <Truck className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+        </div>
+        <div className="text-left min-w-0">
+          <div className={`text-[10.5px] font-bold uppercase tracking-wider ${
+            ativo ? 'text-indigo-500' : 'text-amber-600'
+          }`}>
+            Entregador ativo
+          </div>
+          <div className={`text-[14px] font-black tracking-tight truncate max-w-[180px] ${
+            ativo ? 'text-neutral-900' : 'text-amber-800'
+          }`}>
+            {ativo ?? 'Selecione ou crie'}
+          </div>
+        </div>
+        <ChevronDown className={`h-4 w-4 shrink-0 ${ativo ? 'text-indigo-400' : 'text-amber-500'} ${aberto ? 'rotate-180' : ''} transition`} />
+      </button>
+
+      {aberto && (
+        <div className="absolute z-50 top-full mt-2 left-0 right-0 sm:w-[320px] bg-white rounded-2xl shadow-2xl border border-neutral-100 p-3 animate-slide-up">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <UserRound className="h-4 w-4 text-neutral-400" />
+              <Input
+                autoFocus
+                placeholder="Buscar ou digite um novo..."
+                value={filtro}
+                onChange={(e) => {
+                  setFiltro(e.target.value);
+                  setNovo(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    adicionarNovo();
+                  }
+                }}
+                className="!h-10"
+              />
+            </div>
+
+            {(novo.trim() || filtro.trim()) && !todos.some((t) => t.toLowerCase() === (novo.trim() || filtro.trim()).toLowerCase()) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full !h-9"
+                onClick={adicionarNovo}
+              >
+                <Plus className="h-4 w-4" />
+                Criar "{novo.trim() || filtro.trim()}"
+              </Button>
+            )}
+
+            <div className="max-h-64 overflow-auto space-y-1 pr-1">
+              {!filtrados.length && !(novo.trim() || filtro.trim()) ? (
+                <div className="py-6 text-center text-[12.5px] text-neutral-500">
+                  Nenhum entregador cadastrado. Digite acima para criar o primeiro.
+                </div>
+              ) : (
+                filtrados.map((nome) => {
+                  const selecionado = ativo === nome;
+                  return (
+                    <button
+                      key={nome}
+                      type="button"
+                      onClick={() => escolher(nome)}
+                      className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
+                        selecionado
+                          ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                          : 'hover:bg-neutral-50 text-neutral-800'
+                      }`}
+                    >
+                      <span className="text-[13.5px] font-bold truncate">{nome}</span>
+                      {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {ativo && (
+              <div className="pt-1 border-t border-neutral-100">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full !h-8 !text-neutral-500"
+                  onClick={() => {
+                    store.definirEntregador(null);
+                    setAberto(false);
+                  }}
+                >
+                  <Ban className="h-3.5 w-3.5" /> Limpar seleção
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModalMoverPacote({
+  aberto,
+  pacote,
+  aoFechar,
+}: {
+  aberto: boolean;
+  pacote: PacoteLidoLocal | null;
+  aoFechar: () => void;
+}) {
+  const store = usePacoteStore();
+  const [destino, setDestino] = React.useState('');
+  const [novo, setNovo] = React.useState('');
+  const [movendo, setMovendo] = React.useState(false);
+
+  const entregadoresStore = store.entregadores;
+  const entregadoresDaSaca = store.listarEntregadoresDaSaca();
+
+  const opcoes = React.useMemo(() => {
+    const s = new Set<string>();
+    for (const e of entregadoresDaSaca) s.add(e);
+    for (const e of entregadoresStore) s.add(e);
+    return Array.from(s);
+  }, [entregadoresStore, entregadoresDaSaca]);
+
+  const destinoValido = React.useMemo(() => (destino.trim() ? destino.trim() : null), [destino]);
+
+  React.useEffect(() => {
+    if (aberto) {
+      setDestino('');
+      setNovo('');
+      setMovendo(false);
+    }
+  }, [aberto, pacote?.id]);
+
+  const confirmar = async () => {
+    if (!pacote || !destinoValido) return;
+    setMovendo(true);
+    try {
+      await store.moverPacote(pacote.id, destinoValido, 'manual');
+      aoFechar();
+    } finally {
+      setMovendo(false);
+    }
+  };
+
+  return (
+    <ModalBase aberto={aberto} aoFechar={aoFechar} maxW="max-w-md">
+      <div className="p-6 sm:p-7">
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <ArrowRightLeft className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-tight text-neutral-900">
+                Alterar rota
+              </h2>
+              <p className="text-sm text-neutral-500 mt-0.5">
+                Mover pacote para outro entregador
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={aoFechar}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {pacote && (
+          <div className="mb-5 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center text-neutral-600">
+              <Package className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[18px] font-black tabular-nums tracking-tight text-neutral-900 break-all">
+                {pacote.codigo_pacote}
+              </div>
+              <div className="text-[11.5px] text-neutral-500 mt-0.5">
+                Entregador atual:{' '}
+                <span className="font-bold text-neutral-700">
+                  {pacote.entregador ?? 'Sem entregador'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-[13px] font-bold">Entregador de destino *</Label>
+            <div className="space-y-2">
+              {opcoes.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {opcoes.map((nome) => {
+                    const selecionado = destino.trim() === nome;
+                    return (
+                      <button
+                        key={nome}
+                        type="button"
+                        onClick={() => setDestino(nome)}
+                        className={`px-3 py-1.5 rounded-xl text-[12.5px] font-bold transition ${
+                          selecionado
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-white border border-neutral-200 text-neutral-700 hover:border-indigo-300 hover:text-indigo-700'
+                        }`}
+                      >
+                        {selecionado && <CheckCircle2 className="h-3.5 w-3.5 inline mr-1" />}
+                        {nome}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <UserRound className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <Input
+                    value={novo}
+                    onChange={(e) => {
+                      setNovo(e.target.value);
+                      setDestino(e.target.value);
+                    }}
+                    placeholder="Ou crie um novo entregador..."
+                    className="!h-11 !pl-9"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              onClick={aoFechar}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              disabled={!destinoValido || movendo || !pacote}
+              onClick={confirmar}
+              className="flex-1"
+            >
+              {movendo ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Movendo...
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Mover
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </ModalBase>
+  );
+}
+
 export default function ContagemPage() {
   const pacotes = usePacoteStore((s) => s.pacotes);
   const carregando = usePacoteStore((s) => s.carregando);
   const ultimoLido = usePacoteStore((s) => s.ultimoLido);
   const ultimoDuplicado = usePacoteStore((s) => s.ultimoDuplicado);
   const ultimoResultado = usePacoteStore((s) => s.ultimoResultado);
+  const ultimoMovido = usePacoteStore((s) => s.ultimoMovido);
+  const ultimoResultadoMover = usePacoteStore((s) => s.ultimoResultadoMover);
   const sacaAtiva = usePacoteStore((s) => s.sacaAtiva);
   const resumos = usePacoteStore((s) => s.resumos);
   const carregar = usePacoteStore((s) => s.carregar);
   const carregarSacas = usePacoteStore((s) => s.carregarSacas);
-  const adicionar = usePacoteStore((s) => s.adicionar);
+  const adicionarOuMover = usePacoteStore((s) => s.adicionarOuMover);
   const remover = usePacoteStore((s) => s.remover);
   const limpar = usePacoteStore((s) => s.limpar);
   const total = usePacoteStore((s) => s.total());
@@ -449,14 +799,18 @@ export default function ContagemPage() {
   const abrirModalSaca = usePacoteStore((s) => s.abrirModalSaca);
   const abrirHistoricoSacas = usePacoteStore((s) => s.abrirHistoricoSacas);
   const fecharSacaAtiva = usePacoteStore((s) => s.fecharSacaAtiva);
+  const entregadorAtivo = usePacoteStore((s) => s.entregadorAtivo);
+  const contagemPorEntregador = usePacoteStore((s) => s.contagemPorEntregador());
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
   const [codigoLeitor, setCodigoLeitor] = React.useState('');
   const [filtro, setFiltro] = React.useState('');
+  const [filtroEntregador, setFiltroEntregador] = React.useState<string>('__todos__');
   const [exportando, setExportando] = React.useState(false);
   const [flashId, setFlashId] = React.useState<string | null>(null);
   const [shakeId, setShakeId] = React.useState<string | null>(null);
+  const [moverId, setMoverId] = React.useState<string | null>(null);
   const [som, setSom] = React.useState<boolean>(() => {
     try {
       const raw = localStorage.getItem('ml_som_contagem');
@@ -468,6 +822,11 @@ export default function ContagemPage() {
   const [feedback, setFeedback] = React.useState<{ tipo: TipoFeedback; mensagem: string; codigo?: string } | null>(null);
   const inputLeitorRef = React.useRef<HTMLInputElement>(null);
   const inputManualRef = React.useRef<HTMLInputElement>(null);
+
+  const pacoteParaMover = React.useMemo(() => {
+    if (!moverId) return null;
+    return pacotes.find((p) => p.id === moverId) ?? null;
+  }, [moverId, pacotes]);
 
   React.useEffect(() => {
     try {
@@ -498,6 +857,15 @@ export default function ContagemPage() {
   }, [ultimoLido]);
 
   React.useEffect(() => {
+    if (ultimoMovido) {
+      setFlashId(ultimoMovido.id);
+      const t = setTimeout(() => setFlashId(null), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [ultimoMovido]);
+
+  React.useEffect(() => {
+    if (ultimoMovido && ultimoResultadoMover) return;
     if (!ultimoResultado) return;
 
     let fb: { tipo: TipoFeedback; mensagem: string; codigo?: string } | null = null;
@@ -511,7 +879,7 @@ export default function ContagemPage() {
     } else if (ultimoResultado.duplicado && ultimoResultado.existente) {
       fb = {
         tipo: 'duplicado',
-        mensagem: ultimoResultado.mensagem ?? 'ID já contado',
+        mensagem: ultimoResultado.mensagem ?? 'ID já contado no mesmo entregador',
         codigo: ultimoResultado.existente.codigo_pacote,
       };
       setShakeId(ultimoResultado.existente.id);
@@ -533,7 +901,23 @@ export default function ContagemPage() {
       }, 2500);
       return () => clearTimeout(t);
     }
-  }, [ultimoResultado, som, limparFeedback]);
+  }, [ultimoResultado, som, limparFeedback, ultimoMovido, ultimoResultadoMover]);
+
+  React.useEffect(() => {
+    if (!ultimoResultadoMover || !ultimoResultadoMover.movido) return;
+    const fb: { tipo: TipoFeedback; mensagem: string; codigo?: string } = {
+      tipo: 'movido',
+      mensagem: ultimoResultadoMover.mensagem ?? 'Rota alterada',
+      codigo: ultimoResultadoMover.pacote?.codigo_pacote,
+    };
+    if (som) beep('movido');
+    setFeedback(fb);
+    const t = setTimeout(() => {
+      setFeedback(null);
+      limparFeedback();
+    }, 2600);
+    return () => clearTimeout(t);
+  }, [ultimoResultadoMover, som, limparFeedback]);
 
   const processarCodigo = async (raw: string, origem: OrigemLeitura) => {
     if (!sacaAtiva) {
@@ -542,7 +926,7 @@ export default function ContagemPage() {
     }
     const extraido = extrairCodigoDoJson(raw);
     if (!extraido.codigo) return;
-    await adicionar(extraido.codigo, origem, { tipo: extraido.tipo });
+    await adicionarOuMover(extraido.codigo, origem, { tipo: extraido.tipo });
   };
 
   const onCodigoCamera = (codigo: string, raw?: string) => {
@@ -589,16 +973,34 @@ export default function ContagemPage() {
     void fecharSacaAtiva();
   };
 
+  const contagemEntregadores = React.useMemo(() => {
+    const arr: Array<{ nome: string; qtd: number }> = [];
+    for (const [nome, qtd] of contagemPorEntregador.entries()) {
+      arr.push({ nome, qtd });
+    }
+    arr.sort((a, b) => b.qtd - a.qtd);
+    return arr;
+  }, [contagemPorEntregador]);
+
   const filtrados = React.useMemo(() => {
-    if (!filtro.trim()) return pacotes;
+    let lista = pacotes;
+    if (filtroEntregador !== '__todos__') {
+      if (filtroEntregador === '__sem__') {
+        lista = lista.filter((p) => !p.entregador);
+      } else {
+        lista = lista.filter((p) => p.entregador === filtroEntregador);
+      }
+    }
+    if (!filtro.trim()) return lista;
     const q = filtro.trim().toLowerCase();
-    return pacotes.filter(
+    return lista.filter(
       (p) =>
         p.codigo_pacote.toLowerCase().includes(q) ||
         (p.tipo ?? '').toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q),
+        p.id.toLowerCase().includes(q) ||
+        (p.entregador ?? '').toLowerCase().includes(q),
     );
-  }, [pacotes, filtro]);
+  }, [pacotes, filtro, filtroEntregador]);
 
   const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
 
@@ -607,6 +1009,8 @@ export default function ContagemPage() {
       ? 'bg-emerald-500 text-white'
       : feedback?.tipo === 'duplicado'
       ? 'bg-red-500 text-white'
+      : feedback?.tipo === 'movido'
+      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
       : feedback?.tipo === 'erro'
       ? 'bg-amber-500 text-white'
       : 'bg-neutral-800 text-white';
@@ -617,6 +1021,11 @@ export default function ContagemPage() {
     <div className="space-y-4 animate-slide-up">
       <ModalNovaSaca />
       <ModalHistoricoSacas />
+      <ModalMoverPacote
+        aberto={!!pacoteParaMover}
+        pacote={pacoteParaMover}
+        aoFechar={() => setMoverId(null)}
+      />
 
       {feedback && (
         <div
@@ -626,12 +1035,20 @@ export default function ContagemPage() {
             <CheckCircle2 className="h-5 w-5 shrink-0" />
           ) : feedback.tipo === 'duplicado' ? (
             <Ban className="h-5 w-5 shrink-0" />
+          ) : feedback.tipo === 'movido' ? (
+            <ArrowRightLeft className="h-5 w-5 shrink-0" />
           ) : (
             <AlertTriangle className="h-5 w-5 shrink-0" />
           )}
           <div className="min-w-0">
             <div className="font-black text-[14px] leading-tight">
-              {feedback.tipo === 'sucesso' ? 'Contado ✅' : feedback.tipo === 'duplicado' ? 'Duplicado ❌' : 'Aviso'}
+              {feedback.tipo === 'sucesso'
+                ? 'Contado ✅'
+                : feedback.tipo === 'movido'
+                ? 'Rota alterada 🔄'
+                : feedback.tipo === 'duplicado'
+                ? 'Duplicado ❌'
+                : 'Aviso'}
               {feedback.codigo && (
                 <span className="ml-2 tabular-nums font-black opacity-95">#{feedback.codigo}</span>
               )}
@@ -644,13 +1061,13 @@ export default function ContagemPage() {
       )}
 
       <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
               Contagem de pacotes
             </h1>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {sacaAtiva ? (
               <button
                 onClick={abrirHistoricoSacas}
@@ -677,6 +1094,7 @@ export default function ContagemPage() {
                 <span className="text-[13px] font-bold text-amber-800">Selecione uma saca</span>
               </button>
             )}
+            <SeletorEntregador />
             {sacaAtiva?.descricao && (
               <p className="text-sm text-neutral-500 truncate max-w-[320px]">
                 {sacaAtiva.descricao}
@@ -768,11 +1186,19 @@ export default function ContagemPage() {
                 </span>
               </div>
             )}
-            {ultimoDuplicado && !ultimoLido && (
+            {ultimoDuplicado && !ultimoLido && !ultimoMovido && (
               <div className="mt-3 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
                 <Ban className="h-4 w-4 text-red-600 shrink-0" />
                 <span className="text-[12px] font-semibold text-red-800 truncate">
                   Duplicado: <span className="font-black text-red-900">#{ultimoDuplicado.codigo_pacote}</span>
+                </span>
+              </div>
+            )}
+            {ultimoMovido && (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 flex items-center gap-2 min-w-0">
+                <ArrowRightLeft className="h-4 w-4 text-amber-600 shrink-0" />
+                <span className="text-[12px] font-semibold text-amber-800 truncate">
+                  Movido: <span className="font-black text-amber-900">#{ultimoMovido.codigo_pacote}</span>
                 </span>
               </div>
             )}
@@ -809,33 +1235,135 @@ export default function ContagemPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  Status
+                  Entregadores
                 </p>
-                <p className="mt-1 text-2xl sm:text-3xl font-black tracking-tight tabular-nums">
-                  {carregando ? (
-                    <span className="text-amber-600">Carregando</span>
-                  ) : bloqueado ? (
-                    <Badge variant="warning">Sem saca</Badge>
-                  ) : (
-                    <Badge variant="success">Sincronizado</Badge>
-                  )}
+                <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-violet-600">
+                  {contagemEntregadores.filter((c) => c.nome !== 'Sem entregador').length}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 shadow-sm">
-                <Sparkles className="h-6 w-6" />
+                <Users className="h-6 w-6" />
               </div>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="mt-3 w-full !h-9"
-              onClick={() => void carregar()}
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Atualizar do banco
-            </Button>
+            {entregadorAtivo ? (
+              <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
+                <Truck className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span className="text-[12px] font-semibold text-indigo-800 truncate">
+                  Ativo: <span className="font-black text-indigo-900">{entregadorAtivo}</span>
+                </span>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span className="text-[12px] font-semibold text-amber-800 truncate">
+                  Sem entregador selecionado
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
+
+      {contagemEntregadores.length > 0 && (
+        <Card>
+          <CardContent className="!p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4 text-violet-600" />
+                <h3 className="text-[13px] font-black uppercase tracking-wider text-neutral-700">
+                  Por entregador
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFiltroEntregador('__todos__')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                    filtroEntregador === '__todos__'
+                      ? 'bg-neutral-900 text-white'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  Todos
+                </button>
+                {contagemEntregadores.map(({ nome, qtd }) => {
+                  const selecionado =
+                    filtroEntregador === (nome === 'Sem entregador' ? '__sem__' : nome);
+                  return (
+                    <button
+                      key={nome}
+                      type="button"
+                      onClick={() =>
+                        setFiltroEntregador(nome === 'Sem entregador' ? '__sem__' : nome)
+                      }
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1.5 ${
+                        selecionado
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : nome === 'Sem entregador'
+                          ? 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                      }`}
+                    >
+                      <span className="truncate max-w-[120px]">{nome}</span>
+                      <span
+                        className={`tabular-nums ${
+                          selecionado ? 'text-white/90' : 'opacity-75'
+                        }`}
+                      >
+                        {qtd}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {contagemEntregadores.slice(0, 12).map(({ nome, qtd }) => {
+                const pct = pacotes.length ? Math.round((qtd / pacotes.length) * 100) : 0;
+                const sem = nome === 'Sem entregador';
+                return (
+                  <div
+                    key={nome}
+                    className={`rounded-2xl p-3 border transition ${
+                      sem
+                        ? 'bg-neutral-50 border-neutral-200'
+                        : 'bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-200/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span
+                        className={`text-[11px] font-bold uppercase tracking-wider truncate ${
+                          sem ? 'text-neutral-500' : 'text-violet-600'
+                        }`}
+                      >
+                        {nome}
+                      </span>
+                    </div>
+                    <div
+                      className={`text-[22px] font-black tabular-nums leading-none ${
+                        sem ? 'text-neutral-800' : 'text-violet-700'
+                      }`}
+                    >
+                      {qtd}
+                    </div>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          sem ? 'bg-neutral-400' : 'bg-violet-500'
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className={`mt-1 text-[10px] font-bold ${sem ? 'text-neutral-500' : 'text-violet-600/80'}`}>
+                      {pct}%
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className={bloqueado ? 'opacity-60 pointer-events-none' : ''}>
         <CardContent className="!p-4 space-y-4">
@@ -895,6 +1423,11 @@ export default function ContagemPage() {
               <p className="text-[11.5px] text-neutral-500">
                 Dica: leitores externos enviam Enter automaticamente após cada leitura.
                 Se perder o foco, ele volta sozinho em 50ms.
+                {entregadorAtivo && (
+                  <span className="block mt-0.5 font-bold text-violet-700">
+                    ✓ Lançando em: {entregadorAtivo}
+                  </span>
+                )}
               </p>
             </form>
           )}
@@ -927,6 +1460,11 @@ export default function ContagemPage() {
                   <CheckCircle2 className="h-5 w-5" /> Contar
                 </Button>
               </div>
+              {entregadorAtivo && (
+                <p className="text-[11.5px] font-bold text-violet-700">
+                  ✓ Lançando em: {entregadorAtivo}
+                </p>
+              )}
             </form>
           )}
         </CardContent>
@@ -945,6 +1483,12 @@ export default function ContagemPage() {
           </div>
           <div className="text-[11.5px] font-semibold text-neutral-500">
             Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID na saca
+            {filtroEntregador !== '__todos__' && (
+              <span className="ml-1 text-violet-700">
+                · Filtrado por:{' '}
+                {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -957,7 +1501,13 @@ export default function ContagemPage() {
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-neutral-900">
-                {pacotes.length ? 'Nenhum resultado na busca' : bloqueado ? 'Selecione uma saca para começar' : 'Nenhum pacote contado'}
+                {pacotes.length
+                  ? filtroEntregador !== '__todos__'
+                    ? 'Nenhum pacote no filtro de entregador'
+                    : 'Nenhum resultado na busca'
+                  : bloqueado
+                  ? 'Selecione uma saca para começar'
+                  : 'Nenhum pacote contado'}
               </h3>
               <p className="text-sm text-neutral-600 mt-1">
                 {pacotes.length
@@ -1021,7 +1571,7 @@ export default function ContagemPage() {
                     </div>
                   </div>
 
-                  <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[18px] sm:text-[20px] font-black tracking-tight tabular-nums text-neutral-900 break-all">
                         {p.codigo_pacote}
@@ -1029,6 +1579,14 @@ export default function ContagemPage() {
                       {p.tipo && (
                         <Badge variant="info" className="!py-0.5">
                           tipo: {p.tipo}
+                        </Badge>
+                      )}
+                      {p.entregador && (
+                        <Badge
+                          className="!py-0.5 !bg-violet-100 !text-violet-700 !border-violet-200"
+                        >
+                          <Truck className="h-3 w-3 mr-1" />
+                          {p.entregador}
                         </Badge>
                       )}
                       <Badge variant={oMeta.variant} className="!py-0.5">
@@ -1052,15 +1610,26 @@ export default function ContagemPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => void remover(p.id)}
-                    className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 transition"
-                    aria-label="Remover"
-                    title="Remover da contagem"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
+                  <div className="shrink-0 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMoverId(p.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-500 hover:bg-amber-50 hover:text-amber-700 transition"
+                      aria-label="Mover entregador"
+                      title="Alterar rota / entregador"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void remover(p.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 transition"
+                      aria-label="Remover"
+                      title="Remover da contagem"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </div>
                 </CardContent>
               </Card>
             );
