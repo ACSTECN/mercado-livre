@@ -17,6 +17,7 @@ type PacoteState = {
   ultimoResultado: ResultadoAdicaoPacote | null;
   ultimoMovido: PacoteLidoLocal | null;
   ultimoResultadoMover: ResultadoMoverPacote | null;
+  ultimoAlteradoStatus: { id: string; status: StatusPacote | null; ts: number } | null;
   mostrarModalSaca: boolean;
   mostrarHistoricoSacas: boolean;
 
@@ -182,6 +183,7 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   ultimoResultado: null,
   ultimoMovido: null,
   ultimoResultadoMover: null,
+  ultimoAlteradoStatus: null,
   mostrarModalSaca: false,
   mostrarHistoricoSacas: false,
 
@@ -466,7 +468,13 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     const nova = [...atual];
     nova[idx] = atualizado;
     salvarCache(nova);
-    set({ pacotes: nova });
+    const r = recalcular(nova);
+    set({
+      pacotes: nova,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+      ultimoAlteradoStatus: { id, status, ts: Date.now() },
+    });
   },
 
   alternarStatusRetorno: async (id) => {
