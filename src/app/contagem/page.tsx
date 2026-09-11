@@ -443,8 +443,7 @@ function ModalHistoricoSacas() {
 function SeletorEntregador() {
   const store = usePacoteStore();
   const [aberto, setAberto] = React.useState(false);
-  const [novo, setNovo] = React.useState('');
-  const [filtro, setFiltro] = React.useState('');
+  const [query, setQuery] = React.useState('');
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const entregadoresStore = store.entregadores;
@@ -457,11 +456,23 @@ function SeletorEntregador() {
     return Array.from(s);
   }, [entregadoresStore, entregadoresDaSaca]);
 
+  const q = query.trim();
+  const qLow = q.toLowerCase();
+
+  const matchExato = React.useMemo(() => {
+    if (!q) return null;
+    return todos.find((t) => t.toLowerCase() === qLow) ?? null;
+  }, [todos, q, qLow]);
+
   const filtrados = React.useMemo(() => {
-    if (!filtro.trim()) return todos;
-    const q = filtro.toLowerCase();
-    return todos.filter((t) => t.toLowerCase().includes(q));
-  }, [todos, filtro]);
+    if (!q) return todos;
+    const restantes = todos.filter((t) => !(matchExato && t.toLowerCase() === qLow));
+    const comeca = restantes.filter((t) => t.toLowerCase().startsWith(qLow));
+    const contem = restantes.filter(
+      (t) => !t.toLowerCase().startsWith(qLow) && t.toLowerCase().includes(qLow),
+    );
+    return [...comeca, ...contem];
+  }, [todos, q, qLow, matchExato]);
 
   React.useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -474,27 +485,38 @@ function SeletorEntregador() {
 
   const ativo = store.entregadorAtivo;
 
-  const escolher = (nome: string) => {
-    store.definirEntregador(nome);
+  const fechar = () => {
     setAberto(false);
-    setFiltro('');
-    setNovo('');
+    setQuery('');
   };
 
-  const adicionarNovo = () => {
-    const v = (novo.trim() || filtro.trim()).trim();
-    if (!v) return;
-    store.definirEntregador(v);
-    setAberto(false);
-    setFiltro('');
-    setNovo('');
+  const escolher = (nome: string) => {
+    store.definirEntregador(nome);
+    fechar();
+  };
+
+  const confirmar = () => {
+    if (!q) return;
+    if (matchExato) {
+      escolher(matchExato);
+      return;
+    }
+    if (filtrados.length === 1) {
+      escolher(filtrados[0]);
+      return;
+    }
+    store.definirEntregador(q);
+    fechar();
   };
 
   return (
     <div ref={containerRef} className="relative w-full sm:w-auto">
       <button
         type="button"
-        onClick={() => setAberto((v) => !v)}
+        onClick={() => {
+          setAberto((v) => !v);
+          setQuery('');
+        }}
         className={`w-full sm:w-auto inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 transition ${
           ativo
             ? 'bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-200/70 hover:shadow-sm'
@@ -524,44 +546,73 @@ function SeletorEntregador() {
       </button>
 
       {aberto && (
-        <div className="absolute z-50 top-full mt-2 left-0 right-0 sm:w-[320px] bg-white rounded-2xl shadow-2xl border border-neutral-100 p-3 animate-slide-up">
-          <div className="space-y-2">
+        <div className="absolute z-50 top-full mt-2 left-0 right-0 sm:w-[340px] bg-white rounded-2xl shadow-2xl border border-neutral-100 p-3 animate-slide-up">
+          <div className="space-y-2.5">
             <div className="flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-neutral-400" />
+              <UserRound className="h-4 w-4 text-neutral-400 shrink-0" />
               <Input
                 autoFocus
-                placeholder="Buscar ou digite um novo..."
-                value={filtro}
-                onChange={(e) => {
-                  setFiltro(e.target.value);
-                  setNovo(e.target.value);
-                }}
+                placeholder="Digite o nome do entregador..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    adicionarNovo();
+                    confirmar();
                   }
                 }}
-                className="!h-10"
+                className="!h-11 !text-[14px]"
               />
             </div>
 
-            {(novo.trim() || filtro.trim()) && !todos.some((t) => t.toLowerCase() === (novo.trim() || filtro.trim()).toLowerCase()) && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full !h-9"
-                onClick={adicionarNovo}
-              >
-                <Plus className="h-4 w-4" />
-                Criar "{novo.trim() || filtro.trim()}"
-              </Button>
+            {q && (
+              <div className="space-y-1.5">
+                {matchExato ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full !h-10 justify-start gap-2"
+                    onClick={confirmar}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <div className="text-left flex-1 min-w-0">
+                      <div className="text-[13px] font-black leading-tight truncate">Selecionar "{matchExato}"</div>
+                      <div className="text-[10.5px] font-bold uppercase tracking-wider opacity-80">existente · Enter</div>
+                    </div>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full !h-10 justify-start gap-2"
+                    onClick={confirmar}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <div className="text-left flex-1 min-w-0">
+                      <div className="text-[13px] font-black leading-tight truncate">Cadastrar "{q}"</div>
+                      <div className="text-[10.5px] font-bold uppercase tracking-wider opacity-85">novo entregador · Enter</div>
+                    </div>
+                  </Button>
+                )}
+
+                {filtrados.length === 1 && !matchExato && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full !h-9 justify-start"
+                    onClick={() => escolher(filtrados[0])}
+                  >
+                    <span className="text-neutral-400 mr-1">ou</span>
+                    <span className="font-bold truncate">{filtrados[0]}</span>
+                  </Button>
+                )}
+              </div>
             )}
 
-            <div className="max-h-64 overflow-auto space-y-1 pr-1">
-              {!filtrados.length && !(novo.trim() || filtro.trim()) ? (
+            <div className="max-h-64 overflow-auto space-y-1 pr-1 pt-1">
+              {todos.length === 0 && !q ? (
                 <div className="py-6 text-center text-[12.5px] text-neutral-500">
-                  Nenhum entregador cadastrado. Digite acima para criar o primeiro.
+                  Digite o nome acima para criar o primeiro entregador.
                 </div>
               ) : (
                 filtrados.map((nome) => {
@@ -593,7 +644,7 @@ function SeletorEntregador() {
                   className="w-full !h-8 !text-neutral-500"
                   onClick={() => {
                     store.definirEntregador(null);
-                    setAberto(false);
+                    fechar();
                   }}
                 >
                   <Ban className="h-3.5 w-3.5" /> Limpar seleção
@@ -617,8 +668,7 @@ function ModalMoverPacote({
   aoFechar: () => void;
 }) {
   const store = usePacoteStore();
-  const [destino, setDestino] = React.useState('');
-  const [novo, setNovo] = React.useState('');
+  const [query, setQuery] = React.useState('');
   const [movendo, setMovendo] = React.useState(false);
 
   const entregadoresStore = store.entregadores;
@@ -631,12 +681,22 @@ function ModalMoverPacote({
     return Array.from(s);
   }, [entregadoresStore, entregadoresDaSaca]);
 
-  const destinoValido = React.useMemo(() => (destino.trim() ? destino.trim() : null), [destino]);
+  const q = query.trim();
+  const qLow = q.toLowerCase();
+
+  const matchExato = React.useMemo(() => {
+    if (!q) return null;
+    return opcoes.find((o) => o.toLowerCase() === qLow) ?? null;
+  }, [opcoes, q, qLow]);
+
+  const destinoValido = React.useMemo(() => {
+    if (matchExato) return matchExato;
+    return q || null;
+  }, [matchExato, q]);
 
   React.useEffect(() => {
     if (aberto) {
-      setDestino('');
-      setNovo('');
+      setQuery('');
       setMovendo(false);
     }
   }, [aberto, pacote?.id]);
@@ -703,12 +763,12 @@ function ModalMoverPacote({
               {opcoes.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {opcoes.map((nome) => {
-                    const selecionado = destino.trim() === nome;
+                    const selecionado = destinoValido === nome;
                     return (
                       <button
                         key={nome}
                         type="button"
-                        onClick={() => setDestino(nome)}
+                        onClick={() => setQuery(nome)}
                         className={`px-3 py-1.5 rounded-xl text-[12.5px] font-bold transition ${
                           selecionado
                             ? 'bg-indigo-600 text-white shadow-sm'
@@ -727,10 +787,13 @@ function ModalMoverPacote({
                 <div className="relative flex-1">
                   <UserRound className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <Input
-                    value={novo}
-                    onChange={(e) => {
-                      setNovo(e.target.value);
-                      setDestino(e.target.value);
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void confirmar();
+                      }
                     }}
                     placeholder="Ou crie um novo entregador..."
                     className="!h-11 !pl-9"
