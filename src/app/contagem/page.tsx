@@ -4,14 +4,14 @@ import * as React from 'react';
 
 export const dynamic = 'force-dynamic';
 
-import { Card, CardContent } from '@/components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { QrCodeScanner, extrairCodigoDoJson } from '@/components/QrCodeScanner';
 import { usePacoteStore } from '@/stores/pacoteStore';
-import type { OrigemLeitura, ResultadoAdicaoPacote } from '@/types';
+import type { OrigemLeitura, ResultadoAdicaoPacote, Saca } from '@/types';
 import {
   Package,
   QrCode,
@@ -30,6 +30,18 @@ import {
   Ban,
   Volume2,
   VolumeX,
+  Boxes,
+  FolderPlus,
+  FolderOpen,
+  FolderClosed,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Calendar,
+  Lock,
+  Unlock,
+  ListTodo,
+  Plus,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 
@@ -76,13 +88,357 @@ function beep(tipo: 'sucesso' | 'erro') {
   }
 }
 
+function ModalBase({
+  aberto,
+  aoFechar,
+  children,
+  maxW = 'max-w-lg',
+}: {
+  aberto: boolean;
+  aoFechar: () => void;
+  children: React.ReactNode;
+  maxW?: string;
+}) {
+  if (!aberto) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={aoFechar}
+      />
+      <div
+        className={`relative w-full ${maxW} bg-white rounded-3xl shadow-2xl animate-slide-up max-h-[92vh] overflow-hidden flex flex-col`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ModalNovaSaca() {
+  const store = usePacoteStore();
+  const [nome, setNome] = React.useState('');
+  const [descricao, setDescricao] = React.useState('');
+  const [erro, setErro] = React.useState<string | null>(null);
+  const [carregando, setCarregando] = React.useState(false);
+
+  const sugestao = React.useMemo(() => {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const aaaa = d.getFullYear();
+    return `Saca ${dd}/${mm}/${aaaa}`;
+  }, []);
+
+  React.useEffect(() => {
+    if (store.mostrarModalSaca && !nome) setNome(sugestao);
+  }, [store.mostrarModalSaca, sugestao, nome]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim()) {
+      setErro('Informe o nome da saca');
+      return;
+    }
+    try {
+      setCarregando(true);
+      await store.criarSaca(nome.trim(), descricao.trim() || undefined);
+      setNome('');
+      setDescricao('');
+      setErro(null);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao criar saca');
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  return (
+    <ModalBase aberto={store.mostrarModalSaca} aoFechar={() => {}} maxW="max-w-md">
+      <div className="p-6 sm:p-7">
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Boxes className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-tight text-neutral-900">
+                Iniciar nova saca
+              </h2>
+              <p className="text-sm text-neutral-500 mt-0.5">
+                Cada dia/lote é uma saca separada
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="saca-nome" className="text-[13px] font-bold">
+              Nome da saca *
+            </Label>
+            <Input
+              id="saca-nome"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex: Saca 11/09 Manhã"
+              className="!h-12 text-[15px] font-bold"
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="saca-desc" className="text-[13px] font-bold text-neutral-600">
+              Descrição (opcional)
+            </Label>
+            <Input
+              id="saca-desc"
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="Ex: Rota centro, entregador João..."
+              className="!h-11 text-[14px]"
+            />
+          </div>
+
+          {erro && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+              <span className="text-[12.5px] font-semibold text-red-800">{erro}</span>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            {store.sacas.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                onClick={() => {
+                  store.fecharModalSaca();
+                  store.abrirHistoricoSacas();
+                }}
+              >
+                <ListTodo className="h-4 w-4" />
+                Abrir existente
+              </Button>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={!nome.trim() || carregando}
+              className="flex-1"
+            >
+              {carregando ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <FolderPlus className="h-4 w-4" />
+                  Criar e começar
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </ModalBase>
+  );
+}
+
+function ModalHistoricoSacas() {
+  const store = usePacoteStore();
+  const [filtro, setFiltro] = React.useState('');
+  const [removendo, setRemovendo] = React.useState<string | null>(null);
+
+  const filtradas = React.useMemo(() => {
+    if (!filtro.trim()) return store.sacas;
+    const q = filtro.toLowerCase();
+    return store.sacas.filter(
+      (s) => s.nome.toLowerCase().includes(q) || (s.descricao ?? '').toLowerCase().includes(q),
+    );
+  }, [store.sacas, filtro]);
+
+  const resumoMap = React.useMemo(() => {
+    const m = new Map<string, { total: number; unicos: number }>();
+    for (const r of store.resumos) m.set(r.saca.id, { total: r.total, unicos: r.unicos });
+    return m;
+  }, [store.resumos]);
+
+  return (
+    <ModalBase
+      aberto={store.mostrarHistoricoSacas}
+      aoFechar={store.fecharHistoricoSacas}
+      maxW="max-w-xl"
+    >
+      <div className="p-6 sm:p-7 border-b border-neutral-100 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black tracking-tight text-neutral-900 flex items-center gap-2">
+            <FolderOpen className="h-5 w-5 text-ml-blue" />
+            Sacas
+          </h2>
+          <p className="text-sm text-neutral-500 mt-0.5">
+            Total de {store.sacas.length} saca(s) · clique para abrir
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              store.fecharHistoricoSacas();
+              store.abrirModalSaca();
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Nova
+          </Button>
+          <button
+            onClick={store.fecharHistoricoSacas}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="px-6 sm:px-7 pt-4">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-neutral-400" />
+          <Input
+            placeholder="Buscar saca..."
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            className="!h-10"
+          />
+        </div>
+      </div>
+
+      <div className="p-5 sm:p-7 overflow-auto space-y-2">
+        {!filtradas.length ? (
+          <div className="py-10 text-center">
+            <FolderClosed className="h-12 w-12 text-neutral-300 mx-auto" />
+            <p className="text-sm text-neutral-500 mt-2">Nenhuma saca encontrada</p>
+          </div>
+        ) : (
+          filtradas.map((s) => {
+            const resumo = resumoMap.get(s.id) ?? { total: 0, unicos: 0 };
+            const aberta = s.status === 'aberta';
+            const ativa = store.sacaAtiva?.id === s.id;
+            return (
+              <Card
+                key={s.id}
+                className={`cursor-pointer transition-all duration-200 group ${
+                  ativa
+                    ? 'ring-2 ring-ml-blue border-blue-200 bg-blue-50/40'
+                    : 'hover:shadow-md hover:-translate-y-0.5'
+                }`}
+                onClick={() => {
+                  void store.definirSacaAtiva(s.id);
+                }}
+              >
+                <CardContent className="!p-4 !pl-5 flex items-center gap-4">
+                  <div
+                    className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${
+                      aberta
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : 'bg-neutral-100 text-neutral-400'
+                    }`}
+                  >
+                    {aberta ? (
+                      <FolderOpen className="h-6 w-6" />
+                    ) : (
+                      <FolderClosed className="h-6 w-6" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-[16px] font-black tracking-tight text-neutral-900 truncate">
+                        {s.nome}
+                      </h3>
+                      <Badge variant={aberta ? 'success' : 'info'} className="!text-[10.5px] !py-0.5">
+                        {aberta ? 'Aberta' : 'Fechada'}
+                      </Badge>
+                      {ativa && (
+                        <Badge variant="warning" className="!text-[10.5px] !py-0.5">
+                          Atual
+                        </Badge>
+                      )}
+                    </div>
+                    {s.descricao && (
+                      <p className="text-[12px] text-neutral-500 truncate mt-0.5">{s.descricao}</p>
+                    )}
+                    <div className="flex items-center gap-2 text-[11.5px] text-neutral-500 mt-1">
+                      <Calendar className="h-3 w-3" />
+                      {formatarData(new Date(s.created_at).getTime())}
+                      <span className="text-neutral-300">·</span>
+                      <Hash className="h-3 w-3" />
+                      {resumo.unicos} IDs
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <p className="text-[22px] font-black tabular-nums text-ml-blue leading-none">
+                      {resumo.unicos}
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                      únicos
+                    </p>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => {
+                          if (aberta) void store.fecharSaca(s.id);
+                          else void store.reabrirSaca(s.id);
+                        }}
+                      >
+                        {aberta ? (
+                          <>
+                            <Lock className="h-3 w-3" /> Fechar
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="h-3 w-3" /> Abrir
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        disabled={removendo === s.id}
+                        onClick={() => {
+                          if (!confirm(`Remover saca "${s.nome}" e TODOS os ${resumo.unicos} pacotes dela?`)) return;
+                          setRemovendo(s.id);
+                          void store.removerSaca(s.id).finally(() => setRemovendo(null));
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-neutral-300 group-hover:text-ml-blue transition shrink-0" />
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+    </ModalBase>
+  );
+}
+
 export default function ContagemPage() {
   const pacotes = usePacoteStore((s) => s.pacotes);
   const carregando = usePacoteStore((s) => s.carregando);
   const ultimoLido = usePacoteStore((s) => s.ultimoLido);
   const ultimoDuplicado = usePacoteStore((s) => s.ultimoDuplicado);
   const ultimoResultado = usePacoteStore((s) => s.ultimoResultado);
+  const sacaAtiva = usePacoteStore((s) => s.sacaAtiva);
+  const resumos = usePacoteStore((s) => s.resumos);
   const carregar = usePacoteStore((s) => s.carregar);
+  const carregarSacas = usePacoteStore((s) => s.carregarSacas);
   const adicionar = usePacoteStore((s) => s.adicionar);
   const remover = usePacoteStore((s) => s.remover);
   const limpar = usePacoteStore((s) => s.limpar);
@@ -90,6 +446,9 @@ export default function ContagemPage() {
   const unicos = usePacoteStore((s) => s.unicos());
   const exportar = usePacoteStore((s) => s.exportar);
   const limparFeedback = usePacoteStore((s) => s.limparFeedback);
+  const abrirModalSaca = usePacoteStore((s) => s.abrirModalSaca);
+  const abrirHistoricoSacas = usePacoteStore((s) => s.abrirHistoricoSacas);
+  const fecharSacaAtiva = usePacoteStore((s) => s.fecharSacaAtiva);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
@@ -119,8 +478,8 @@ export default function ContagemPage() {
   }, [som]);
 
   React.useEffect(() => {
-    carregar();
-  }, [carregar]);
+    void carregarSacas().then(() => void carregar());
+  }, [carregarSacas, carregar]);
 
   React.useEffect(() => {
     if (modo === 'leitor' && inputLeitorRef.current) {
@@ -128,7 +487,7 @@ export default function ContagemPage() {
     } else if (modo === 'manual' && inputManualRef.current) {
       inputManualRef.current.focus();
     }
-  }, [modo]);
+  }, [modo, sacaAtiva]);
 
   React.useEffect(() => {
     if (ultimoLido) {
@@ -177,6 +536,10 @@ export default function ContagemPage() {
   }, [ultimoResultado, som, limparFeedback]);
 
   const processarCodigo = async (raw: string, origem: OrigemLeitura) => {
+    if (!sacaAtiva) {
+      abrirModalSaca();
+      return;
+    }
     const extraido = extrairCodigoDoJson(raw);
     if (!extraido.codigo) return;
     await adicionar(extraido.codigo, origem, { tipo: extraido.tipo });
@@ -206,7 +569,7 @@ export default function ContagemPage() {
 
   const confirmarLimpar = () => {
     if (!pacotes.length) return;
-    if (!confirm(`Remover TODOS os ${pacotes.length} pacotes da contagem?`)) return;
+    if (!confirm(`Remover TODOS os ${pacotes.length} pacotes da saca "${sacaAtiva?.nome ?? 'atual'}"?`)) return;
     void limpar();
   };
 
@@ -220,6 +583,12 @@ export default function ContagemPage() {
     }
   };
 
+  const confirmarFecharSaca = () => {
+    if (!sacaAtiva) return;
+    if (!confirm(`Fechar a saca "${sacaAtiva.nome}"? Você poderá reabri-la depois.`)) return;
+    void fecharSacaAtiva();
+  };
+
   const filtrados = React.useMemo(() => {
     if (!filtro.trim()) return pacotes;
     const q = filtro.trim().toLowerCase();
@@ -231,6 +600,8 @@ export default function ContagemPage() {
     );
   }, [pacotes, filtro]);
 
+  const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
+
   const feedbackCor =
     feedback?.tipo === 'sucesso'
       ? 'bg-emerald-500 text-white'
@@ -240,8 +611,13 @@ export default function ContagemPage() {
       ? 'bg-amber-500 text-white'
       : 'bg-neutral-800 text-white';
 
+  const bloqueado = !sacaAtiva;
+
   return (
     <div className="space-y-4 animate-slide-up">
+      <ModalNovaSaca />
+      <ModalHistoricoSacas />
+
       {feedback && (
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-3 max-w-[92vw] w-auto animate-slide-down ${feedbackCor}`}
@@ -268,15 +644,63 @@ export default function ContagemPage() {
       )}
 
       <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
-            Contagem de pacotes
-          </h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            Câmera, leitor externo ou digitação · sem duplicatas · salvo no banco
-          </p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
+              Contagem de pacotes
+            </h1>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {sacaAtiva ? (
+              <button
+                onClick={abrirHistoricoSacas}
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200/60 px-3 py-1.5 hover:shadow-sm transition"
+              >
+                <Boxes className="h-4 w-4 text-ml-blue" />
+                <span className="text-[13px] font-black tracking-tight text-neutral-900 truncate max-w-[260px]">
+                  {sacaAtiva.nome}
+                </span>
+                <Badge
+                  variant={sacaAtiva.status === 'aberta' ? 'success' : 'info'}
+                  className="!text-[10px] !py-0.5 !px-1.5"
+                >
+                  {sacaAtiva.status === 'aberta' ? 'Aberta' : 'Fechada'}
+                </Badge>
+                <ChevronDown className="h-3.5 w-3.5 text-neutral-400" />
+              </button>
+            ) : (
+              <button
+                onClick={abrirModalSaca}
+                className="inline-flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3 py-1.5"
+              >
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <span className="text-[13px] font-bold text-amber-800">Selecione uma saca</span>
+              </button>
+            )}
+            {sacaAtiva?.descricao && (
+              <p className="text-sm text-neutral-500 truncate max-w-[320px]">
+                {sacaAtiva.descricao}
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={abrirHistoricoSacas}
+          >
+            <FolderOpen className="h-4 w-4" />
+            Sacas
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={abrirModalSaca}
+          >
+            <FolderPlus className="h-4 w-4" />
+            Nova saca
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -295,14 +719,27 @@ export default function ContagemPage() {
             <Download className="h-4 w-4" />
             {exportando ? 'Exportando...' : 'Exportar Excel'}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={confirmarLimpar}
-            disabled={!pacotes.length}
-          >
-            <Trash2 className="h-4 w-4" /> Limpar tudo
-          </Button>
+          <div className="flex gap-1">
+            {sacaAtiva && sacaAtiva.status === 'aberta' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={confirmarFecharSaca}
+                title="Fechar saca"
+              >
+                <Lock className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={confirmarLimpar}
+              disabled={!pacotes.length}
+              title="Limpar pacotes desta saca"
+            >
+              <Trash2 className="h-4 w-4" /> Limpar
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -313,10 +750,10 @@ export default function ContagemPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  Total de IDs únicos
+                  IDs únicos na saca
                 </p>
                 <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums bg-gradient-to-b from-neutral-900 to-blue-800 bg-clip-text text-transparent">
-                  {unicos}
+                  {resumoAtual?.unicos ?? unicos}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
@@ -377,6 +814,8 @@ export default function ContagemPage() {
                 <p className="mt-1 text-2xl sm:text-3xl font-black tracking-tight tabular-nums">
                   {carregando ? (
                     <span className="text-amber-600">Carregando</span>
+                  ) : bloqueado ? (
+                    <Badge variant="warning">Sem saca</Badge>
                   ) : (
                     <Badge variant="success">Sincronizado</Badge>
                   )}
@@ -398,7 +837,7 @@ export default function ContagemPage() {
         </Card>
       </section>
 
-      <Card>
+      <Card className={bloqueado ? 'opacity-60 pointer-events-none' : ''}>
         <CardContent className="!p-4 space-y-4">
           <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-neutral-100">
             {(Object.keys(MODO_META) as Modo[]).map((m) => {
@@ -493,19 +932,19 @@ export default function ContagemPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={bloqueado ? 'opacity-60' : ''}>
         <CardContent className="!p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4 text-neutral-500" />
             <Input
-              placeholder={`Buscar nos ${pacotes.length} IDs...`}
+              placeholder={`Buscar nos ${pacotes.length} IDs da saca...`}
               value={filtro}
               onChange={(e) => setFiltro(e.target.value)}
               className="!h-10"
             />
           </div>
           <div className="text-[11.5px] font-semibold text-neutral-500">
-            Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID no banco
+            Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID na saca
           </div>
         </CardContent>
       </Card>
@@ -518,14 +957,26 @@ export default function ContagemPage() {
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-neutral-900">
-                {pacotes.length ? 'Nenhum resultado na busca' : 'Nenhum pacote contado'}
+                {pacotes.length ? 'Nenhum resultado na busca' : bloqueado ? 'Selecione uma saca para começar' : 'Nenhum pacote contado'}
               </h3>
               <p className="text-sm text-neutral-600 mt-1">
                 {pacotes.length
                   ? 'Ajuste o filtro de busca.'
+                  : bloqueado
+                  ? 'Clique em "Nova saca" ou "Sacas" para escolher um lote.'
                   : 'Use a câmera, leitor externo ou digite o ID para começar.'}
               </p>
             </div>
+            {bloqueado && (
+              <div className="flex gap-2 mt-2">
+                <Button variant="primary" size="sm" onClick={abrirModalSaca}>
+                  <FolderPlus className="h-4 w-4" /> Nova saca
+                </Button>
+                <Button variant="ghost" size="sm" onClick={abrirHistoricoSacas}>
+                  <FolderOpen className="h-4 w-4" /> Abrir existente
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (

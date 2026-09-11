@@ -116,6 +116,17 @@ export const LIMIAR_ALTA_CONFIANCA = 85;
 export const LIMIAR_BAIXA_CONFIANCA = 60;
 
 export type OrigemLeitura = 'camera' | 'leitor_externo' | 'manual';
+export type StatusSaca = 'aberta' | 'fechada';
+
+export type Saca = {
+  id: string;
+  user_id?: string | null;
+  nome: string;
+  descricao?: string | null;
+  status: StatusSaca;
+  created_at: string;
+  updated_at: string;
+};
 
 export type PacoteLido = {
   id: string;
@@ -125,6 +136,7 @@ export type PacoteLido = {
   metadados?: Record<string, unknown> | null;
   created_at: string;
   user_id?: string | null;
+  saca_id?: string | null;
 };
 
 export type PacoteLidoLocal = PacoteLido & {
@@ -137,4 +149,10 @@ export type ResultadoAdicaoPacote = {
   pacote?: PacoteLidoLocal;
   existente?: PacoteLidoLocal;
   mensagem?: string;
+};
+
+export type ResumoSaca = {
+  saca: Saca;
+  total: number;
+  unicos: number;
 };
