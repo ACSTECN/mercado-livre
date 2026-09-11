@@ -145,11 +145,10 @@ async function sincronizarComSupabase(): Promise<void> {
   if (!sb) return;
 
   const locais = lerLocal();
-  const naoSincronizados = locais.filter((p) => !p.sincronizado);
-
-  for (const p of naoSincronizados) {
+  for (const p of locais) {
     try {
       const payload = {
+        id: p.id,
         codigo_pacote: p.codigo_pacote,
         tipo: p.tipo ?? null,
         origem: p.origem,
@@ -162,8 +161,8 @@ async function sincronizarComSupabase(): Promise<void> {
       };
       const { error } = await sb
         .from('pacotes_lidos')
-        .upsert({ id: p.id, ...payload }, { onConflict: 'codigo_pacote', ignoreDuplicates: true });
-      if (!error || (error && /duplicate|unique/i.test(error.message ?? ''))) {
+        .upsert(payload, { onConflict: 'id' });
+      if (!error) {
         p.sincronizado = true;
       }
     } catch {
