@@ -937,6 +937,7 @@ export default function ContagemPage() {
   const contagensEntregadoresStore = usePacoteStore((s) => s.contagensEntregadores);
   const alternarStatusRetorno = usePacoteStore((s) => s.alternarStatusRetorno);
   const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
+  const forcarSincronizacaoCompleta = usePacoteStore((s) => s.forcarSincronizacaoCompleta);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
@@ -948,6 +949,11 @@ export default function ContagemPage() {
   const [flashId, setFlashId] = React.useState<string | null>(null);
   const [shakeId, setShakeId] = React.useState<string | null>(null);
   const [moverId, setMoverId] = React.useState<string | null>(null);
+  const [sincronizando, setSincronizando] = React.useState(false);
+  const [resultadoSync, setResultadoSync] = React.useState<{
+    sacas: { sincronizados: number; falhas: number };
+    pacotes: { sincronizados: number; falhas: number };
+  } | null>(null);
   const [som, setSom] = React.useState<boolean>(() => {
     try {
       const raw = localStorage.getItem('ml_som_contagem');
@@ -2187,6 +2193,63 @@ export default function ContagemPage() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={async () => {
+          if (sincronizando) return;
+          setSincronizando(true);
+          setResultadoSync(null);
+          try {
+            const r = await forcarSincronizacaoCompleta();
+            setResultadoSync(r);
+          } finally {
+            setSincronizando(false);
+            setTimeout(() => setResultadoSync(null), 7000);
+          }
+        }}
+        disabled={sincronizando}
+        className="fixed bottom-4 right-4 z-[90] inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 px-4 py-3 text-[13px] font-black text-white shadow-xl shadow-emerald-900/20 ring-1 ring-emerald-700/10 active:scale-95 transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {sincronizando ? (
+          <RefreshCw className="h-4 w-4 animate-spin" />
+        ) : (
+          <RefreshCw className="h-4 w-4" />
+        )}
+        {sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}
+      </button>
+
+      {resultadoSync && !sincronizando && (
+        <div className="fixed bottom-20 right-4 z-[90] w-[280px] sm:w-[340px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-4 animate-slide-up">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <p className="text-[13px] font-black text-neutral-900">Sincronização concluída</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11.5px]">
+            <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
+              <p className="text-neutral-500 font-bold uppercase tracking-wider text-[10px]">Sacas</p>
+              <p className="text-neutral-900 font-black tabular-nums mt-0.5">
+                {resultadoSync.sacas.sincronizados} ok
+                {resultadoSync.sacas.falhas > 0 && (
+                  <span className="ml-1 text-red-600">· {resultadoSync.sacas.falhas} falha</span>
+                )}
+              </p>
+            </div>
+            <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
+              <p className="text-neutral-500 font-bold uppercase tracking-wider text-[10px]">Pacotes</p>
+              <p className="text-neutral-900 font-black tabular-nums mt-0.5">
+                {resultadoSync.pacotes.sincronizados} ok
+                {resultadoSync.pacotes.falhas > 0 && (
+                  <span className="ml-1 text-red-600">· {resultadoSync.pacotes.falhas} falha</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <p className="text-[10.5px] text-neutral-500 mt-2 leading-snug">
+            Abra no outro aparelho ou clique em &quot;Todas&quot; para atualizar o histórico.
+          </p>
         </div>
       )}
     </div>

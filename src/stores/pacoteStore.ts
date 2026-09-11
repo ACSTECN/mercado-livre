@@ -53,6 +53,10 @@ type PacoteState = {
   exportar: () => Promise<void>;
   limparFeedback: () => void;
   inscreverRealtime: () => () => void;
+  forcarSincronizacaoCompleta: () => Promise<{
+    sacas: { sincronizados: number; falhas: number };
+    pacotes: { sincronizados: number; falhas: number };
+  }>;
 };
 
 const CHAVE_CACHE = 'ml_pacote_store_v1';
@@ -524,5 +528,14 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       () => disparar('pacotes'),
       () => disparar('sacas'),
     );
+  },
+
+  forcarSincronizacaoCompleta: async () => {
+    console.log('[sincronia] INICIO sincronização forçada');
+    const sacas = await SacaService.sincronizarAgora();
+    const pacotes = await PacoteService.sincronizarAgora();
+    console.log('[sincronia] FIM sincronização forçada:', { sacas, pacotes });
+    void get().carregarSacas().then(() => void get().carregar());
+    return { sacas, pacotes };
   },
 }));

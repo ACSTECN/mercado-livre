@@ -38,21 +38,65 @@ export function salvarIdSacaAtiva(id: string | null) {
   }
 }
 
-async function sincronizarSacasComSupabase(): Promise<void> {
-  if (!isSupabaseConfigurado) return;
+const SACA_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function sincronizarSacasAgora(): Promise<{ sincronizados: number; falhas: number }> {
+  if (!isSupabaseConfigurado) return { sincronizados: 0, falhas: 0 };
   const sb = getSupabase();
-  if (!sb) return;
+  if (!sb) return { sincronizados: 0, falhas: 0 };
 
   const locais = lerSacasLocal();
-  for (const s of locais) {
+  let ok = 0;
+  let falha = 0;
+
+  for (let i = 0; i < locais.length; i++) {
+    const s = locais[i];
     try {
-      await sb
+      const basePayload = {
+        nome: s.nome,
+        descricao: s.descricao ?? null,
+        status: s.status ?? 'aberta',
+        created_at: s.created_at,
+        updated_at: s.updated_at ?? new Date().toISOString(),
+        user_id: s.user_id ?? null,
+      };
+      const idValido = SACA_UUID_RE.test(s.id ?? '');
+
+      if (idValido) {
+        const { error } = await sb
+          .from('sacas')
+          .upsert({ id: s.id, ...basePayload }, { onConflict: 'id' });
+        if (!error) {
+          ok += 1;
+          continue;
+        }
+        console.warn('[sincronia-sacas] upsert por id falhou, tentando insert sem id:', s.id, error);
+      }
+
+      const { data, error: insertErr } = await sb
         .from('sacas')
-        .upsert(s, { onConflict: 'id' });
-    } catch {
-      /* continua */
+        .insert(basePayload)
+        .select('id')
+        .maybeSingle();
+      if (!insertErr && data) {
+        locais[i] = { ...s, id: (data as { id: string }).id };
+        ok += 1;
+      } else {
+        if (insertErr && /duplicate|unique|23505/i.test((insertErr as { message?: string; code?: string }).message ?? (insertErr as { code?: string }).code ?? '')) {
+          ok += 1;
+        } else {
+          console.error('[sincronia-sacas] falha definitiva saca:', s.nome, insertErr);
+          falha += 1;
+        }
+      }
+    } catch (e) {
+      console.error('[sincronia-sacas] catch:', s?.nome, e);
+      falha += 1;
     }
   }
+  salvarSacasLocal(locais);
+  console.log('[sincronia-sacas] resultado sacas:', { sincronizados: ok, falhas: falha });
+  return { sincronizados: ok, falhas: falha };
 }
 
 export const SacaService = {
@@ -61,7 +105,7 @@ export const SacaService = {
       return lerSacasLocal().sort((a, b) => b.created_at.localeCompare(a.created_at));
     }
     try {
-      await sincronizarSacasComSupabase();
+      await sincronizarSacasAgora();
       const sb = getSupabase();
       if (!sb) return lerSacasLocal();
       const { data, error } = await sb
@@ -215,5 +259,9 @@ export const SacaService = {
       const unicos = new Set(daSaca.map((p) => p.codigo_pacote));
       return { saca, total: daSaca.length, unicos: unicos.size };
     });
+  },
+
+  async sincronizarAgora(): Promise<{ sincronizados: number; falhas: number }> {
+    return sincronizarSacasAgora();
   },
 };

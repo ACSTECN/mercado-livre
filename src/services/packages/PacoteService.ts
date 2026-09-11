@@ -139,16 +139,21 @@ function encontrarPorCodigo(lista: PacoteLidoLocal[], codigo: string, sacaId: st
   return lista.find((p) => p.codigo_pacote.trim() === alvo && (sacaId ? p.saca_id === sacaId : !p.saca_id));
 }
 
-async function sincronizarComSupabase(): Promise<void> {
-  if (!isSupabaseConfigurado) return;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function sincronizarComSupabase(): Promise<{ sincronizados: number; falhas: number }> {
+  if (!isSupabaseConfigurado) return { sincronizados: 0, falhas: 0 };
   const sb = getSupabase();
-  if (!sb) return;
+  if (!sb) return { sincronizados: 0, falhas: 0 };
 
   const locais = lerLocal();
-  for (const p of locais) {
+  let ok = 0;
+  let falha = 0;
+
+  for (let i = 0; i < locais.length; i++) {
+    const p = locais[i];
     try {
-      const payload = {
-        id: p.id,
+      const basePayload = {
         codigo_pacote: p.codigo_pacote,
         tipo: p.tipo ?? null,
         origem: p.origem,
@@ -159,17 +164,45 @@ async function sincronizarComSupabase(): Promise<void> {
         entregador: p.entregador ?? null,
         status: p.status ?? null,
       };
-      const { error } = await sb
-        .from('pacotes_lidos')
-        .upsert(payload, { onConflict: 'id' });
-      if (!error) {
-        p.sincronizado = true;
+
+      const idValido = UUID_RE.test(p.id ?? '');
+
+      if (idValido) {
+        const { error } = await sb
+          .from('pacotes_lidos')
+          .upsert({ id: p.id, ...basePayload }, { onConflict: 'id' });
+        if (!error) {
+          locais[i] = { ...p, sincronizado: true };
+          ok += 1;
+          continue;
+        }
+        console.warn('[sincronia] upsert pacote por id falhou, tentando insert sem id:', p.id, error);
       }
-    } catch {
-      /* continua */
+
+      const { data, error: insertErr } = await sb
+        .from('pacotes_lidos')
+        .insert(basePayload)
+        .select('id')
+        .maybeSingle();
+      if (!insertErr && data) {
+        locais[i] = { ...p, id: (data as { id: string }).id, sincronizado: true };
+        ok += 1;
+      } else {
+        if (insertErr && /duplicate|unique|23505/i.test((insertErr as { message?: string; code?: string }).message ?? (insertErr as { code?: string }).code ?? '')) {
+          locais[i] = { ...p, sincronizado: true };
+          ok += 1;
+        } else {
+          console.error('[sincronia] falha definitiva pacote:', p.codigo_pacote, insertErr);
+          falha += 1;
+        }
+      }
+    } catch (e) {
+      console.error('[sincronia] catch pacote:', p?.codigo_pacote, e);
+      falha += 1;
     }
   }
   salvarLocal(locais);
+  return { sincronizados: ok, falhas: falha };
 }
 
 async function buscarNoBancoPorCodigo(codigo: string, sacaId: string | null): Promise<PacoteLidoLocal | null> {
@@ -516,5 +549,11 @@ export const PacoteService = {
       };
     });
     await exportarParaCsv(linhas, nomeArquivo ?? `contagem_pacotes_${Date.now()}.xlsx`);
+  },
+
+  async sincronizarAgora(): Promise<{ sincronizados: number; falhas: number }> {
+    const r = await sincronizarComSupabase();
+    console.log('[sincronia] resultado pacotes:', r);
+    return r;
   },
 };
