@@ -117,6 +117,7 @@ export const LIMIAR_BAIXA_CONFIANCA = 60;
 
 export type OrigemLeitura = 'camera' | 'leitor_externo' | 'manual';
 export type StatusSaca = 'aberta' | 'fechada';
+export type StatusPacote = 'retorno';
 
 export type Saca = {
   id: string;
@@ -138,6 +139,7 @@ export type PacoteLido = {
   user_id?: string | null;
   saca_id?: string | null;
   entregador?: string | null;
+  status?: StatusPacote | null;
 };
 
 export type MovimentacaoPacote = {

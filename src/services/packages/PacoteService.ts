@@ -1,11 +1,81 @@
-import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote } from '@/types';
+import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
 import { exportarParaCsv } from '../spreadsheet/ExcelService';
 import { pegarIdSacaAtiva } from './SacaService';
 
-const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
+export const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
 const CHAVE_ENTREGADORES = 'ml_entregadores_v1';
+
+let _realtimeInscrito = false;
+let _realtimeCallback: (() => void) | null = null;
+let _realtimeRef = 0;
+
+export function inscreverRealtimePacotes(onMudouPacotes: () => void, onMudouSacas: () => void): () => void {
+  if (!isSupabaseConfigurado) return () => {};
+  const sb = getSupabase();
+  if (!sb) return () => {};
+
+  _realtimeRef += 1;
+  const meuRef = _realtimeRef;
+
+  if (_realtimeInscrito && _realtimeCallback) {
+    const antigo = _realtimeCallback;
+    _realtimeCallback = () => {
+      onMudouPacotes();
+      onMudouSacas();
+    };
+    return () => {
+        if (meuRef === _realtimeRef) {
+          _realtimeCallback = antigo;
+        }
+      };
+  }
+  _realtimeInscrito = true;
+  _realtimeCallback = () => {
+    onMudouPacotes();
+    onMudouSacas();
+  };
+
+  try {
+    const canalPacotes = sb
+      .channel('pacotes_lidos_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pacotes_lidos' },
+        () => {
+          _realtimeCallback?.();
+        },
+      )
+      .subscribe();
+
+    const canalSacas = sb
+      .channel('sacas_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sacas' },
+        () => {
+          _realtimeCallback?.();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (meuRef !== _realtimeRef) return;
+      try {
+        void sb.removeChannel(canalPacotes).catch(() => {});
+        void sb.removeChannel(canalSacas).catch(() => {});
+      } catch {
+        /* noop */
+      }
+      _realtimeInscrito = false;
+      _realtimeCallback = null;
+    };
+  } catch {
+    _realtimeInscrito = false;
+    return () => {};
+  }
+}
 
 function lerLocal(): PacoteLidoLocal[] {
   try {
@@ -75,6 +145,7 @@ async function sincronizarComSupabase(): Promise<void> {
         user_id: p.user_id ?? null,
         saca_id: p.saca_id ?? null,
         entregador: p.entregador ?? null,
+        status: p.status ?? null,
       };
       const { error } = await sb
         .from('pacotes_lidos')
@@ -211,6 +282,7 @@ export const PacoteService = {
       user_id: extra.user_id ?? null,
       saca_id,
       entregador,
+      status: extra.status ?? null,
       sincronizado: false,
     };
 
@@ -231,6 +303,7 @@ export const PacoteService = {
             user_id: novo.user_id,
             saca_id: novo.saca_id,
             entregador: novo.entregador ?? null,
+            status: novo.status ?? null,
           };
           const { error } = await sb.from('pacotes_lidos').insert(payload);
           if (error && /duplicate|unique|23505/i.test(error.message ?? error.code ?? '')) {
@@ -333,6 +406,44 @@ export const PacoteService = {
     };
   },
 
+  async definirStatus(id: string, status: StatusPacote | null): Promise<PacoteLidoLocal | null> {
+    const locais = lerLocal();
+    const idx = locais.findIndex((p) => p.id === id);
+    if (idx < 0) return null;
+    const anterior = locais[idx];
+    const atualizado: PacoteLidoLocal = {
+      ...anterior,
+      status,
+      sincronizado: false,
+    };
+    locais[idx] = atualizado;
+    salvarLocal(locais);
+
+    if (isSupabaseConfigurado) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { error } = await sb
+            .from('pacotes_lidos')
+            .update({ status })
+            .eq('id', id);
+          if (!error) {
+            const locais2 = lerLocal();
+            const idx2 = locais2.findIndex((p) => p.id === id);
+            if (idx2 >= 0) {
+              locais2[idx2] = { ...locais2[idx2], sincronizado: true };
+              salvarLocal(locais2);
+              atualizado.sincronizado = true;
+            }
+          }
+        }
+      } catch {
+        /* noop */
+      }
+    }
+    return atualizado;
+  },
+
   async remover(id: string): Promise<void> {
     const locais = lerLocal().filter((p) => p.id !== id);
     salvarLocal(locais);
@@ -385,6 +496,7 @@ export const PacoteService = {
         Codigo: h.codigo_pacote,
         Tipo: h.tipo ?? '',
         Entregador: h.entregador ?? '',
+        Status: h.status ?? '',
         Origem: h.origem === 'camera' ? 'Câmera' : h.origem === 'leitor_externo' ? 'Leitor externo' : 'Manual',
         Data: d.toLocaleDateString('pt-BR'),
         Hora: d.toLocaleTimeString('pt-BR'),

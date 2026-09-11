@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote } from '@/types';
-import { PacoteService, adicionarEntregador, listarEntregadores } from '@/services/packages/PacoteService';
+import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote, StatusPacote } from '@/types';
+import { PacoteService, adicionarEntregador, listarEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 
 type ContagemEntregador = { nome: string; qtd: number };
@@ -44,12 +44,15 @@ type PacoteState = {
   adicionar: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<ResultadoAdicaoPacote>;
   moverPacote: (id: string, novoEntregador: string, origemMovimento?: 'manual' | 're_scan') => Promise<ResultadoMoverPacote>;
   adicionarOuMover: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<{ tipo: 'adicao' | 'movimento' | 'duplicado_mesmo_entregador' | 'erro'; resultado: ResultadoAdicaoPacote | ResultadoMoverPacote }>;
+  definirStatus: (id: string, status: StatusPacote | null) => Promise<void>;
+  alternarStatusRetorno: (id: string) => Promise<void>;
   remover: (id: string) => Promise<void>;
   limpar: () => Promise<void>;
   total: () => number;
   unicos: () => number;
   exportar: () => Promise<void>;
   limparFeedback: () => void;
+  inscreverRealtime: () => () => void;
 };
 
 const CHAVE_CACHE = 'ml_pacote_store_v1';
@@ -448,6 +451,24 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     });
   },
 
+  definirStatus: async (id, status) => {
+    const atualizado = await PacoteService.definirStatus(id, status);
+    if (!atualizado) return;
+    const atual = get().pacotes;
+    const idx = atual.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const nova = [...atual];
+    nova[idx] = atualizado;
+    salvarCache(nova);
+    set({ pacotes: nova });
+  },
+
+  alternarStatusRetorno: async (id) => {
+    const atual = get().pacotes.find((p) => p.id === id);
+    const novo: StatusPacote | null = atual?.status === 'retorno' ? null : 'retorno';
+    await get().definirStatus(id, novo);
+  },
+
   limpar: async () => {
     const sacaAtual = get().sacaAtiva;
     await PacoteService.limpar(sacaAtual?.id ?? null);
@@ -485,5 +506,21 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       ultimoMovido: null,
       ultimoResultadoMover: null,
     });
+  },
+
+  inscreverRealtime: () => {
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const disparar = (tipo: 'pacotes' | 'sacas') => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        const g = get();
+        if (tipo === 'sacas') void g.carregarSacas().then(() => void g.carregar());
+        else void g.carregar();
+      }, 120);
+    };
+    return inscreverRealtimePacotes(
+      () => disparar('pacotes'),
+      () => disparar('sacas'),
+    );
   },
 }));

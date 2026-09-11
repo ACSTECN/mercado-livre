@@ -17,6 +17,9 @@ export function getSupabase(): SupabaseClient | null {
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      realtime: {
+        params: { eventsPerSecond: 20 },
+      },
     });
     return singleton;
   } catch {

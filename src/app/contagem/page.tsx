@@ -46,6 +46,8 @@ import {
   Truck,
   ArrowRightLeft,
   Users,
+  RefreshCw,
+  Filter,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 
@@ -864,12 +866,15 @@ export default function ContagemPage() {
   const fecharSacaAtiva = usePacoteStore((s) => s.fecharSacaAtiva);
   const entregadorAtivo = usePacoteStore((s) => s.entregadorAtivo);
   const contagensEntregadoresStore = usePacoteStore((s) => s.contagensEntregadores);
+  const alternarStatusRetorno = usePacoteStore((s) => s.alternarStatusRetorno);
+  const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
   const [codigoLeitor, setCodigoLeitor] = React.useState('');
   const [filtro, setFiltro] = React.useState('');
   const [filtroEntregador, setFiltroEntregador] = React.useState<string>('__todos__');
+  const [filtroStatus, setFiltroStatus] = React.useState<'__todos__' | 'retorno'>('__todos__');
   const [exportando, setExportando] = React.useState(false);
   const [flashId, setFlashId] = React.useState<string | null>(null);
   const [shakeId, setShakeId] = React.useState<string | null>(null);
@@ -902,6 +907,11 @@ export default function ContagemPage() {
   React.useEffect(() => {
     void carregarSacas().then(() => void carregar());
   }, [carregarSacas, carregar]);
+
+  React.useEffect(() => {
+    const cleanup = inscreverRealtime();
+    return cleanup;
+  }, [inscreverRealtime]);
 
   React.useEffect(() => {
     if (modo === 'leitor' && inputLeitorRef.current) {
@@ -1050,6 +1060,9 @@ export default function ContagemPage() {
         lista = lista.filter((p) => p.entregador === filtroEntregador);
       }
     }
+    if (filtroStatus === 'retorno') {
+      lista = lista.filter((p) => p.status === 'retorno');
+    }
     if (!filtro.trim()) return lista;
     const q = filtro.trim().toLowerCase();
     return lista.filter(
@@ -1059,7 +1072,7 @@ export default function ContagemPage() {
         p.id.toLowerCase().includes(q) ||
         (p.entregador ?? '').toLowerCase().includes(q),
     );
-  }, [pacotes, filtro, filtroEntregador]);
+  }, [pacotes, filtro, filtroEntregador, filtroStatus]);
 
   const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
 
@@ -1531,22 +1544,66 @@ export default function ContagemPage() {
 
       <Card className={bloqueado ? 'opacity-60' : ''}>
         <CardContent className="!p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-neutral-500" />
-            <Input
-              placeholder={`Buscar nos ${pacotes.length} IDs da saca...`}
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-              className="!h-10"
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Search className="h-4 w-4 text-neutral-500 shrink-0" />
+              <Input
+                placeholder={`Buscar nos ${pacotes.length} IDs da saca...`}
+                value={filtro}
+                onChange={(e) => setFiltro(e.target.value)}
+                className="!h-10"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+                <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Realtime</span>
+              </div>
+              <Filter className="h-4 w-4 text-neutral-400 shrink-0" />
+              <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setFiltroStatus('__todos__')}
+                  className={`px-2.5 py-1 rounded-lg text-[11.5px] font-bold transition ${
+                    filtroStatus === '__todos__'
+                      ? 'bg-white shadow-sm ring-1 ring-black/5 text-neutral-900'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroStatus('retorno')}
+                  className={`px-2.5 py-1 rounded-lg text-[11.5px] font-bold transition inline-flex items-center gap-1 ${
+                    filtroStatus === 'retorno'
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : 'text-neutral-600 hover:text-orange-700'
+                  }`}
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Retorno
+                  <span className={`tabular-nums opacity-80 ${
+                    filtroStatus === 'retorno' ? 'text-white/90' : 'text-neutral-400'
+                  }`}>
+                    {pacotes.filter((p) => p.status === 'retorno').length}
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="text-[11.5px] font-semibold text-neutral-500">
-            Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID na saca
+          <div className="text-[11.5px] font-semibold text-neutral-500 flex flex-wrap items-center gap-x-2">
+            <span>
+              Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID na saca
+            </span>
             {filtroEntregador !== '__todos__' && (
-              <span className="ml-1 text-violet-700">
-                · Filtrado por:{' '}
+              <span className="text-violet-700">
+                · Entregador:{' '}
                 {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
               </span>
+            )}
+            {filtroStatus === 'retorno' && (
+              <span className="text-orange-700">· Apenas retorno</span>
             )}
           </div>
         </CardContent>
@@ -1648,6 +1705,14 @@ export default function ContagemPage() {
                           {p.entregador}
                         </Badge>
                       )}
+                      {p.status === 'retorno' && (
+                        <Badge
+                          className="!py-0.5 !bg-orange-100 !text-orange-700 !border-orange-200"
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Retorno
+                        </Badge>
+                      )}
                       <Badge variant={oMeta.variant} className="!py-0.5">
                         {oMeta.label}
                       </Badge>
@@ -1670,6 +1735,19 @@ export default function ContagemPage() {
                   </div>
 
                   <div className="shrink-0 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void alternarStatusRetorno(p.id)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                        p.status === 'retorno'
+                          ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200 hover:bg-orange-200'
+                          : 'text-neutral-400 hover:bg-orange-50 hover:text-orange-600'
+                      }`}
+                      aria-label={p.status === 'retorno' ? 'Desmarcar retorno' : 'Marcar como retorno'}
+                      title={p.status === 'retorno' ? 'Desmarcar retorno' : 'Marcar como retorno'}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setMoverId(p.id)}
