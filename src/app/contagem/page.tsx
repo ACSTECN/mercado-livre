@@ -54,6 +54,10 @@ import {
   Upload,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
+import {
+  NEXT_PUBLIC_SUPABASE_URL_DEBUG,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG,
+} from '@/lib/supabase';
 import { PacoteService } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 
@@ -2244,11 +2248,19 @@ export default function ContagemPage() {
             try {
               const conn = await PacoteService.testarConexaoBanco();
               if (!conn.ok) {
-                setDiagnostico({ etapa: '❌ Conexão falhou', ok: false, detalhe: conn.erro ?? 'erro desconhecido' });
+                const extraInfo = [
+                  `URL carregada: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
+                  `Anon Key: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? '✅ carregada (' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…)' : '❌ NÃO ENCONTRADA'}`,
+                ].join('\n');
+                setDiagnostico({
+                  etapa: '❌ Supabase NÃO está conectado nesse deploy',
+                  ok: false,
+                  detalhe: (conn.erro ?? 'erro desconhecido') + '\n\n' + extraInfo,
+                });
                 return;
               }
               setDiagnostico({
-                etapa: '✅ Banco conectado',
+                etapa: '✅ Supabase conectado',
                 ok: true,
                 detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}`,
                 tabelasBanco: conn.tabelas,
@@ -2275,7 +2287,7 @@ export default function ContagemPage() {
         </button>
 
         {diagnostico && (
-          <div className={`w-[300px] sm:w-[360px] rounded-2xl p-4 shadow-2xl ring-1 animate-slide-up ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
+          <div className={`w-[300px] sm:w-[400px] rounded-2xl p-4 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
             <div className="flex items-center gap-2">
               {diagnostico.ok ? (
                 <Database className="h-5 w-5 text-sky-600" />
@@ -2285,6 +2297,19 @@ export default function ContagemPage() {
               <p className="text-[13px] font-black text-neutral-900">{diagnostico.etapa}</p>
             </div>
             <p className="text-[11.5px] text-neutral-700 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
+            {!diagnostico.ok && (
+              <div className="mt-2 rounded-xl bg-amber-50 ring-1 ring-amber-200 p-2.5">
+                <p className="text-[10.5px] font-black uppercase tracking-wider text-amber-800">Como consertar em 2 minutos:</p>
+                <ol className="list-decimal list-inside space-y-0.5 mt-1 text-[10.5px] text-amber-950 leading-snug">
+                  <li>Vercel → seu projeto → Settings → Environment Variables.</li>
+                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_URL</b> (ex: <code className="bg-white/60 px-1 rounded">https://xxxx.supabase.co</code>).</li>
+                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b> (a chave pública &quot;anon public&quot; do Supabase Project Settings → API).</li>
+                  <li>Importante: marque a checkbox <b>Production</b> ao salvar (e Preview se quiser).</li>
+                  <li>Vercel menu Deployments → clique &quot;Redeploy&quot; no último deploy (ou faça qualquer novo commit).</li>
+                  <li>Se estiver rodando LOCALMENTE (npm run dev), crie um arquivo <code className="bg-white/60 px-1 rounded">.env.local</code> na pasta do projeto com as mesmas 2 linhas.</li>
+                </ol>
+              </div>
+            )}
             {diagnostico.tabelasBanco && (
               <p className="mt-2 text-[10.5px] text-neutral-500">
                 Se aparecerem zeros aqui e sua tela mostrar 274 pacotes → os dados estão só LOCAL. Use o botão
