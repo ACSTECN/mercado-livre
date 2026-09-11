@@ -201,7 +201,6 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         resumos,
         sacaAtiva: ativa,
         carregandoSacas: false,
-        mostrarModalSaca: !ativa,
       };
       if (!arraysIguais(stateAntigo.entregadores, entregadores)) patch.entregadores = entregadores;
       set(patch);
@@ -259,7 +258,6 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       const r = recalcular([]);
       set({
         sacaAtiva: null,
-        mostrarModalSaca: true,
         pacotes: [],
         entregadoresSaca: r.entregadoresSaca,
         contagensEntregadores: r.contagens,

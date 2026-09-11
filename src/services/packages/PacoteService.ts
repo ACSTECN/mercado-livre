@@ -8,10 +8,13 @@ export const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
 const CHAVE_ENTREGADORES = 'ml_entregadores_v1';
 
 let _realtimeInscrito = false;
-let _realtimeCallback: (() => void) | null = null;
+let _realtimeCallback: ((tipo: 'pacotes' | 'sacas') => void) | null = null;
 let _realtimeRef = 0;
 
-export function inscreverRealtimePacotes(onMudouPacotes: () => void, onMudouSacas: () => void): () => void {
+export function inscreverRealtimePacotes(
+  onMudouPacotes: () => void,
+  onMudouSacas: () => void,
+): () => void {
   if (!isSupabaseConfigurado) return () => {};
   const sb = getSupabase();
   if (!sb) return () => {};
@@ -19,23 +22,37 @@ export function inscreverRealtimePacotes(onMudouPacotes: () => void, onMudouSaca
   _realtimeRef += 1;
   const meuRef = _realtimeRef;
 
+  const wrapperCb = (tipo: 'pacotes' | 'sacas') => {
+    if (tipo === 'pacotes') {
+      try {
+        sessionStorage.removeItem('ml_pacote_store_v1');
+        localStorage.removeItem('ml_pacotes_lidos_v1');
+      } catch {
+        /* noop */
+      }
+      onMudouPacotes();
+    } else {
+      try {
+        localStorage.removeItem('ml_sacas_v1');
+        localStorage.removeItem('ml_sacas_store_v1');
+      } catch {
+        /* noop */
+      }
+      onMudouSacas();
+    }
+  };
+
   if (_realtimeInscrito && _realtimeCallback) {
     const antigo = _realtimeCallback;
-    _realtimeCallback = () => {
-      onMudouPacotes();
-      onMudouSacas();
-    };
+    _realtimeCallback = (tipo) => wrapperCb(tipo);
     return () => {
-        if (meuRef === _realtimeRef) {
-          _realtimeCallback = antigo;
-        }
-      };
+      if (meuRef === _realtimeRef) {
+        _realtimeCallback = antigo;
+      }
+    };
   }
   _realtimeInscrito = true;
-  _realtimeCallback = () => {
-    onMudouPacotes();
-    onMudouSacas();
-  };
+  _realtimeCallback = (tipo) => wrapperCb(tipo);
 
   try {
     const canalPacotes = sb
@@ -43,22 +60,18 @@ export function inscreverRealtimePacotes(onMudouPacotes: () => void, onMudouSaca
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pacotes_lidos' },
-        () => {
-          _realtimeCallback?.();
-        },
+        () => _realtimeCallback?.('pacotes'),
       )
-      .subscribe();
+      .subscribe(() => {});
 
     const canalSacas = sb
       .channel('sacas_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sacas' },
-        () => {
-          _realtimeCallback?.();
-        },
+        () => _realtimeCallback?.('sacas'),
       )
-      .subscribe();
+      .subscribe(() => {});
 
     return () => {
       if (meuRef !== _realtimeRef) return;

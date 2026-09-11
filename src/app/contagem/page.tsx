@@ -916,9 +916,13 @@ export default function ContagemPage() {
   const ultimoMovido = usePacoteStore((s) => s.ultimoMovido);
   const ultimoResultadoMover = usePacoteStore((s) => s.ultimoResultadoMover);
   const sacaAtiva = usePacoteStore((s) => s.sacaAtiva);
+  const sacas = usePacoteStore((s) => s.sacas);
+  const carregandoSacas = usePacoteStore((s) => s.carregandoSacas);
+  const definirSacaAtiva = usePacoteStore((s) => s.definirSacaAtiva);
   const resumos = usePacoteStore((s) => s.resumos);
   const carregar = usePacoteStore((s) => s.carregar);
   const carregarSacas = usePacoteStore((s) => s.carregarSacas);
+  const criarSaca = usePacoteStore((s) => s.criarSaca);
   const adicionarOuMover = usePacoteStore((s) => s.adicionarOuMover);
   const remover = usePacoteStore((s) => s.remover);
   const limpar = usePacoteStore((s) => s.limpar);
@@ -1179,7 +1183,38 @@ export default function ContagemPage() {
       ? 'bg-amber-500 text-white'
       : 'bg-neutral-800 text-white';
 
+  const hojeFormatado = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+  .replace('-feira', '')
+  .replace(/^\w/, (c) => c.toUpperCase());
+  const sacaHoje = (() => {
+    const d = new Date();
+    const inicio = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).toISOString();
+    const fim = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).toISOString();
+    const matches = sacas.filter((s) => s.created_at >= inicio && s.created_at <= fim);
+    if (!matches.length) return null;
+    matches.sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'aberta' ? -1 : 1;
+      return b.created_at.localeCompare(a.created_at);
+    });
+    return matches[0];
+  })();
+
   const bloqueado = !sacaAtiva;
+
+  const criarSacaHoje = () => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const h = new Date();
+    const nome = `Saca ${pad(h.getDate())}/${pad(h.getMonth() + 1)}/${h.getFullYear()}`;
+    void criarSaca(nome, '');
+  };
+  const salvarIdSacaAtivaJS = (id: string | null) => {
+    try {
+      if (id) localStorage.setItem('ml_saca_ativa_id_v1', id);
+      else localStorage.removeItem('ml_saca_ativa_id_v1');
+    } catch {
+      /* noop */
+    }
+  };
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -1222,6 +1257,159 @@ export default function ContagemPage() {
             )}
           </div>
         </div>
+      )}
+
+      {!sacaAtiva && (
+        <Card className="overflow-hidden border-2 border-dashed">
+          <CardContent className="!p-6 sm:!p-8 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5">
+              <div className="min-w-0 flex-1">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-blue-50 border border-blue-200/60 mb-3">
+                  <Calendar className="h-3.5 w-3.5 text-ml-blue" />
+                  <span className="text-[11.5px] font-black uppercase tracking-wider text-blue-800">
+                    Hoje · {hojeFormatado}
+                  </span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-900">
+                  {sacaHoje ? 'Selecione uma saca para começar' : 'Crie a saca de hoje'}
+                </h2>
+                <p className="text-sm text-neutral-600 mt-2">
+                  {sacaHoje
+                    ? 'Você tem sacas cadastradas. Selecione abaixo para visualizar ou continuar a contagem, ou crie uma nova saca de hoje.'
+                    : 'Cada dia registra uma nova saca. Você também pode abrir e visualizar qualquer saca do histórico abaixo.'}
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {sacaHoje && (
+                  <Button
+                    size="lg"
+                    variant="primary"
+                    onClick={() => void definirSacaAtiva(sacaHoje.id)}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    Abrir saca de hoje
+                  </Button>
+                )}
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={sacaHoje ? abrirModalSaca : criarSacaHoje}
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  {sacaHoje ? 'Criar nova saca' : 'Criar saca de hoje'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <ListTodo className="h-4 w-4 text-neutral-600" />
+                <h3 className="text-[13px] font-black uppercase tracking-wider text-neutral-700">
+                  Histórico de sacas
+                </h3>
+                {carregandoSacas && (
+                  <span className="text-[11px] font-bold text-neutral-400 inline-flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded-full border-2 border-neutral-300 border-t-neutral-600 animate-spin" />
+                    sincronizando
+                  </span>
+                )}
+              </div>
+
+              {sacas.length === 0 ? (
+                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-10 text-center">
+                  <Boxes className="h-9 w-9 mx-auto text-neutral-400 mb-2" />
+                  <p className="text-[13px] font-semibold text-neutral-600">
+                    Nenhuma saca registrada ainda.
+                  </p>
+                  <p className="text-[11.5px] text-neutral-500 mt-1">
+                    Clique em "Criar saca de hoje" para começar a contagem.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {sacas.slice(0, 24).map((s) => {
+                    const r = resumos.find((x) => x.saca.id === s.id);
+                    const d = new Date(s.created_at);
+                    const dia = d.toLocaleDateString('pt-BR');
+                    const hor = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const ehHoje = s.id === sacaHoje?.id;
+                    return (
+                      <button
+                        type="button"
+                        key={s.id}
+                        onClick={() => void definirSacaAtiva(s.id)}
+                        className={`group text-left rounded-2xl p-3.5 border transition hover:shadow-md ${
+                          ehHoje
+                            ? 'bg-gradient-to-br from-blue-50 to-emerald-50 border-blue-200/60 hover:border-blue-300'
+                            : 'bg-white border-neutral-200 hover:border-indigo-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {ehHoje && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20 text-[10px] font-black uppercase tracking-wider">
+                                  Hoje
+                                </span>
+                              )}
+                              <Badge
+                                variant={s.status === 'aberta' ? 'success' : 'info'}
+                                className="!py-0.5 !px-1.5 !text-[10px]"
+                              >
+                                {s.status === 'aberta' ? 'Aberta' : 'Fechada'}
+                              </Badge>
+                            </div>
+                            <div className={`mt-1.5 font-black tracking-tight leading-tight truncate ${
+                              ehHoje ? 'text-neutral-900 text-[15px]' : 'text-neutral-800 text-[14px]'
+                            }`}>
+                              {s.nome}
+                            </div>
+                            {s.descricao && (
+                              <div className="text-[11px] text-neutral-500 mt-0.5 truncate">{s.descricao}</div>
+                            )}
+                          </div>
+                          {s.status === 'aberta' ? (
+                            <Unlock className="h-4 w-4 shrink-0 text-emerald-600" />
+                          ) : (
+                            <Lock className="h-4 w-4 shrink-0 text-neutral-400" />
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-end justify-between gap-2">
+                          <div>
+                            <div className="text-[18px] font-black tabular-nums leading-none text-neutral-900">
+                              {r ? r.unicos : '…'}
+                            </div>
+                            <div className="text-[10.5px] font-bold text-neutral-500 mt-0.5">IDs únicos</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[11px] font-bold text-neutral-600">{dia}</div>
+                            <div className="text-[10px] text-neutral-400">{hor}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 inline-flex items-center gap-1 text-[11.5px] font-black text-indigo-700 opacity-0 group-hover:opacity-100 transition">
+                          Abrir e visualizar <ChevronRight className="h-3.5 w-3.5" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {sacas.length > 0 && (
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={abrirHistoricoSacas}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    Ver tudo ({sacas.length}) · Histórico completo
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <header className="flex items-start justify-between gap-3 flex-wrap">
@@ -1267,13 +1455,27 @@ export default function ContagemPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {sacaAtiva && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                salvarIdSacaAtivaJS(null);
+                window.location.reload();
+              }}
+              title="Todas as sacas"
+            >
+              <Boxes className="h-4 w-4" />
+              Todas
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
             onClick={abrirHistoricoSacas}
           >
             <FolderOpen className="h-4 w-4" />
-            Sacas
+            Histórico
           </Button>
           <Button
             size="sm"
