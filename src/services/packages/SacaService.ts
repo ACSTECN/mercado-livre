@@ -1,7 +1,7 @@
 import type { Saca, StatusSaca, ResumoSaca } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
-import { PacoteService } from './PacoteService';
+import { PacoteService, corrigirSacaIdsNosPacotes } from './PacoteService';
 
 const CHAVE_LOCAL_SACAS = 'ml_sacas_v1';
 const CHAVE_SACA_ATIVA = 'ml_saca_ativa_id_v1';
@@ -40,17 +40,28 @@ export function salvarIdSacaAtiva(id: string | null) {
 
 const SACA_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function sincronizarSacasAgora(): Promise<{ sincronizados: number; falhas: number }> {
-  if (!isSupabaseConfigurado) return { sincronizados: 0, falhas: 0 };
+export async function sincronizarSacasAgora(): Promise<{
+  sincronizados: number;
+  falhas: number;
+  total: number;
+  primeiroErro: string | null;
+  idsRemapeados: Record<string, string>;
+}> {
+  if (!isSupabaseConfigurado) return { sincronizados: 0, falhas: 0, total: 0, primeiroErro: null, idsRemapeados: {} };
   const sb = getSupabase();
-  if (!sb) return { sincronizados: 0, falhas: 0 };
+  if (!sb) return { sincronizados: 0, falhas: 0, total: 0, primeiroErro: null, idsRemapeados: {} };
 
   const locais = lerSacasLocal();
   let ok = 0;
   let falha = 0;
+  let primeiroErro: string | null = null;
+  const idsRemapeados: Record<string, string> = {};
+
+  console.log('[sincronia-sacas] processando', locais.length, 'sacas locais');
 
   for (let i = 0; i < locais.length; i++) {
     const s = locais[i];
+    const idAntigo = s.id;
     try {
       const basePayload = {
         nome: s.nome,
@@ -71,6 +82,7 @@ export async function sincronizarSacasAgora(): Promise<{ sincronizados: number; 
           continue;
         }
         console.warn('[sincronia-sacas] upsert por id falhou, tentando insert sem id:', s.id, error);
+        if (!primeiroErro) primeiroErro = `upsert saca: ${(error as { message?: string })?.message ?? String(error)}`;
       }
 
       const { data, error: insertErr } = await sb
@@ -79,24 +91,40 @@ export async function sincronizarSacasAgora(): Promise<{ sincronizados: number; 
         .select('id')
         .maybeSingle();
       if (!insertErr && data) {
-        locais[i] = { ...s, id: (data as { id: string }).id };
+        const novoId = (data as { id: string }).id;
+        locais[i] = { ...s, id: novoId };
+        if (idAntigo !== novoId) idsRemapeados[idAntigo] = novoId;
         ok += 1;
       } else {
         if (insertErr && /duplicate|unique|23505/i.test((insertErr as { message?: string; code?: string }).message ?? (insertErr as { code?: string }).code ?? '')) {
           ok += 1;
         } else {
+          const msg = (insertErr as { message?: string; code?: string })?.message
+            ?? (insertErr as { code?: string })?.code
+            ?? 'erro desconhecido';
           console.error('[sincronia-sacas] falha definitiva saca:', s.nome, insertErr);
+          if (!primeiroErro) primeiroErro = `saca ${s.nome}: ${msg}`;
           falha += 1;
         }
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error('[sincronia-sacas] catch:', s?.nome, e);
+      if (!primeiroErro) primeiroErro = `catch saca: ${msg}`;
       falha += 1;
     }
   }
   salvarSacasLocal(locais);
-  console.log('[sincronia-sacas] resultado sacas:', { sincronizados: ok, falhas: falha });
-  return { sincronizados: ok, falhas: falha };
+
+  if (Object.keys(idsRemapeados).length) {
+    console.log('[sincronia-sacas] ids remapeados:', idsRemapeados);
+    await corrigirSacaIdsNosPacotes(idsRemapeados);
+    const ativaLocal = pegarIdSacaAtiva();
+    if (ativaLocal && idsRemapeados[ativaLocal]) salvarIdSacaAtiva(idsRemapeados[ativaLocal]);
+  }
+
+  console.log('[sincronia-sacas] resultado sacas:', { sincronizados: ok, falhas: falha, total: locais.length });
+  return { sincronizados: ok, falhas: falha, total: locais.length, primeiroErro, idsRemapeados };
 }
 
 export const SacaService = {
@@ -261,7 +289,13 @@ export const SacaService = {
     });
   },
 
-  async sincronizarAgora(): Promise<{ sincronizados: number; falhas: number }> {
+  async sincronizarAgora(): Promise<{
+    sincronizados: number;
+    falhas: number;
+    total: number;
+    primeiroErro: string | null;
+    idsRemapeados: Record<string, string>;
+  }> {
     return sincronizarSacasAgora();
   },
 };

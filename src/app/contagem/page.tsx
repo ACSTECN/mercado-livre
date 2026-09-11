@@ -951,8 +951,8 @@ export default function ContagemPage() {
   const [moverId, setMoverId] = React.useState<string | null>(null);
   const [sincronizando, setSincronizando] = React.useState(false);
   const [resultadoSync, setResultadoSync] = React.useState<{
-    sacas: { sincronizados: number; falhas: number };
-    pacotes: { sincronizados: number; falhas: number };
+    sacas: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
+    pacotes: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
   } | null>(null);
   const [som, setSom] = React.useState<boolean>(() => {
     try {
@@ -2222,31 +2222,48 @@ export default function ContagemPage() {
       </button>
 
       {resultadoSync && !sincronizando && (
-        <div className="fixed bottom-20 right-4 z-[90] w-[280px] sm:w-[340px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-4 animate-slide-up">
+        <div className="fixed bottom-20 right-4 z-[90] w-[290px] sm:w-[360px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-4 animate-slide-up">
           <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            <p className="text-[13px] font-black text-neutral-900">Sincronização concluída</p>
+            {resultadoSync.sacas.falhas === 0 && resultadoSync.pacotes.falhas === 0 ? (
+              <>
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <p className="text-[13px] font-black text-neutral-900">Sincronização concluída</p>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                <p className="text-[13px] font-black text-neutral-900">Sincronização finalizada com falhas</p>
+              </>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2 text-[11.5px]">
             <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
               <p className="text-neutral-500 font-bold uppercase tracking-wider text-[10px]">Sacas</p>
               <p className="text-neutral-900 font-black tabular-nums mt-0.5">
-                {resultadoSync.sacas.sincronizados} ok
-                {resultadoSync.sacas.falhas > 0 && (
-                  <span className="ml-1 text-red-600">· {resultadoSync.sacas.falhas} falha</span>
-                )}
+                {resultadoSync.sacas.sincronizados}/{resultadoSync.sacas.total} ok
               </p>
+              {resultadoSync.sacas.falhas > 0 && (
+                <p className="text-red-600 font-bold text-[11px] mt-0.5">{resultadoSync.sacas.falhas} falha</p>
+              )}
             </div>
             <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
               <p className="text-neutral-500 font-bold uppercase tracking-wider text-[10px]">Pacotes</p>
               <p className="text-neutral-900 font-black tabular-nums mt-0.5">
-                {resultadoSync.pacotes.sincronizados} ok
-                {resultadoSync.pacotes.falhas > 0 && (
-                  <span className="ml-1 text-red-600">· {resultadoSync.pacotes.falhas} falha</span>
-                )}
+                {resultadoSync.pacotes.sincronizados}/{resultadoSync.pacotes.total} ok
               </p>
+              {resultadoSync.pacotes.falhas > 0 && (
+                <p className="text-red-600 font-bold text-[11px] mt-0.5">{resultadoSync.pacotes.falhas} falha</p>
+              )}
             </div>
           </div>
+          {(resultadoSync.sacas.primeiroErro || resultadoSync.pacotes.primeiroErro) && (
+            <div className="mt-2 rounded-xl bg-red-50 ring-1 ring-red-100 p-2.5">
+              <p className="text-[10.5px] font-black uppercase tracking-wider text-red-700">Primeiro erro:</p>
+              <p className="text-[11px] text-red-900 mt-0.5 break-all leading-snug">
+                {resultadoSync.sacas.primeiroErro ?? resultadoSync.pacotes.primeiroErro}
+              </p>
+            </div>
+          )}
           <p className="text-[10.5px] text-neutral-500 mt-2 leading-snug">
             Abra no outro aparelho ou clique em &quot;Todas&quot; para atualizar o histórico.
           </p>

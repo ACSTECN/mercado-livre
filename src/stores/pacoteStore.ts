@@ -54,8 +54,8 @@ type PacoteState = {
   limparFeedback: () => void;
   inscreverRealtime: () => () => void;
   forcarSincronizacaoCompleta: () => Promise<{
-    sacas: { sincronizados: number; falhas: number };
-    pacotes: { sincronizados: number; falhas: number };
+    sacas: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
+    pacotes: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
   }>;
 };
 
@@ -536,6 +536,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     const pacotes = await PacoteService.sincronizarAgora();
     console.log('[sincronia] FIM sincronização forçada:', { sacas, pacotes });
     void get().carregarSacas().then(() => void get().carregar());
-    return { sacas, pacotes };
+    return {
+      sacas: { sincronizados: sacas.sincronizados, falhas: sacas.falhas, total: sacas.total, primeiroErro: sacas.primeiroErro },
+      pacotes: { sincronizados: pacotes.sincronizados, falhas: pacotes.falhas, total: pacotes.total, primeiroErro: pacotes.primeiroErro },
+    };
   },
 }));
