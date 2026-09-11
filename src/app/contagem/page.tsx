@@ -971,6 +971,10 @@ export default function ContagemPage() {
 
   React.useEffect(() => {
     void carregarSacas().then(() => void carregar());
+    const id1 = setInterval(() => {
+      void carregarSacas().then(() => void carregar());
+    }, 6000);
+    return () => clearInterval(id1);
   }, [carregarSacas, carregar]);
 
   React.useEffect(() => {
@@ -1141,6 +1145,29 @@ export default function ContagemPage() {
 
   const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
 
+  const escopo = React.useMemo(() => {
+    let base = pacotes;
+    if (filtroEntregador !== '__todos__') {
+      if (filtroEntregador === '__sem__') base = base.filter((p) => !p.entregador);
+      else base = base.filter((p) => p.entregador === filtroEntregador);
+    }
+    if (filtroStatus !== '__todos__') {
+      base = base.filter((p) => p.status === filtroStatus);
+    }
+    const unicos = new Set(base.map((p) => p.codigo_pacote));
+    const retornos = base.filter((p) => p.status === 'retorno').length;
+    const entregadores = new Set(
+      base.filter((p) => p.entregador).map((p) => p.entregador as string),
+    );
+    return {
+      lista: base,
+      total: base.length,
+      unicos: unicos.size,
+      retornos,
+      entregadores: entregadores.size,
+    };
+  }, [pacotes, filtroEntregador, filtroStatus]);
+
   const feedbackCor =
     feedback?.tipo === 'sucesso'
       ? 'bg-emerald-500 text-white'
@@ -1298,23 +1325,38 @@ export default function ContagemPage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <section className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <Card className="relative overflow-hidden gradient-card border-emerald-200">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-ml-yellow to-ml-blue" />
           <CardContent className="!p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  IDs únicos na saca
+                {filtroEntregador === '__todos__' && filtroStatus === '__todos__'
+                  ? 'IDs únicos na saca'
+                  : 'IDs únicos no filtro'}
                 </p>
                 <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums bg-gradient-to-b from-neutral-900 to-blue-800 bg-clip-text text-transparent">
-                  {resumoAtual?.unicos ?? unicos}
+                  {escopo.unicos}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
                 <Package className="h-6 w-6" />
               </div>
             </div>
+            {(filtroEntregador !== '__todos__' || filtroStatus !== '__todos__') && (
+              <div className="mt-3 rounded-xl border border-neutral-200 bg-white/60 px-3 py-2 text-[11.5px] font-bold text-neutral-600">
+                {filtroEntregador !== '__todos__' && (
+                  <>
+                    <span>
+                      {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
+                    </span>
+                  </>
+                )}
+                {filtroEntregador !== '__todos__' && filtroStatus === 'retorno' && <span className="mx-1.5">·</span>}
+                {filtroStatus === 'retorno' && <span className="text-orange-700">Apenas retorno</span>}
+              </div>
+            )}
             {ultimoLido && (
               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -1347,22 +1389,28 @@ export default function ContagemPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  Leituras totais
+                  {filtroEntregador === '__todos__' && filtroStatus === '__todos__' ? 'Leituras totais' : 'Leituras no filtro'}
                 </p>
                 <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-ml-blue">
-                  {pacotes.length}
+                  {escopo.total}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-ml-blue shadow-sm">
                 <Hash className="h-6 w-6" />
               </div>
             </div>
-            <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2">
-              <span className="text-[12px] font-semibold text-neutral-600">
-                {unicos === pacotes.length
+            <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 space-y-1">
+              <div className="text-[12px] font-semibold text-neutral-600">
+                {escopo.unicos === escopo.total
                   ? '✨ 100% sem duplicatas'
-                  : `Duplicatas bloqueadas: ${pacotes.length - unicos}`}
-              </span>
+                  : `Duplicatas bloqueadas: ${escopo.total - escopo.unicos}`}
+              </div>
+              {escopo.retornos > 0 && (
+                <div className="text-[11.5px] font-black text-orange-700 inline-flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" /> {escopo.retornos} retorno{escopo.retornos === 1 ? '' : 's'} ·{' '}
+                  {escopo.total ? Math.round((escopo.retornos / escopo.total) * 100) : 0}%
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1375,14 +1423,28 @@ export default function ContagemPage() {
                   Entregadores
                 </p>
                 <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-violet-600">
-                  {contagemEntregadores.filter((c) => c.nome !== 'Sem entregador').length}
+                  {filtroEntregador !== '__todos__' ? (
+                    escopo.total > 0 ? 1 : 0
+                  ) : (
+                    escopo.entregadores
+                  )}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 shadow-sm">
                 <Users className="h-6 w-6" />
               </div>
             </div>
-            {entregadorAtivo ? (
+            {filtroEntregador !== '__todos__' ? (
+              <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
+                <Truck className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span className="text-[12px] font-semibold text-indigo-800 truncate">
+                  Filtrado:{' '}
+                  <span className="font-black text-indigo-900">
+                    {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
+                  </span>
+                </span>
+              </div>
+            ) : entregadorAtivo ? (
               <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
                 <Truck className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span className="text-[12px] font-semibold text-indigo-800 truncate">
@@ -1397,6 +1459,43 @@ export default function ContagemPage() {
                 </span>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="!p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
+                  Retornos
+                </p>
+                <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-orange-600">
+                  {escopo.retornos}
+                </p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 shadow-sm">
+                <RefreshCw className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50/70 px-3 py-2">
+              <div className="text-[12px] font-bold text-orange-800">
+                {escopo.total ? (
+                  <>
+                    {Math.round((escopo.retornos / escopo.total) * 100)}%
+                    <span className="font-semibold text-orange-700 ml-1">
+                      dos {escopo.total} pacotes
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-semibold">Sem pacotes no filtro</span>
+                )}
+              </div>
+              {escopo.retornos === 0 && (
+                <div className="text-[10.5px] font-bold uppercase tracking-wider text-orange-600/80 mt-0.5">
+                  Zero retornos até agora
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </section>

@@ -188,9 +188,23 @@ export const SacaService = {
 
   async pegarAtiva(): Promise<Saca | null> {
     const id = pegarIdSacaAtiva();
-    if (!id) return null;
     const todas = await SacaService.listar();
-    return todas.find((s) => s.id === id) ?? null;
+    if (id) {
+      const match = todas.find((s) => s.id === id);
+      if (match) return match;
+    }
+    const hoje = new Date();
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0, 0).toISOString();
+    const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999).toISOString();
+    const sacasDeHoje = todas.filter((s) => s.created_at >= inicio && s.created_at <= fim);
+    if (!sacasDeHoje.length) return null;
+    sacasDeHoje.sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'aberta' ? -1 : 1;
+      return b.created_at.localeCompare(a.created_at);
+    });
+    const escolhida = sacasDeHoje[0];
+    salvarIdSacaAtiva(escolhida.id);
+    return escolhida;
   },
 
   async resumos(): Promise<ResumoSaca[]> {

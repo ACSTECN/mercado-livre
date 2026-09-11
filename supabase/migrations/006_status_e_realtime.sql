@@ -5,6 +5,9 @@ comment on column public.pacotes_lidos.status is 'Status opcional do pacote: atu
 
 create index if not exists idx_pacotes_lidos_status on public.pacotes_lidos (status) where status is not null;
 
+alter table public.pacotes_lidos replica identity full;
+alter table public.sacas replica identity full;
+
 alter publication supabase_realtime add table public.pacotes_lidos;
 alter publication supabase_realtime add table public.sacas;
 
