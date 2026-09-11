@@ -368,6 +368,13 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       if (resultado.sucesso && resultado.pacote) {
         patch.ultimoLido = resultado.pacote;
         patch.ultimoDuplicado = null;
+        if (resultado.pacote.status === 'retorno') {
+          patch.ultimoAlteradoStatus = {
+            id: resultado.pacote.id,
+            status: 'retorno',
+            ts: Date.now(),
+          };
+        }
       } else if (resultado.duplicado && resultado.existente) {
         patch.ultimoLido = null;
         patch.ultimoDuplicado = resultado.existente;

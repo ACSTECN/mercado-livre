@@ -170,6 +170,7 @@ export type ResultadoAdicaoPacote = {
   pacote?: PacoteLidoLocal;
   existente?: PacoteLidoLocal;
   mensagem?: string;
+  statusHerdado?: StatusPacote | null;
 };
 
 export type ResumoSaca = {
