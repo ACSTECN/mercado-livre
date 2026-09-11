@@ -18,6 +18,8 @@ import {
   QrCode,
   BarChart3,
   MapPin,
+  Package,
+  ListPlus,
 } from 'lucide-react';
 import { useSpreadsheetStore } from '@/stores/spreadsheetStore';
 import { SpreadsheetStatus } from '@/components/SpreadsheetStatus';
@@ -63,19 +65,20 @@ export default function HomePage() {
               size="xl"
               variant="primary"
               className="!h-14 text-[15px]"
-              onClick={() => router.push('/escanear')}
+              onClick={() => router.push('/contagem')}
             >
-              <QrCode className="h-5 w-5" />
-              Escanear etiqueta agora
-              <ArrowRight className="h-4.5 w-4.5 ml-1 h-4 w-4 ml-1 h-5 w-5 ml-1 h-5 w-5 ml-1" />
+              <ListPlus className="h-5 w-5" />
+              Contar pacotes agora
+              <ArrowRight className="h-4.5 w-4.5 ml-1 h-5 w-5 ml-1" />
             </Button>
             <Button
               size="xl"
+              variant="secondary"
               className="!h-14 text-[15px]"
-              onClick={() => router.push('/importar')}
+              onClick={() => router.push('/escanear')}
             >
-              <Upload className="h-5 w-5" />
-              {planilha ? 'Atualizar planilha' : 'Importar Excel'}
+              <QrCode className="h-5 w-5" />
+              Escanear etiqueta OCR
             </Button>
           </div>
         </div>
@@ -83,7 +86,15 @@ export default function HomePage() {
 
       <SpreadsheetStatus />
 
-      <section className="grid grid-cols-2 gap-3">
+      <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <QuickCard
+          href="/contagem"
+          icon={Package}
+          title="Contagem"
+          subtitle="Câmera · leitor · digitar"
+          color="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white"
+          destaque
+        />
         <QuickCard
           href="/importar"
           icon={Upload}
@@ -94,10 +105,9 @@ export default function HomePage() {
         <QuickCard
           href="/escanear"
           icon={FileSearch}
-          title="Escanear"
+          title="Escanear OCR"
           subtitle="Câmera ou galeria"
           color="bg-gradient-to-br from-ml-blue to-blue-600 text-white"
-          destaque
         />
         <QuickCard
           href="/historico"
@@ -111,25 +121,32 @@ export default function HomePage() {
           icon={MapPin}
           title="Busca manual"
           subtitle="Digitar endereço"
-          color="bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-900 border border-emerald-200"
+          color="bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 border border-violet-200"
+        />
+        <QuickCard
+          href="/contagem"
+          icon={ListPlus}
+          title="Contar rápido"
+          subtitle="Leitor USB recomendado"
+          color="bg-gradient-to-br from-amber-100 to-amber-50 text-amber-900 border border-amber-200"
         />
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <FeatureCard
-          icon={<BarChart3 className="h-5 w-5 text-emerald-600" />}
-          title="Score ponderado"
-          text="CEP (35%) + Número (30%) + Logradouro (25%) com fallback fuzzy."
+          icon={<Package className="h-5 w-5 text-emerald-600" />}
+          title="Contagem persistente"
+          text="Salva no Supabase + localStorage. Não perde nem em refresh nem fechamento."
         />
         <FeatureCard
-          icon={<Sparkles className="h-5 w-5 text-ml-blue" />}
-          title="Normalização"
-          text="Remove acentos, pontuação, expande abreviações (R. → RUA)."
+          icon={<BarChart3 className="h-5 w-5 text-ml-blue" />}
+          title="3 modos de leitura"
+          text="Câmera (QR/barcode em tempo real), leitor externo USB ou digitação manual."
         />
         <FeatureCard
-          icon={<QrCode className="h-5 w-5 text-amber-600" />}
-          title="Tesseract OCR"
-          text="Português + Inglês, com barra de progresso e troca futura para API."
+          icon={<Sparkles className="h-5 w-5 text-amber-600" />}
+          title="JSON automático"
+          text="Extrai ID automaticamente de JSON no formato {id:..., t:...} da sua etiqueta."
         />
       </section>
     </div>

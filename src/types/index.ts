@@ -114,3 +114,19 @@ export const PESOS_DEFAULT: PesosMatch = {
 
 export const LIMIAR_ALTA_CONFIANCA = 85;
 export const LIMIAR_BAIXA_CONFIANCA = 60;
+
+export type OrigemLeitura = 'camera' | 'leitor_externo' | 'manual';
+
+export type PacoteLido = {
+  id: string;
+  codigo_pacote: string;
+  tipo?: string | null;
+  origem: OrigemLeitura;
+  metadados?: Record<string, unknown> | null;
+  created_at: string;
+  user_id?: string | null;
+};
+
+export type PacoteLidoLocal = PacoteLido & {
+  sincronizado?: boolean;
+};
