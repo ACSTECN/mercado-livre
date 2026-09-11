@@ -1,4 +1,4 @@
-import type { PacoteLido, PacoteLidoLocal, OrigemLeitura } from '@/types';
+import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
 import { exportarParaCsv } from '../spreadsheet/ExcelService';
@@ -18,6 +18,11 @@ function lerLocal(): PacoteLidoLocal[] {
 
 function salvarLocal(lista: PacoteLidoLocal[]) {
   localStorage.setItem(CHAVE_LOCAL, JSON.stringify(lista));
+}
+
+function encontrarPorCodigo(lista: PacoteLidoLocal[], codigo: string): PacoteLidoLocal | undefined {
+  const alvo = codigo.trim();
+  return lista.find((p) => p.codigo_pacote.trim() === alvo);
 }
 
 async function sincronizarComSupabase(): Promise<void> {
@@ -40,8 +45,8 @@ async function sincronizarComSupabase(): Promise<void> {
       };
       const { error } = await sb
         .from('pacotes_lidos')
-        .upsert({ id: p.id, ...payload }, { onConflict: 'id' });
-      if (!error) {
+        .upsert({ id: p.id, ...payload }, { onConflict: 'codigo_pacote', ignoreDuplicates: true });
+      if (!error || (error && /duplicate|unique/i.test(error.message ?? ''))) {
         p.sincronizado = true;
       }
     } catch {
@@ -49,6 +54,24 @@ async function sincronizarComSupabase(): Promise<void> {
     }
   }
   salvarLocal(locais);
+}
+
+async function buscarNoBancoPorCodigo(codigo: string): Promise<PacoteLidoLocal | null> {
+  if (!isSupabaseConfigurado) return null;
+  const sb = getSupabase();
+  if (!sb) return null;
+  try {
+    const { data } = await sb
+      .from('pacotes_lidos')
+      .select('*')
+      .eq('codigo_pacote', codigo.trim())
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return { ...(data as PacoteLido), sincronizado: true };
+  } catch {
+    return null;
+  }
 }
 
 export const PacoteService = {
@@ -77,15 +100,19 @@ export const PacoteService = {
 
       const todos: PacoteLidoLocal[] = [];
       const idsVistos = new Set<string>();
+      const codigosVistos = new Set<string>();
 
       for (const item of data as PacoteLido[]) {
+        if (codigosVistos.has(item.codigo_pacote)) continue;
         idsVistos.add(item.id);
+        codigosVistos.add(item.codigo_pacote);
         const local = mapaLocal.get(item.id);
         todos.push({ ...item, sincronizado: true });
       }
 
       for (const local of locais) {
-        if (!idsVistos.has(local.id)) {
+        if (!idsVistos.has(local.id) && !codigosVistos.has(local.codigo_pacote)) {
+          codigosVistos.add(local.codigo_pacote);
           todos.push(local);
         }
       }
@@ -101,9 +128,36 @@ export const PacoteService = {
     codigo_pacote: string,
     origem: OrigemLeitura,
     extra: Partial<PacoteLido> = {},
-  ): Promise<PacoteLidoLocal> {
+  ): Promise<ResultadoAdicaoPacote> {
     const trimmed = codigo_pacote.trim();
-    if (!trimmed) throw new Error('Código vazio');
+    if (!trimmed) {
+      return { sucesso: false, duplicado: false, mensagem: 'Código vazio' };
+    }
+
+    const locais = lerLocal();
+    const jaExisteLocal = encontrarPorCodigo(locais, trimmed);
+    if (jaExisteLocal) {
+      return {
+        sucesso: false,
+        duplicado: true,
+        existente: jaExisteLocal,
+        mensagem: `ID ${trimmed} já foi contado`,
+      };
+    }
+
+    const jaExisteBanco = await buscarNoBancoPorCodigo(trimmed);
+    if (jaExisteBanco) {
+      if (!jaExisteLocal) {
+        locais.unshift(jaExisteBanco);
+        salvarLocal(locais);
+      }
+      return {
+        sucesso: false,
+        duplicado: true,
+        existente: jaExisteBanco,
+        mensagem: `ID ${trimmed} já está no banco`,
+      };
+    }
 
     const novo: PacoteLidoLocal = {
       id: extra.id ?? gerarId(),
@@ -116,7 +170,6 @@ export const PacoteService = {
       sincronizado: false,
     };
 
-    const locais = lerLocal();
     locais.unshift(novo);
     salvarLocal(locais);
 
@@ -134,6 +187,20 @@ export const PacoteService = {
             user_id: novo.user_id,
           };
           const { error } = await sb.from('pacotes_lidos').insert(payload);
+          if (error && /duplicate|unique|23505/i.test(error.message ?? error.code ?? '')) {
+            const atualizados = lerLocal().filter((p) => p.codigo_pacote !== trimmed);
+            const noBanco = await buscarNoBancoPorCodigo(trimmed);
+            if (noBanco) {
+              atualizados.unshift(noBanco);
+              salvarLocal(atualizados);
+              return {
+                sucesso: false,
+                duplicado: true,
+                existente: noBanco,
+                mensagem: `ID ${trimmed} já está no banco`,
+              };
+            }
+          }
           if (!error) {
             novo.sincronizado = true;
             const atualizados = lerLocal();
@@ -149,7 +216,12 @@ export const PacoteService = {
       }
     }
 
-    return novo;
+    return {
+      sucesso: true,
+      duplicado: false,
+      pacote: novo,
+      mensagem: `ID ${trimmed} contado com sucesso`,
+    };
   },
 
   async remover(id: string): Promise<void> {

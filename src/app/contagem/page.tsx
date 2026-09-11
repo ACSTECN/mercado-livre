@@ -4,14 +4,14 @@ import * as React from 'react';
 
 export const dynamic = 'force-dynamic';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { QrCodeScanner, extrairCodigoDoJson } from '@/components/QrCodeScanner';
 import { usePacoteStore } from '@/stores/pacoteStore';
-import type { OrigemLeitura } from '@/types';
+import type { OrigemLeitura, ResultadoAdicaoPacote } from '@/types';
 import {
   Package,
   QrCode,
@@ -26,6 +26,10 @@ import {
   Sparkles,
   XCircle,
   Hash,
+  AlertTriangle,
+  Ban,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 
@@ -40,10 +44,44 @@ const MODO_META: Record<
   manual: { label: 'Digitar ID', icon: PencilLine, origem: 'manual' },
 };
 
+type TipoFeedback = 'sucesso' | 'duplicado' | 'erro' | null;
+
+function beep(tipo: 'sucesso' | 'erro') {
+  try {
+    if (typeof window === 'undefined' || !(window as unknown as { AudioContext?: unknown }).AudioContext) return;
+    const AC = (window as unknown as { AudioContext: typeof AudioContext }).AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (tipo === 'sucesso') {
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } else {
+      osc.frequency.value = 220;
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch {
+    /* noop */
+  }
+}
+
 export default function ContagemPage() {
   const pacotes = usePacoteStore((s) => s.pacotes);
   const carregando = usePacoteStore((s) => s.carregando);
   const ultimoLido = usePacoteStore((s) => s.ultimoLido);
+  const ultimoDuplicado = usePacoteStore((s) => s.ultimoDuplicado);
+  const ultimoResultado = usePacoteStore((s) => s.ultimoResultado);
   const carregar = usePacoteStore((s) => s.carregar);
   const adicionar = usePacoteStore((s) => s.adicionar);
   const remover = usePacoteStore((s) => s.remover);
@@ -51,6 +89,7 @@ export default function ContagemPage() {
   const total = usePacoteStore((s) => s.total());
   const unicos = usePacoteStore((s) => s.unicos());
   const exportar = usePacoteStore((s) => s.exportar);
+  const limparFeedback = usePacoteStore((s) => s.limparFeedback);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
@@ -58,8 +97,26 @@ export default function ContagemPage() {
   const [filtro, setFiltro] = React.useState('');
   const [exportando, setExportando] = React.useState(false);
   const [flashId, setFlashId] = React.useState<string | null>(null);
+  const [shakeId, setShakeId] = React.useState<string | null>(null);
+  const [som, setSom] = React.useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem('ml_som_contagem');
+      return raw ? raw === '1' : true;
+    } catch {
+      return true;
+    }
+  });
+  const [feedback, setFeedback] = React.useState<{ tipo: TipoFeedback; mensagem: string; codigo?: string } | null>(null);
   const inputLeitorRef = React.useRef<HTMLInputElement>(null);
   const inputManualRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('ml_som_contagem', som ? '1' : '0');
+    } catch {
+      /* noop */
+    }
+  }, [som]);
 
   React.useEffect(() => {
     carregar();
@@ -80,6 +137,44 @@ export default function ContagemPage() {
       return () => clearTimeout(t);
     }
   }, [ultimoLido]);
+
+  React.useEffect(() => {
+    if (!ultimoResultado) return;
+
+    let fb: { tipo: TipoFeedback; mensagem: string; codigo?: string } | null = null;
+    if (ultimoResultado.sucesso && ultimoResultado.pacote) {
+      fb = {
+        tipo: 'sucesso',
+        mensagem: ultimoResultado.mensagem ?? 'Contado com sucesso',
+        codigo: ultimoResultado.pacote.codigo_pacote,
+      };
+      if (som) beep('sucesso');
+    } else if (ultimoResultado.duplicado && ultimoResultado.existente) {
+      fb = {
+        tipo: 'duplicado',
+        mensagem: ultimoResultado.mensagem ?? 'ID já contado',
+        codigo: ultimoResultado.existente.codigo_pacote,
+      };
+      setShakeId(ultimoResultado.existente.id);
+      setTimeout(() => setShakeId(null), 600);
+      if (som) beep('erro');
+    } else if (!ultimoResultado.sucesso) {
+      fb = {
+        tipo: 'erro',
+        mensagem: ultimoResultado.mensagem ?? 'Erro',
+      };
+      if (som) beep('erro');
+    }
+
+    if (fb) {
+      setFeedback(fb);
+      const t = setTimeout(() => {
+        setFeedback(null);
+        limparFeedback();
+      }, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [ultimoResultado, som, limparFeedback]);
 
   const processarCodigo = async (raw: string, origem: OrigemLeitura) => {
     const extraido = extrairCodigoDoJson(raw);
@@ -136,18 +231,61 @@ export default function ContagemPage() {
     );
   }, [pacotes, filtro]);
 
+  const feedbackCor =
+    feedback?.tipo === 'sucesso'
+      ? 'bg-emerald-500 text-white'
+      : feedback?.tipo === 'duplicado'
+      ? 'bg-red-500 text-white'
+      : feedback?.tipo === 'erro'
+      ? 'bg-amber-500 text-white'
+      : 'bg-neutral-800 text-white';
+
   return (
     <div className="space-y-4 animate-slide-up">
+      {feedback && (
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-3 max-w-[92vw] w-auto animate-slide-down ${feedbackCor}`}
+        >
+          {feedback.tipo === 'sucesso' ? (
+            <CheckCircle2 className="h-5 w-5 shrink-0" />
+          ) : feedback.tipo === 'duplicado' ? (
+            <Ban className="h-5 w-5 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+          )}
+          <div className="min-w-0">
+            <div className="font-black text-[14px] leading-tight">
+              {feedback.tipo === 'sucesso' ? 'Contado ✅' : feedback.tipo === 'duplicado' ? 'Duplicado ❌' : 'Aviso'}
+              {feedback.codigo && (
+                <span className="ml-2 tabular-nums font-black opacity-95">#{feedback.codigo}</span>
+              )}
+            </div>
+            {feedback.mensagem && (
+              <div className="text-[11.5px] opacity-90 leading-tight">{feedback.mensagem}</div>
+            )}
+          </div>
+        </div>
+      )}
+
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
             Contagem de pacotes
           </h1>
           <p className="mt-1 text-sm text-neutral-600">
-            Câmera, leitor externo ou digitação · salvo no banco · não perde em refresh
+            Câmera, leitor externo ou digitação · sem duplicatas · salvo no banco
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSom((s) => !s)}
+            title={som ? 'Desativar som' : 'Ativar som'}
+          >
+            {som ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            {som ? 'Som ON' : 'Som OFF'}
+          </Button>
           <Button
             size="sm"
             variant="secondary"
@@ -175,10 +313,10 @@ export default function ContagemPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  Total lidos
+                  Total de IDs únicos
                 </p>
                 <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums bg-gradient-to-b from-neutral-900 to-blue-800 bg-clip-text text-transparent">
-                  {total}
+                  {unicos}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
@@ -193,6 +331,14 @@ export default function ContagemPage() {
                 </span>
               </div>
             )}
+            {ultimoDuplicado && !ultimoLido && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
+                <Ban className="h-4 w-4 text-red-600 shrink-0" />
+                <span className="text-[12px] font-semibold text-red-800 truncate">
+                  Duplicado: <span className="font-black text-red-900">#{ultimoDuplicado.codigo_pacote}</span>
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -201,10 +347,10 @@ export default function ContagemPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  IDs únicos
+                  Leituras totais
                 </p>
                 <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-ml-blue">
-                  {unicos}
+                  {pacotes.length}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-ml-blue shadow-sm">
@@ -213,8 +359,9 @@ export default function ContagemPage() {
             </div>
             <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2">
               <span className="text-[12px] font-semibold text-neutral-600">
-                Duplicados detectados:{' '}
-                <span className="font-black text-neutral-900">{total - unicos}</span>
+                {unicos === pacotes.length
+                  ? '✨ 100% sem duplicatas'
+                  : `Duplicatas bloqueadas: ${pacotes.length - unicos}`}
               </span>
             </div>
           </CardContent>
@@ -275,23 +422,22 @@ export default function ContagemPage() {
             })}
           </div>
 
-          {modo === 'camera' && (
-            <QrCodeScanner onCodigoLido={onCodigoCamera} />
-          )}
+          {modo === 'camera' && <QrCodeScanner onCodigoLido={onCodigoCamera} />}
 
           {modo === 'leitor' && (
             <form onSubmit={onSubmitLeitor} className="space-y-2">
               <Label htmlFor="leitor-input" className="flex items-center gap-1.5">
                 <Usb className="h-3.5 w-3.5 text-neutral-500" />
-                Leitor externo (USB / serial) · aperte ENTER após leitura
+                Leitor externo (USB / serial / HID) · campo sempre em foco
               </Label>
               <div className="flex gap-2">
                 <Input
                   id="leitor-input"
                   ref={inputLeitorRef}
-                  placeholder="Cole ou aponte o leitor aqui..."
+                  placeholder="Aponte o leitor..."
                   value={codigoLeitor}
                   onChange={(e) => setCodigoLeitor(e.target.value)}
+                  onBlur={(e) => setTimeout(() => e.target.focus(), 50)}
                   className="!h-14 text-lg font-bold tabular-nums tracking-wide"
                   autoComplete="off"
                   autoCorrect="off"
@@ -308,8 +454,8 @@ export default function ContagemPage() {
                 </Button>
               </div>
               <p className="text-[11.5px] text-neutral-500">
-                Dica: leitores externos geralmente enviam Enter automaticamente após cada leitura.
-                Campo sempre em foco neste modo.
+                Dica: leitores externos enviam Enter automaticamente após cada leitura.
+                Se perder o foco, ele volta sozinho em 50ms.
               </p>
             </form>
           )}
@@ -352,14 +498,14 @@ export default function ContagemPage() {
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4 text-neutral-500" />
             <Input
-              placeholder={`Buscar nos ${pacotes.length} pacotes...`}
+              placeholder={`Buscar nos ${pacotes.length} IDs...`}
               value={filtro}
               onChange={(e) => setFiltro(e.target.value)}
               className="!h-10"
             />
           </div>
           <div className="text-[11.5px] font-semibold text-neutral-500">
-            Exibindo {filtrados.length} de {pacotes.length}
+            Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID no banco
           </div>
         </CardContent>
       </Card>
@@ -393,6 +539,7 @@ export default function ContagemPage() {
             const oMeta = origemMap[p.origem];
             const OIcon = oMeta.icon;
             const destaque = flashId === p.id;
+            const shaking = shakeId === p.id;
             const d = new Date(p.created_at);
             return (
               <Card
@@ -400,6 +547,8 @@ export default function ContagemPage() {
                 className={`overflow-hidden transition-all duration-300 ${
                   destaque
                     ? 'ring-2 ring-emerald-400 shadow-lg bg-emerald-50/50 border-emerald-200'
+                    : shaking
+                    ? 'ring-2 ring-red-400 animate-shake border-red-200 bg-red-50/40'
                     : 'hover:shadow-sm'
                 }`}
               >

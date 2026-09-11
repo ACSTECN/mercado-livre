@@ -130,3 +130,11 @@ export type PacoteLido = {
 export type PacoteLidoLocal = PacoteLido & {
   sincronizado?: boolean;
 };
+
+export type ResultadoAdicaoPacote = {
+  sucesso: boolean;
+  duplicado: boolean;
+  pacote?: PacoteLidoLocal;
+  existente?: PacoteLidoLocal;
+  mensagem?: string;
+};

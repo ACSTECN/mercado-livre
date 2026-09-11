@@ -86,6 +86,17 @@ const config: Config = {
           from: { transform: 'translateY(10px)', opacity: '0' },
           to: { transform: 'translateY(0)', opacity: '1' },
         },
+        'slide-down': {
+          from: { transform: 'translate(-50%, -16px)', opacity: '0' },
+          to: { transform: 'translate(-50%, 0)', opacity: '1' },
+        },
+        shake: {
+          '0%,100%': { transform: 'translateX(0)' },
+          '20%': { transform: 'translateX(-6px)' },
+          '40%': { transform: 'translateX(6px)' },
+          '60%': { transform: 'translateX(-4px)' },
+          '80%': { transform: 'translateX(4px)' },
+        },
         'pulse-slow': {
           '0%,100%': { opacity: '1' },
           '50%': { opacity: '0.6' },
@@ -94,6 +105,8 @@ const config: Config = {
       animation: {
         'fade-in': 'fade-in 0.3s ease-out',
         'slide-up': 'slide-up 0.35s ease-out',
+        'slide-down': 'slide-down 0.25s ease-out',
+        shake: 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
         'pulse-slow': 'pulse-slow 2s ease-in-out infinite',
       },
     },
