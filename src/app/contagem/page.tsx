@@ -48,8 +48,14 @@ import {
   Users,
   RefreshCw,
   Filter,
+  HardDrive,
+  Database,
+  FileJson,
+  Upload,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
+import { PacoteService } from '@/services/packages/PacoteService';
+import { SacaService } from '@/services/packages/SacaService';
 
 type Modo = 'camera' | 'leitor' | 'manual';
 
@@ -954,6 +960,15 @@ export default function ContagemPage() {
     sacas: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
     pacotes: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
   } | null>(null);
+  const [diagnostico, setDiagnostico] = React.useState<{
+    etapa: string;
+    ok: boolean;
+    detalhe: string;
+    tabelasBanco?: { sacas: number | null; pacotes: number | null };
+  } | null>(null);
+  const [mostrarBackup, setMostrarBackup] = React.useState(false);
+  const [backupMsg, setBackupMsg] = React.useState<{ ok: boolean; texto: string } | null>(null);
+  const inputArquivoRef = React.useRef<HTMLInputElement | null>(null);
   const [som, setSom] = React.useState<boolean>(() => {
     try {
       const raw = localStorage.getItem('ml_som_contagem');
@@ -2207,7 +2222,7 @@ export default function ContagemPage() {
             setResultadoSync(r);
           } finally {
             setSincronizando(false);
-            setTimeout(() => setResultadoSync(null), 7000);
+            setTimeout(() => setResultadoSync(null), 10000);
           }
         }}
         disabled={sincronizando}
@@ -2220,6 +2235,161 @@ export default function ContagemPage() {
         )}
         {sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}
       </button>
+
+      <div className="fixed bottom-4 left-4 z-[90] flex flex-col gap-2 items-end sm:items-start">
+        <button
+          type="button"
+          onClick={async () => {
+            setDiagnostico({ etapa: 'Testando conexão com Supabase…', ok: false, detalhe: '…' });
+            try {
+              const conn = await PacoteService.testarConexaoBanco();
+              if (!conn.ok) {
+                setDiagnostico({ etapa: '❌ Conexão falhou', ok: false, detalhe: conn.erro ?? 'erro desconhecido' });
+                return;
+              }
+              setDiagnostico({
+                etapa: '✅ Banco conectado',
+                ok: true,
+                detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}`,
+                tabelasBanco: conn.tabelas,
+              });
+              setTimeout(() => setDiagnostico(null), 12000);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              setDiagnostico({ etapa: '❌ Exceção', ok: false, detalhe: msg });
+            }
+          }}
+          className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-[13px] font-black text-neutral-800 shadow-xl ring-1 ring-neutral-200 active:scale-95 transition-all hover:bg-neutral-50"
+        >
+          <Database className="h-4 w-4 text-sky-600" />
+          Diagnóstico banco
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMostrarBackup(true)}
+          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 px-4 py-3 text-[13px] font-black text-white shadow-xl shadow-amber-900/20 ring-1 ring-orange-700/10 active:scale-95 transition-all hover:brightness-110"
+        >
+          <HardDrive className="h-4 w-4" />
+          Backup / Recuperar
+        </button>
+
+        {diagnostico && (
+          <div className={`w-[300px] sm:w-[360px] rounded-2xl p-4 shadow-2xl ring-1 animate-slide-up ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
+            <div className="flex items-center gap-2">
+              {diagnostico.ok ? (
+                <Database className="h-5 w-5 text-sky-600" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              )}
+              <p className="text-[13px] font-black text-neutral-900">{diagnostico.etapa}</p>
+            </div>
+            <p className="text-[11.5px] text-neutral-700 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
+            {diagnostico.tabelasBanco && (
+              <p className="mt-2 text-[10.5px] text-neutral-500">
+                Se aparecerem zeros aqui e sua tela mostrar 274 pacotes → os dados estão só LOCAL. Use o botão
+                laranja &quot;Backup / Recuperar&quot; e clique em &quot;Exportar JSON (BAIXAR AGORA)&quot; para
+                salvar um arquivo com tudo ANTES de qualquer coisa.
+              </p>
+            )}
+          </div>
+        )}
+
+        {mostrarBackup && (
+          <div className="w-[300px] sm:w-[420px] rounded-3xl bg-white shadow-2xl ring-1 ring-neutral-200 p-4 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-5 w-5 text-amber-600" />
+                <p className="text-[14px] font-black text-neutral-900">Backup e recuperação</p>
+              </div>
+              <button
+                onClick={() => { setMostrarBackup(false); setBackupMsg(null); }}
+                className="text-neutral-400 hover:text-neutral-800"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-[11.5px] text-neutral-600 mt-2 leading-snug">
+              Os seus registros de hoje estão &quot;vivos&quot; no armazenamento do seu navegador. Baixe um
+              arquivo JSON AGORA para recuperar os 274 pacotes e a saca mesmo se o navegador limpar o cache.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <button
+                onClick={() => {
+                  PacoteService.baixarArquivoBackup();
+                  setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo — ele é a cópia de segurança dos seus 274 pacotes!' });
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 px-3 py-2.5 text-[12px] font-black text-white shadow-lg active:scale-95 transition"
+              >
+                <FileJson className="h-4 w-4" />
+                Exportar JSON (BAIXAR AGORA)
+              </button>
+              <button
+                onClick={() => inputArquivoRef.current?.click()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-3 py-2.5 text-[12px] font-black text-white shadow-lg active:scale-95 transition"
+              >
+                <Upload className="h-4 w-4" />
+                Restaurar backup
+              </button>
+              <input
+                ref={inputArquivoRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={async (ev) => {
+                  const arquivo = ev.target.files?.[0];
+                  if (!arquivo) return;
+                  try {
+                    const texto = await arquivo.text();
+                    const obj = JSON.parse(texto);
+                    const r = PacoteService.importarBackupJson(obj);
+                    if (!r.ok) throw new Error(r.erro ?? 'falhou');
+                    setBackupMsg({ ok: true, texto: `✅ ${r.pacotesRestaurados} pacotes restaurados do arquivo. Agora clique em Sincronizar agora para enviar pro banco.` });
+                    setTimeout(() => window.location.reload(), 1800);
+                  } catch (e) {
+                    const msg = e instanceof Error ? e.message : 'arquivo inválido';
+                    setBackupMsg({ ok: false, texto: `❌ Não restaurou: ${msg}` });
+                  } finally {
+                    if (inputArquivoRef.current) inputArquivoRef.current.value = '';
+                  }
+                }}
+              />
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const sacas = await SacaService.listar();
+                  const pacotes = await PacoteService.listarTodasSacas();
+                  const unicosPorSaca = new Map<string, number>();
+                  for (const p of pacotes) {
+                    const k = p.saca_id ?? '__sem_saca__';
+                    unicosPorSaca.set(k, (unicosPorSaca.get(k) ?? 0) + 1);
+                  }
+                  const detalhe = [
+                    `Sacas locais: ${sacas.length}`,
+                    ...sacas.map((s) => `  · ${s.nome} (${s.status}) — ${unicosPorSaca.get(s.id) ?? 0} pacotes`),
+                    `Pacotes locais (total lidos): ${pacotes.length}`,
+                  ].join('\n');
+                  setBackupMsg({ ok: true, texto: detalhe });
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setBackupMsg({ ok: false, texto: `❌ ${msg}` });
+                }
+              }}
+              className="mt-2 w-full rounded-xl bg-neutral-100 px-3 py-2 text-[11.5px] font-black text-neutral-800 hover:bg-neutral-200 transition"
+            >
+              🔍 Verificar quantidade de dados locais
+            </button>
+            {backupMsg && (
+              <div className={`mt-3 rounded-xl p-3 ring-1 whitespace-pre-line ${backupMsg.ok ? 'bg-emerald-50 ring-emerald-200' : 'bg-red-50 ring-red-200'}`}>
+                <p className={`text-[11.5px] font-bold leading-snug ${backupMsg.ok ? 'text-emerald-900' : 'text-red-900'}`}>
+                  {backupMsg.texto}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {resultadoSync && !sincronizando && (
         <div className="fixed bottom-20 right-4 z-[90] w-[290px] sm:w-[360px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-4 animate-slide-up">

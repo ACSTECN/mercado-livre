@@ -69,7 +69,6 @@ export async function sincronizarSacasAgora(): Promise<{
         status: s.status ?? 'aberta',
         created_at: s.created_at,
         updated_at: s.updated_at ?? new Date().toISOString(),
-        user_id: s.user_id ?? null,
       };
       const idValido = SACA_UUID_RE.test(s.id ?? '');
 
@@ -184,7 +183,15 @@ export const SacaService = {
       try {
         const sb = getSupabase();
         if (sb) {
-          const { error } = await sb.from('sacas').insert(nova);
+          const payload = {
+            id: nova.id,
+            nome: nova.nome,
+            descricao: nova.descricao ?? null,
+            status: nova.status,
+            created_at: nova.created_at,
+            updated_at: nova.updated_at,
+          };
+          const { error } = await sb.from('sacas').insert(payload);
           if (!error) {
             const atualizados = lerSacasLocal();
             const idx = atualizados.findIndex((s) => s.id === nova.id);
@@ -192,10 +199,12 @@ export const SacaService = {
               atualizados[idx] = nova;
               salvarSacasLocal(atualizados);
             }
+          } else {
+            console.error('[sacas] criar insert erro:', error);
           }
         }
-      } catch {
-        /* noop */
+      } catch (e) {
+        console.error('[sacas] criar insert catch:', e);
       }
     }
     return nova;

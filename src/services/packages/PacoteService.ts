@@ -180,7 +180,6 @@ async function sincronizarComSupabase(): Promise<{ sincronizados: number; falhas
         origem: p.origem,
         metadados: p.metadados ?? {},
         created_at: p.created_at,
-        user_id: p.user_id ?? null,
         saca_id: p.saca_id ?? null,
         entregador: p.entregador ?? null,
         status: p.status ?? null,
@@ -374,7 +373,6 @@ export const PacoteService = {
             origem: novo.origem,
             metadados: novo.metadados ?? {},
             created_at: novo.created_at,
-            user_id: novo.user_id,
             saca_id: novo.saca_id,
             entregador: novo.entregador ?? null,
             status: novo.status ?? null,
@@ -584,5 +582,82 @@ export const PacoteService = {
     const r = await sincronizarComSupabase();
     console.log('[sincronia] resultado pacotes:', r);
     return r;
+  },
+
+  exportarBackupJson(): {
+    versao: number;
+    extraidoEm: string;
+    pacotes: PacoteLidoLocal[];
+    sacaAtivaId: string | null;
+    entregadorAtivo: string | null;
+    sacasStoreCache: unknown;
+    pacoteStoreCache: unknown;
+  } {
+    return {
+      versao: 1,
+      extraidoEm: new Date().toISOString(),
+      pacotes: lerLocal(),
+      sacaAtivaId: localStorage.getItem('ml_saca_ativa_id_v1'),
+      entregadorAtivo: localStorage.getItem('ml_entregador_ativo_v1'),
+      sacasStoreCache: (() => {
+        try { return JSON.parse(localStorage.getItem('ml_sacas_store_v1') ?? 'null'); } catch { return null; }
+      })(),
+      pacoteStoreCache: (() => {
+        try { return JSON.parse(sessionStorage.getItem('ml_pacote_store_v1') ?? 'null'); } catch { return null; }
+      })(),
+    };
+  },
+
+  baixarArquivoBackup(): void {
+    const payload = PacoteService.exportarBackupJson();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `backup-mercadolivre-${ts}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  },
+
+  importarBackupJson(
+    payload: unknown,
+  ): {
+    ok: boolean;
+    pacotesRestaurados: number;
+    erro?: string;
+  } {
+    try {
+      if (!payload || typeof payload !== 'object') throw new Error('Arquivo inválido');
+      const p = payload as { pacotes?: PacoteLidoLocal[]; sacaAtivaId?: string | null; entregadorAtivo?: string | null };
+      if (!Array.isArray(p.pacotes)) throw new Error('Arquivo sem campo "pacotes" array');
+      salvarLocal(p.pacotes);
+      if (typeof p.sacaAtivaId === 'string' && p.sacaAtivaId) localStorage.setItem('ml_saca_ativa_id_v1', p.sacaAtivaId);
+      if (typeof p.entregadorAtivo === 'string' && p.entregadorAtivo) localStorage.setItem('ml_entregador_ativo_v1', p.entregadorAtivo);
+      return { ok: true, pacotesRestaurados: p.pacotes.length };
+    } catch (e) {
+      const mensagem = e instanceof Error ? e.message : 'Erro desconhecido';
+      console.error('[backup] importarBackupJson falhou:', e);
+      return { ok: false, pacotesRestaurados: 0, erro: mensagem };
+    }
+  },
+
+  async testarConexaoBanco(): Promise<{ ok: boolean; erro?: string; tabelas: { sacas: number | null; pacotes: number | null } }> {
+    if (!isSupabaseConfigurado) return { ok: false, erro: 'Supabase não configurado (.env)', tabelas: { sacas: null, pacotes: null } };
+    const sb = getSupabase();
+    if (!sb) return { ok: false, erro: 'cliente supabase nulo', tabelas: { sacas: null, pacotes: null } };
+    try {
+      const [{ count: cS, error: eS }, { count: cP, error: eP }] = await Promise.all([
+        sb.from('sacas').select('*', { count: 'exact', head: true }),
+        sb.from('pacotes_lidos').select('*', { count: 'exact', head: true }),
+      ]);
+      if (eS || eP) return { ok: false, erro: `sacas:${eS?.message ?? ''} pacotes:${eP?.message ?? ''}`, tabelas: { sacas: cS ?? null, pacotes: cP ?? null } };
+      return { ok: true, tabelas: { sacas: cS ?? null, pacotes: cP ?? null } };
+    } catch (e) {
+      const mensagem = e instanceof Error ? e.message : String(e);
+      return { ok: false, erro: mensagem, tabelas: { sacas: null, pacotes: null } };
+    }
   },
 };
