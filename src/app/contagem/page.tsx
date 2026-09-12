@@ -517,7 +517,7 @@ function SeletorEntregador() {
   };
 
   const escolher = (nome: string) => {
-    store.definirEntregador(nome);
+    void store.definirEntregador(nome);
     fechar();
   };
 
@@ -531,7 +531,7 @@ function SeletorEntregador() {
       escolher(filtrados[0]);
       return;
     }
-    store.definirEntregador(q);
+    void store.definirEntregador(q);
     fechar();
   };
 
@@ -953,6 +953,7 @@ export default function ContagemPage() {
   const alternarStatusRetorno = usePacoteStore((s) => s.alternarStatusRetorno);
   const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
   const forcarSincronizacaoCompleta = usePacoteStore((s) => s.forcarSincronizacaoCompleta);
+  const carregarEntregadoresBanco = usePacoteStore((s) => s.carregarEntregadoresBanco);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
   const [codigoManual, setCodigoManual] = React.useState('');
@@ -1052,12 +1053,15 @@ export default function ContagemPage() {
   }, [som]);
 
   React.useEffect(() => {
-    void carregarSacas().then(() => void carregar());
+    void carregarSacas().then(() => {
+      void carregar();
+      void carregarEntregadoresBanco();
+    });
     const id1 = setInterval(() => {
       void carregarSacas().then(() => void carregar());
     }, 6000);
     return () => clearInterval(id1);
-  }, [carregarSacas, carregar]);
+  }, [carregarSacas, carregar, carregarEntregadoresBanco]);
 
   React.useEffect(() => {
     const cleanup = inscreverRealtime();

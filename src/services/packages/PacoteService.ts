@@ -1,4 +1,4 @@
-import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
+import type { EntregadorCadastrado, PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
 import { exportarParaCsv } from '../spreadsheet/ExcelService';
@@ -6,16 +6,180 @@ import { pegarIdSacaAtiva } from './SacaService';
 
 export const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
 const CHAVE_ENTREGADORES = 'ml_entregadores_v1';
+const CHAVE_ENTREGADORES_BAIXADOS = 'ml_entregadores_baixados_v1';
 
 let _realtimeInscrito = false;
-let _realtimeCallback: ((tipo: 'pacotes' | 'sacas') => void) | null = null;
+let _realtimeCallback: ((tipo: 'pacotes' | 'sacas' | 'entregadores') => void) | null = null;
 let _realtimeRef = 0;
 let _ultimoSyncAllTs = 0;
 let forcarSyncAllRef = false;
+let _ultimoSyncEntregadoresTs = 0;
+let _cacheEntregadores: string[] | null = null;
+let _cacheEntregadoresTs = 0;
+
+function igualArrayString(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function ordenarNomes(arr: string[]): string[] {
+  return [...new Set(arr.map((s) => s.trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }),
+  );
+}
+
+function lerLocalEntregadoresOffline(): string[] {
+  try {
+    const raw = localStorage.getItem(CHAVE_ENTREGADORES);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? ordenarNomes(arr) : [];
+  } catch {
+    return [];
+  }
+}
+
+function salvarLocalEntregadoresOffline(nomes: string[]) {
+  try {
+    localStorage.setItem(CHAVE_ENTREGADORES, JSON.stringify(ordenarNomes(nomes)));
+  } catch {
+    /* noop */
+  }
+}
+
+export function listarEntregadoresSyncOffline(): string[] {
+  return lerLocalEntregadoresOffline();
+}
+
+export async function listarEntregadores(force = false): Promise<string[]> {
+  const agora = Date.now();
+  const cacheValido = _cacheEntregadores && agora - _cacheEntregadoresTs < 2000 && !force;
+  if (cacheValido && _cacheEntregadores) return _cacheEntregadores;
+
+  const offline = lerLocalEntregadoresOffline();
+
+  if (!isSupabaseConfigurado) {
+    const r = offline;
+    _cacheEntregadores = r;
+    _cacheEntregadoresTs = agora;
+    return r;
+  }
+  const sb = getSupabase();
+  if (!sb) {
+    const r = offline;
+    _cacheEntregadores = r;
+    _cacheEntregadoresTs = agora;
+    return r;
+  }
+  try {
+    const ultimoBaixado = (() => {
+      try {
+        const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
+        return raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const usarBanco = force || agora - _ultimoSyncEntregadoresTs > 15000;
+    let baixados: EntregadorCadastrado[] = ultimoBaixado;
+    if (usarBanco) {
+      const { data } = await sb.from('entregadores').select('id,nome,created_at').order('created_at', { ascending: false }).limit(500);
+      if (data && Array.isArray(data)) {
+        baixados = data as EntregadorCadastrado[];
+        _ultimoSyncEntregadoresTs = agora;
+        try { localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(baixados)); } catch { /* noop */ }
+      }
+    }
+    const nomesBanco = ordenarNomes(baixados.map((e) => e.nome));
+    const merged = ordenarNomes([...offline, ...nomesBanco]);
+    salvarLocalEntregadoresOffline(merged);
+    _cacheEntregadores = merged;
+    _cacheEntregadoresTs = agora;
+    return merged;
+  } catch {
+    const r = offline;
+    _cacheEntregadores = r;
+    _cacheEntregadoresTs = agora;
+    return r;
+  }
+}
+
+export async function adicionarEntregador(nome: string): Promise<string[]> {
+  const limpo = nome.trim();
+  if (!limpo) return listarEntregadores();
+  const offlineAgora = lerLocalEntregadoresOffline();
+  if (offlineAgora.map((s) => s.toLowerCase()).includes(limpo.toLowerCase())) {
+    return ordenarNomes(offlineAgora);
+  }
+  const localAtualizado = ordenarNomes([limpo, ...offlineAgora]);
+  salvarLocalEntregadoresOffline(localAtualizado);
+  _cacheEntregadores = localAtualizado;
+  _cacheEntregadoresTs = Date.now();
+
+  if (isSupabaseConfigurado && getSupabase()) {
+    void (async () => {
+      const sb = getSupabase()!;
+      try {
+        const { data } = await sb
+          .from('entregadores')
+          .insert({ nome: limpo })
+          .select('id,nome,created_at')
+          .maybeSingle();
+        if (data) {
+          try {
+            const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
+            const arr: EntregadorCadastrado[] = raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
+            const jaTem = arr.some((e) => e.id === (data as EntregadorCadastrado).id);
+            if (!jaTem) {
+              arr.unshift(data as EntregadorCadastrado);
+              localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(arr));
+            }
+          } catch { /* noop */ }
+        }
+      } catch {
+        /* noop - provavel unique conflito, ja existe */
+      }
+    })();
+  }
+  return localAtualizado;
+}
+
+export async function removerEntregador(nome: string): Promise<string[]> {
+  const limpo = nome.trim();
+  if (!limpo) return listarEntregadores();
+  const offlineAgora = lerLocalEntregadoresOffline().filter((e) => e.toLowerCase() !== limpo.toLowerCase());
+  salvarLocalEntregadoresOffline(offlineAgora);
+  _cacheEntregadores = offlineAgora;
+  _cacheEntregadoresTs = Date.now();
+
+  if (isSupabaseConfigurado && getSupabase()) {
+    void (async () => {
+      const sb = getSupabase()!;
+      try {
+        await sb.from('entregadores').delete().ilike('nome', limpo);
+      } catch { /* noop */ }
+      try {
+        const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
+        const arr: EntregadorCadastrado[] = raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
+        const filtrado = arr.filter((e) => e.nome.toLowerCase() !== limpo.toLowerCase());
+        localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(filtrado));
+      } catch { /* noop */ }
+    })();
+  }
+  return offlineAgora;
+}
+
+export function invalidarCacheEntregadores() {
+  _cacheEntregadores = null;
+  _cacheEntregadoresTs = 0;
+  _ultimoSyncEntregadoresTs = 0;
+}
 
 export function inscreverRealtimePacotes(
   onMudouPacotes: () => void,
   onMudouSacas: () => void,
+  onMudouEntregadores: () => void = () => {},
 ): () => void {
   if (!isSupabaseConfigurado) return () => {};
   const sb = getSupabase();
@@ -24,7 +188,7 @@ export function inscreverRealtimePacotes(
   _realtimeRef += 1;
   const meuRef = _realtimeRef;
 
-  const wrapperCb = (tipo: 'pacotes' | 'sacas') => {
+  const wrapperCb = (tipo: 'pacotes' | 'sacas' | 'entregadores') => {
     if (tipo === 'pacotes') {
       try {
         sessionStorage.removeItem('ml_pacote_store_v1');
@@ -32,13 +196,16 @@ export function inscreverRealtimePacotes(
         /* noop */
       }
       onMudouPacotes();
-    } else {
+    } else if (tipo === 'sacas') {
       try {
         localStorage.removeItem('ml_sacas_store_v1');
       } catch {
         /* noop */
       }
       onMudouSacas();
+    } else {
+      invalidarCacheEntregadores();
+      onMudouEntregadores();
     }
   };
 
@@ -73,11 +240,21 @@ export function inscreverRealtimePacotes(
       )
       .subscribe(() => {});
 
+    const canalEntregadores = sb
+      .channel('entregadores_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'entregadores' },
+        () => _realtimeCallback?.('entregadores'),
+      )
+      .subscribe(() => {});
+
     return () => {
       if (meuRef !== _realtimeRef) return;
       try {
         void sb.removeChannel(canalPacotes).catch(() => {});
         void sb.removeChannel(canalSacas).catch(() => {});
+        void sb.removeChannel(canalEntregadores).catch(() => {});
       } catch {
         /* noop */
       }
@@ -103,35 +280,6 @@ function lerLocal(): PacoteLidoLocal[] {
 
 function salvarLocal(lista: PacoteLidoLocal[]) {
   localStorage.setItem(CHAVE_LOCAL, JSON.stringify(lista));
-}
-
-export function listarEntregadores(): string[] {
-  try {
-    const raw = localStorage.getItem(CHAVE_ENTREGADORES);
-    if (!raw) return [];
-    const arr = JSON.parse(raw) as string[];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-export function salvarEntregadores(lista: string[]) {
-  try {
-    localStorage.setItem(CHAVE_ENTREGADORES, JSON.stringify(lista));
-  } catch {
-    /* noop */
-  }
-}
-
-export function adicionarEntregador(nome: string): string[] {
-  const limpo = nome.trim();
-  if (!limpo) return listarEntregadores();
-  const atual = listarEntregadores();
-  if (atual.includes(limpo)) return atual;
-  const nova = [limpo, ...atual].slice(0, 100);
-  salvarEntregadores(nova);
-  return nova;
 }
 
 function encontrarPorCodigo(lista: PacoteLidoLocal[], codigo: string, sacaId: string | null): PacoteLidoLocal | undefined {

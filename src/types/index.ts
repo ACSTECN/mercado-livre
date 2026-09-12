@@ -119,6 +119,12 @@ export type OrigemLeitura = 'camera' | 'leitor_externo' | 'manual';
 export type StatusSaca = 'aberta' | 'fechada';
 export type StatusPacote = 'retorno';
 
+export type EntregadorCadastrado = {
+  id: string;
+  nome: string;
+  created_at: string;
+};
+
 export type Saca = {
   id: string;
   user_id?: string | null;
