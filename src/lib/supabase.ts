@@ -2,7 +2,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export const VERSAO_HARDCODED_CHAVE = '20260912b-CHAVE-VERDADEIRA-SET-2026';
+export const VERSAO_HARDCODED_CHAVE = '20260912c-HARDCODE-PRIORIDADE-MAXIMA-DEPLOY-NOW';
 
 let singleton: SupabaseClient | null = null;
 
