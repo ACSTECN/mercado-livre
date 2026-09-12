@@ -52,6 +52,7 @@ import {
   Database,
   FileJson,
   Upload,
+  WifiOff,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 import {
@@ -962,6 +963,8 @@ export default function ContagemPage() {
   const [filtro, setFiltro] = React.useState('');
   const [filtroEntregador, setFiltroEntregador] = React.useState<string>('__todos__');
   const [filtroStatus, setFiltroStatus] = React.useState<'__todos__' | 'retorno'>('__todos__');
+  type StatusSincronia = 'ocioso' | 'sincronizando' | 'conectado' | 'erro' | 'offline';
+  const [statusSincronia, setStatusSincronia] = React.useState<StatusSincronia>('ocioso');
   const [exportando, setExportando] = React.useState(false);
   const [flashId, setFlashId] = React.useState<string | null>(null);
   const [shakeId, setShakeId] = React.useState<string | null>(null);
@@ -1053,16 +1056,72 @@ export default function ContagemPage() {
     }
   }, [som]);
 
+  const sincronizarAgoraAuto = React.useCallback(async (forcar = false) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        setStatusSincronia('offline');
+        return;
+      }
+    } catch { /* noop */ }
+    setStatusSincronia('sincronizando');
+    let ok = true;
+    try {
+      await forcarSincronizacaoCompleta();
+    } catch { ok = false; }
+    try {
+      await carregarSacas();
+      await carregar();
+      await carregarEntregadoresBanco();
+    } catch { ok = false; }
+    setStatusSincronia(ok ? 'conectado' : 'erro');
+  }, [forcarSincronizacaoCompleta, carregarSacas, carregar, carregarEntregadoresBanco]);
+
   React.useEffect(() => {
-    void carregarSacas().then(() => {
-      void carregar();
-      void carregarEntregadoresBanco();
+    void carregarSacas().then(async () => {
+      await carregar();
+      await carregarEntregadoresBanco();
+      const estado = usePacoteStore.getState();
+      if (!estado.sacas.length || !estado.sacaAtiva) {
+        try {
+          const hj = new Date();
+          const nome = `Saca Hoje ${String(hj.getDate()).padStart(2, '0')}/${String(hj.getMonth() + 1).padStart(2, '0')}/${hj.getFullYear()}`;
+          await criarSaca(nome);
+          await carregarSacas();
+          await carregar();
+        } catch { /* noop */ }
+      }
+      const t = setTimeout(() => { void sincronizarAgoraAuto(true); }, 1200);
+      return () => clearTimeout(t);
     });
     const id1 = setInterval(() => {
       void carregarSacas().then(() => void carregar());
     }, 6000);
-    return () => clearInterval(id1);
-  }, [carregarSacas, carregar, carregarEntregadoresBanco]);
+    const id2 = setInterval(() => {
+      void sincronizarAgoraAuto(false);
+    }, 30000);
+    return () => { clearInterval(id1); clearInterval(id2); };
+  }, [carregarSacas, carregar, carregarEntregadoresBanco, sincronizarAgoraAuto, criarSaca]);
+
+  React.useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void sincronizarAgoraAuto(true);
+    };
+    const onOnline = () => { setStatusSincronia('conectado'); void sincronizarAgoraAuto(true); };
+    const onOffline = () => { setStatusSincronia('offline'); };
+    try {
+      document.addEventListener('visibilitychange', onVis);
+      window.addEventListener('online', onOnline);
+      window.addEventListener('offline', onOffline);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) setStatusSincronia('offline');
+    } catch { /* noop */ }
+    return () => {
+      try {
+        document.removeEventListener('visibilitychange', onVis);
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+      } catch { /* noop */ }
+    };
+  }, [sincronizarAgoraAuto]);
 
   React.useEffect(() => {
     const cleanup = inscreverRealtime();
@@ -2051,10 +2110,41 @@ export default function ContagemPage() {
               />
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <div className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
-                <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Realtime</span>
-              </div>
+              {(() => {
+                const st = statusSincronia;
+                if (st === 'sincronizando') {
+                  return (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 animate-pulse">
+                      <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                      <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Sincronizando…</span>
+                    </div>
+                  );
+                }
+                if (st === 'offline') {
+                  return (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-orange-50 border border-orange-200 text-orange-800">
+                      <WifiOff className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Fora do ar</span>
+                    </div>
+                  );
+                }
+                if (st === 'erro') {
+                  return (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-red-50 border border-red-200 text-red-700">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Sem conexão</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+                    <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-[10.5px] font-black uppercase tracking-wider px-1">
+                      {st === 'conectado' ? 'Sincronizado' : 'Realtime'}
+                    </span>
+                  </div>
+                );
+              })()}
               <Filter className="h-4 w-4 text-neutral-400 shrink-0" />
               <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl">
                 <button

@@ -438,7 +438,7 @@ export const PacoteService = {
     try {
       const agora = Date.now();
       const forcarSync = forcarSyncAllRef;
-      if (forcarSync || agora - _ultimoSyncAllTs > 40000) {
+      if (forcarSync || agora - _ultimoSyncAllTs > 25000) {
         forcarSyncAllRef = false;
         _ultimoSyncAllTs = agora;
         try {
