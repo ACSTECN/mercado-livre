@@ -53,7 +53,7 @@ type PacoteState = {
   limpar: () => Promise<void>;
   total: () => number;
   unicos: () => number;
-  exportar: () => Promise<void>;
+  exportar: (listaFiltrada?: PacoteLidoLocal[], sufixoNomeArquivo?: string) => Promise<void>;
   limparFeedback: () => void;
   inscreverRealtime: () => () => void;
   forcarSincronizacaoCompleta: () => Promise<{
@@ -618,12 +618,12 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
 
   unicos: () => new Set(get().pacotes.map((p) => p.codigo_pacote)).size,
 
-  exportar: async () => {
+  exportar: async (listaFiltrada?: Parameters<typeof PacoteService.exportarCsv>[2], sufixoNomeArquivo?: string) => {
     const sacaAtual = get().sacaAtiva;
-    const nomeArquivo = sacaAtual
-      ? `saca_${sacaAtual.nome.replace(/\s+/g, '_')}_${Date.now()}.xlsx`
-      : undefined;
-    await PacoteService.exportarCsv(sacaAtual?.id ?? null, nomeArquivo);
+    const base = sacaAtual ? `saca_${sacaAtual.nome.replace(/\s+/g, '_')}` : 'contagem';
+    const parteSufixo = sufixoNomeArquivo ? `_${sufixoNomeArquivo.replace(/\s+/g, '_')}` : '';
+    const nomeArquivo = `${base}${parteSufixo}_${Date.now()}.xlsx`;
+    await PacoteService.exportarCsv(sacaAtual?.id ?? null, nomeArquivo, listaFiltrada);
   },
 
   limparFeedback: () => {

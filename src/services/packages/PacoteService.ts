@@ -1,7 +1,7 @@
 import type { EntregadorCadastrado, PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
-import { exportarParaCsv } from '../spreadsheet/ExcelService';
+import { exportarParaCsv, exportarParaXlsx } from '../spreadsheet/ExcelService';
 import { pegarIdSacaAtiva } from './SacaService';
 
 export const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
@@ -782,8 +782,12 @@ export const PacoteService = {
     return { total: lista.length, unicos: unicos.size };
   },
 
-  async exportarCsv(sacaIdArg?: string | null, nomeArquivo?: string): Promise<void> {
-    const itens = await PacoteService.listar(sacaIdArg);
+  async exportarCsv(
+    sacaIdArg?: string | null,
+    nomeArquivo?: string,
+    listaFiltrada?: Array<{ id: string; codigo_pacote: string; tipo?: string | null; entregador?: string | null; status?: string | null; origem?: string | null; created_at: string; sincronizado?: boolean }>,
+  ): Promise<void> {
+    const itens = listaFiltrada && listaFiltrada.length ? listaFiltrada : await PacoteService.listar(sacaIdArg);
     const linhas = itens.map((h, idx) => {
       const d = new Date(h.created_at);
       return {
@@ -799,7 +803,8 @@ export const PacoteService = {
         Sincronizado: h.sincronizado ? 'Sim' : 'Não',
       };
     });
-    await exportarParaCsv(linhas, nomeArquivo ?? `contagem_pacotes_${Date.now()}.xlsx`);
+    const finalNome = nomeArquivo ?? `contagem_pacotes_${Date.now()}.xlsx`;
+    exportarParaXlsx(linhas, finalNome, 'Pacotes');
   },
 
   async sincronizarAgora(): Promise<{ sincronizados: number; falhas: number; total: number; primeiroErro: string | null }> {

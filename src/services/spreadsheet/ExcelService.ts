@@ -382,3 +382,38 @@ export function exportarParaCsv(
   }
   return csvContent;
 }
+
+export function exportarParaXlsx(
+  registros: Array<Record<string, unknown>>,
+  nomeArquivoSugestao?: string,
+  nomeAba?: string,
+): void {
+  if (typeof window === 'undefined') return;
+  const nomeArquivo = nomeArquivoSugestao ?? `dados_${Date.now()}.xlsx`;
+  const aba = nomeAba ?? 'Dados';
+
+  try {
+    if (!registros || !registros.length) {
+      const vazio: Array<Record<string, unknown>> = [{ Aviso: 'Nenhum registro encontrado.' }];
+      const ws = XLSX.utils.json_to_sheet(vazio);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, aba);
+      XLSX.writeFile(wb, nomeArquivo);
+      return;
+    }
+    const ws = XLSX.utils.json_to_sheet(registros);
+    const cols = Object.keys(registros[0] ?? {}).map((h) => {
+      const maxLen = Math.max(
+        String(h ?? '').length,
+        ...registros.map((r) => String(r[h] ?? '').length),
+      );
+      return { wch: Math.min(60, Math.max(10, maxLen + 2)) };
+    });
+    ws['!cols'] = cols;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, aba);
+    XLSX.writeFile(wb, nomeArquivo);
+  } catch (err) {
+    console.error('[ExcelService] exportarParaXlsx falhou:', err);
+  }
+}

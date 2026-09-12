@@ -1,6 +1,6 @@
 import type { HistoricoConsulta } from '@/types';
 import { gerarId } from '@/lib/utils';
-import { exportarParaCsv } from '../spreadsheet/ExcelService';
+import { exportarParaXlsx } from '../spreadsheet/ExcelService';
 
 const CHAVE_STORAGE = 'ml_historico_consultas_v1';
 const MAXIMO = 500;
@@ -70,6 +70,6 @@ export const HistoryService = {
       CEP: h.enderecoEstruturado?.cep ?? '',
       Usuario: h.usuario ?? '',
     }));
-    await exportarParaCsv(linhas, `historico_consultas_${Date.now()}.xlsx`);
+    exportarParaXlsx(linhas, `historico_consultas_${Date.now()}.xlsx`, 'Historico');
   },
 };

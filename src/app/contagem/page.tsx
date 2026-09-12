@@ -1243,10 +1243,16 @@ export default function ContagemPage() {
   };
 
   const acaoExportar = async () => {
-    if (!pacotes.length) return;
+    if (!filtrados.length) return;
     try {
       setExportando(true);
-      await exportar();
+      const partesNome: string[] = [];
+      if (filtroEntregador !== '__todos__') {
+        partesNome.push(filtroEntregador === '__sem__' ? 'sem_entregador' : filtroEntregador);
+      }
+      if (filtroStatus === 'retorno') partesNome.push('retorno');
+      if (filtro.trim()) partesNome.push('busca');
+      await exportar(filtrados, partesNome.join('__'));
     } finally {
       setExportando(false);
     }
