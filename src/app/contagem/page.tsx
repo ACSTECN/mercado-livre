@@ -57,6 +57,7 @@ import { formatarData, truncate } from '@/lib/utils';
 import {
   NEXT_PUBLIC_SUPABASE_URL_DEBUG,
   NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG,
+  VERSAO_HARDCODED_CHAVE,
 } from '@/lib/supabase';
 import { PacoteService } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
@@ -2301,11 +2302,12 @@ export default function ContagemPage() {
             setDiagnostico({ etapa: 'Testando conexão com Supabase…', ok: false, detalhe: '…' });
             try {
               const conn = await PacoteService.testarConexaoBanco();
+              const extraInfo = [
+                `Build: ${VERSAO_HARDCODED_CHAVE}`,
+                `URL carregada: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
+                `Anon Key: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? '✅ carregada (' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(-8) + ')' : '❌ NÃO ENCONTRADA'}`,
+              ].join('\n');
               if (!conn.ok) {
-                const extraInfo = [
-                  `URL carregada: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
-                  `Anon Key: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? '✅ carregada (' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…)' : '❌ NÃO ENCONTRADA'}`,
-                ].join('\n');
                 setDiagnostico({
                   etapa: '❌ Supabase NÃO está conectado nesse deploy',
                   ok: false,
@@ -2316,7 +2318,7 @@ export default function ContagemPage() {
               setDiagnostico({
                 etapa: '✅ Supabase conectado',
                 ok: true,
-                detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}`,
+                detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}\n\n${extraInfo}`,
                 tabelasBanco: conn.tabelas,
               });
               setTimeout(() => setDiagnostico(null), 12000);
