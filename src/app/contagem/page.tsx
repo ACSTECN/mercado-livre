@@ -994,21 +994,38 @@ export default function ContagemPage() {
   const [feedback, setFeedback] = React.useState<{ tipo: TipoFeedback; mensagem: string; codigo?: string } | null>(null);
   const inputLeitorRef = React.useRef<HTMLInputElement>(null);
   const inputManualRef = React.useRef<HTMLInputElement>(null);
+  const sacaCriadaRef = React.useRef(false);
 
   const pacoteParaMover = React.useMemo(() => {
     if (!moverId) return null;
     return pacotes.find((p) => p.id === moverId) ?? null;
   }, [moverId, pacotes]);
 
-  const focarLeitor = React.useCallback(() => {
-    if (modo === 'leitor') {
-      try {
-        inputLeitorRef.current?.focus({ preventScroll: true });
-      } catch {
-        try { inputLeitorRef.current?.focus(); } catch { /* noop */ }
-      }
+  const algumInputInterativoTemFoco = React.useCallback((): boolean => {
+    try {
+      if (typeof document === 'undefined') return false;
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body) return false;
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) return true;
+      if (el.closest('input, textarea, select, [contenteditable="true"]')) return true;
+      const id = el.id;
+      if (id === 'leitor-input') return false;
+      return false;
+    } catch {
+      return false;
     }
-  }, [modo]);
+  }, []);
+
+  const focarLeitor = React.useCallback(() => {
+    if (modo !== 'leitor') return;
+    if (algumInputInterativoTemFoco()) return;
+    try {
+      inputLeitorRef.current?.focus({ preventScroll: true });
+    } catch {
+      try { inputLeitorRef.current?.focus(); } catch { /* noop */ }
+    }
+  }, [modo, algumInputInterativoTemFoco]);
 
   const clicandoModalMoverRef = React.useRef(false);
   React.useEffect(() => {
@@ -1020,10 +1037,12 @@ export default function ContagemPage() {
       if (clicandoModalMoverRef.current) return;
       const target = event.target as HTMLElement | null;
       if (!target) return;
-      if (target.tagName === 'TEXTAREA' || target.closest('textarea')) return;
-      if (target.id === 'filtro-busca') return;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+      if (target.closest('input, textarea, select, button, a, label, [contenteditable="true"], [role="button"], [role="tabindex"], [tabindex]')) {
+        if (!(target.id === 'leitor-input' || target.closest('#leitor-input'))) return;
+      }
       if (target.id === 'leitor-input' || target.closest('#leitor-input')) return;
-      if (target.id === 'modal-mover-input' || target.closest('#modal-mover-input')) return;
       setTimeout(() => focarLeitor(), 300);
     };
     document.addEventListener('click', handler);
@@ -1033,17 +1052,10 @@ export default function ContagemPage() {
   const onBlurLeitorCondicional = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     const rel = (e.relatedTarget ?? document.activeElement) as HTMLElement | null;
     if (rel) {
-      if (
-        rel.tagName === 'BUTTON' ||
-        rel.tagName === 'A' ||
-        rel.tagName === 'INPUT' ||
-        rel.tagName === 'SELECT' ||
-        rel.tagName === 'TEXTAREA' ||
-        rel.tagName === 'LABEL' ||
-        rel.closest('button,a,input,select,textarea,label,[role="button"],[role="tabindex"],[tabindex]')
-      ) {
-        return;
-      }
+      const tag = rel.tagName;
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'LABEL') return;
+      if (rel.isContentEditable) return;
+      if (rel.closest('button,a,input,select,textarea,label,[role="button"],[role="tabindex"],[tabindex],[contenteditable="true"]')) return;
     }
     setTimeout(() => focarLeitor(), 50);
   }, [focarLeitor]);
@@ -1077,15 +1089,22 @@ export default function ContagemPage() {
   }, [forcarSincronizacaoCompleta, carregarSacas, carregar, carregarEntregadoresBanco]);
 
   React.useEffect(() => {
+    let cancelado = false;
     void carregarSacas().then(async () => {
+      if (cancelado) return;
       await carregar();
       await carregarEntregadoresBanco();
+      if (cancelado) return;
+      const hj = new Date();
+      const nomeSacaHoje = `Saca Hoje ${String(hj.getDate()).padStart(2, '0')}/${String(hj.getMonth() + 1).padStart(2, '0')}/${hj.getFullYear()}`;
       const estado = usePacoteStore.getState();
-      if (!estado.sacas.length || !estado.sacaAtiva) {
+      const jaExisteSacaHoje = estado.sacas.find((s) => s.nome.trim() === nomeSacaHoje);
+      if (jaExisteSacaHoje && estado.sacaAtiva?.id !== jaExisteSacaHoje.id) {
+        try { await definirSacaAtiva(jaExisteSacaHoje.id); } catch { /* noop */ }
+      } else if ((!estado.sacas.length || !estado.sacaAtiva) && !sacaCriadaRef.current) {
+        sacaCriadaRef.current = true;
         try {
-          const hj = new Date();
-          const nome = `Saca Hoje ${String(hj.getDate()).padStart(2, '0')}/${String(hj.getMonth() + 1).padStart(2, '0')}/${hj.getFullYear()}`;
-          await criarSaca(nome);
+          await criarSaca(nomeSacaHoje);
           await carregarSacas();
           await carregar();
         } catch { /* noop */ }
@@ -1099,8 +1118,12 @@ export default function ContagemPage() {
     const id2 = setInterval(() => {
       void sincronizarAgoraAuto(false);
     }, 30000);
-    return () => { clearInterval(id1); clearInterval(id2); };
-  }, [carregarSacas, carregar, carregarEntregadoresBanco, sincronizarAgoraAuto, criarSaca]);
+    return () => {
+      cancelado = true;
+      clearInterval(id1);
+      clearInterval(id2);
+    };
+  }, [carregarSacas, carregar, carregarEntregadoresBanco, sincronizarAgoraAuto, criarSaca, definirSacaAtiva]);
 
   React.useEffect(() => {
     const onVis = () => {
@@ -1129,9 +1152,10 @@ export default function ContagemPage() {
   }, [inscreverRealtime]);
 
   React.useEffect(() => {
+    if (algumInputInterativoTemFoco()) return;
     focarLeitor();
-    if (modo === 'manual' && inputManualRef.current) inputManualRef.current.focus();
-  }, [modo, sacaAtiva, focarLeitor]);
+    if (modo === 'manual' && inputManualRef.current && !algumInputInterativoTemFoco()) inputManualRef.current.focus();
+  }, [modo, sacaAtiva, focarLeitor, algumInputInterativoTemFoco]);
 
   React.useEffect(() => {
     if (ultimoLido) {
