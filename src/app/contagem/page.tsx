@@ -545,54 +545,43 @@ function SeletorEntregador() {
           setAberto((v) => !v);
           setQuery('');
         }}
-        className={`w-full sm:w-auto inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 transition ${
+        className={`w-full sm:w-auto inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 transition ${
           ativo
             ? 'bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-200/70 hover:shadow-sm'
             : 'bg-amber-50 border-amber-200 hover:shadow-sm'
         }`}
       >
         <div
-          className={`h-8 w-8 rounded-xl flex items-center justify-center ${
+          className={`h-7 w-7 rounded-lg flex items-center justify-center ${
             ativo ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'
           }`}
         >
-          {ativo ? <Truck className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+          {ativo ? <Truck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
         </div>
         <div className="text-left min-w-0">
-          <div className={`text-[10.5px] font-bold uppercase tracking-wider ${
+          <div className={`text-[9.5px] font-bold uppercase tracking-wider leading-none mb-0.5 ${
             ativo ? 'text-indigo-500' : 'text-amber-600'
           }`}>
-            Entregador ativo
+            {ativo ? 'Entregador' : 'Selecionar'}
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <div className={`text-[14px] font-black tracking-tight truncate max-w-[180px] ${
+          <div className="flex items-center gap-1 flex-wrap">
+            <div className={`text-[12.5px] font-black tracking-tight truncate max-w-[140px] leading-tight ${
               ativo ? 'text-neutral-900' : 'text-amber-800'
             }`}>
-              {ativo ?? 'Selecione ou crie'}
+              {ativo ?? 'Toque aqui'}
             </div>
             {ativo && (() => {
               const c = mapaContagem.get(ativo);
               if (!c || c.qtd === 0) return null;
               return (
-                <div className="inline-flex items-center gap-1 shrink-0">
-                  <span className="text-[10.5px] font-black tabular-nums bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-md">
-                    {c.qtd}
-                  </span>
-                  {c.retornos > 0 && (
-                    <span
-                      className="inline-flex items-center gap-0.5 text-[10.5px] font-black tabular-nums bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-md ring-1 ring-orange-200/60"
-                      title={`${c.retornos} retorno(s)`}
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      {c.retornos}
-                    </span>
-                  )}
-                </div>
+                <span className="text-[10px] font-black tabular-nums bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded shrink-0">
+                  {c.qtd}
+                </span>
               );
             })()}
           </div>
         </div>
-        <ChevronDown className={`h-4 w-4 shrink-0 ${ativo ? 'text-indigo-400' : 'text-amber-500'} ${aberto ? 'rotate-180' : ''} transition`} />
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 ${ativo ? 'text-indigo-400' : 'text-amber-500'} ${aberto ? 'rotate-180' : ''} transition`} />
       </button>
 
       {aberto && (
@@ -1433,8 +1422,38 @@ export default function ContagemPage() {
     }
   };
 
+  const [menuAberto, setMenuAberto] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuAberto(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  const chipSync = React.useMemo(() => {
+    const st = statusSincronia;
+    if (st === 'sincronizando') {
+      return { bg: 'bg-amber-50', txt: 'text-amber-700', ring: 'ring-amber-200', label: 'Sincronizando', icon: RefreshCw, spin: true, pulse: true };
+    }
+    if (st === 'offline') {
+      return { bg: 'bg-orange-50', txt: 'text-orange-700', ring: 'ring-orange-200', label: 'Fora do ar', icon: WifiOff, spin: false, pulse: false };
+    }
+    if (st === 'erro') {
+      return { bg: 'bg-red-50', txt: 'text-red-700', ring: 'ring-red-200', label: 'Erro', icon: AlertTriangle, spin: false, pulse: true };
+    }
+    return { bg: 'bg-transparent', txt: 'text-emerald-600', ring: 'ring-transparent', label: 'OK', icon: CheckCircle2, spin: false, pulse: false };
+  }, [statusSincronia]);
+  const SyncIcon = chipSync.icon;
+
+  const acaoMenu = (fn: () => void) => { fn(); setMenuAberto(false); };
+
   return (
-    <div className="space-y-4 animate-slide-up">
+    <div className="min-h-screen bg-[#FAFAF9]">
       <ModalNovaSaca />
       <ModalHistoricoSacas />
       <ModalMoverPacote
@@ -1445,63 +1464,332 @@ export default function ContagemPage() {
 
       {feedback && (
         <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-3 max-w-[92vw] w-auto animate-slide-down ${feedbackCor}`}
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 shadow-xl rounded-xl px-4 py-2.5 flex items-center gap-2.5 max-w-[92vw] w-auto animate-slide-down ${feedbackCor}`}
         >
           {feedback.tipo === 'sucesso' ? (
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
           ) : feedback.tipo === 'duplicado' ? (
-            <Ban className="h-5 w-5 shrink-0" />
+            <Ban className="h-4 w-4 shrink-0" />
           ) : feedback.tipo === 'movido' ? (
-            <ArrowRightLeft className="h-5 w-5 shrink-0" />
+            <ArrowRightLeft className="h-4 w-4 shrink-0" />
           ) : (
-            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <AlertTriangle className="h-4 w-4 shrink-0" />
           )}
           <div className="min-w-0">
-            <div className="font-black text-[14px] leading-tight">
+            <div className="font-black text-[13px] leading-tight">
               {feedback.tipo === 'sucesso'
-                ? 'Contado ✅'
+                ? 'Contado'
                 : feedback.tipo === 'movido'
-                ? 'Rota alterada 🔄'
+                ? 'Rota alterada'
                 : feedback.tipo === 'duplicado'
-                ? 'Duplicado ❌'
+                ? 'Duplicado'
                 : 'Aviso'}
               {feedback.codigo && (
-                <span className="ml-2 tabular-nums font-black opacity-95">#{feedback.codigo}</span>
+                <span className="ml-1.5 tabular-nums font-black opacity-95">#{feedback.codigo}</span>
               )}
             </div>
             {feedback.mensagem && (
-              <div className="text-[11.5px] opacity-90 leading-tight">{feedback.mensagem}</div>
+              <div className="text-[11px] opacity-90 leading-tight">{feedback.mensagem}</div>
             )}
           </div>
         </div>
       )}
 
-      {!sacaAtiva && (
-        <Card className="overflow-hidden border-2 border-dashed">
-          <CardContent className="!p-6 sm:!p-8 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5">
-              <div className="min-w-0 flex-1">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-blue-50 border border-blue-200/60 mb-3">
-                  <Calendar className="h-3.5 w-3.5 text-ml-blue" />
-                  <span className="text-[11.5px] font-black uppercase tracking-wider text-blue-800">
-                    Hoje · {hojeFormatado}
-                  </span>
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4 animate-fade-in">
+        {/* ===== HEADER COMPACTO ===== */}
+        <header className="flex items-center gap-2 sm:gap-3 bg-white rounded-2xl px-3 sm:px-4 py-2.5 border border-neutral-200/70 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-sm">
+              <Boxes className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={abrirHistoricoSacas}
+                className="text-left w-full group"
+              >
+                <h1 className="text-[15px] sm:text-[16px] font-black tracking-tight text-neutral-900 truncate leading-tight">
+                  {sacaAtiva ? sacaAtiva.nome : (!sacas.length ? 'Contagem' : 'Escolher saca')}
+                </h1>
+                <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px] sm:text-[11px] text-neutral-500 font-semibold">
+                  {sacaAtiva ? (
+                    <>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ring-1 ${
+                        sacaAtiva.status === 'aberta' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-neutral-100 text-neutral-600 ring-neutral-200'
+                      }`}>
+                        {sacaAtiva.status === 'aberta' ? <Unlock className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
+                        {sacaAtiva.status === 'aberta' ? 'Aberta' : 'Fechada'}
+                      </span>
+                      <span className="hidden sm:inline truncate">
+                        {sacas.length} saca{sacas.length !== 1 ? 's' : ''} · {hojeFormatado}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-amber-700">Sem saca ativa · clique para escolher</span>
+                  )}
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-900">
-                  {sacaHoje ? 'Selecione uma saca para começar' : 'Crie a saca de hoje'}
-                </h2>
-                <p className="text-sm text-neutral-600 mt-2">
-                  {sacaHoje
-                    ? 'Você tem sacas cadastradas. Selecione abaixo para visualizar ou continuar a contagem, ou crie uma nova saca de hoje.'
-                    : 'Cada dia registra uma nova saca. Você também pode abrir e visualizar qualquer saca do histórico abaixo.'}
-                </p>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className={`hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg ring-1 ${chipSync.bg} ${chipSync.txt} ${chipSync.ring} ${chipSync.pulse ? 'animate-pulse' : ''}`}>
+              <SyncIcon className={`h-3 w-3 shrink-0 ${chipSync.spin ? 'animate-spin' : ''}`} />
+              <span className="text-[10px] font-black uppercase tracking-wider">{chipSync.label}</span>
+            </div>
+
+            <SeletorEntregador />
+
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={acaoExportar}
+              disabled={!pacotes.length || exportando}
+              className="!h-9 !px-3"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline text-[12px]">{exportando ? 'Exportando' : 'Excel'}</span>
+            </Button>
+
+            <div ref={menuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuAberto((v) => !v)}
+                className={`h-9 w-9 rounded-xl flex items-center justify-center transition ${
+                  menuAberto ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+                }`}
+                aria-label="Menu"
+                title="Ações"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" className="shrink-0">
+                  <circle cx="5" cy="12" r="1.8" />
+                  <circle cx="12" cy="12" r="1.8" />
+                  <circle cx="19" cy="12" r="1.8" />
+                </svg>
+              </button>
+
+              {menuAberto && (
+                <div className="absolute right-0 top-full mt-1.5 w-[260px] sm:w-[280px] bg-white rounded-2xl shadow-2xl border border-neutral-200 p-1.5 z-[80] animate-slide-up">
+                  <div className="px-2.5 py-1.5 border-b border-neutral-100 mb-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Sincronia</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(async () => {
+                      if (sincronizando) return;
+                      setSincronizando(true);
+                      setResultadoSync(null);
+                      try {
+                        const r = await forcarSincronizacaoCompleta();
+                        setResultadoSync(r);
+                      } finally {
+                        setSincronizando(false);
+                        setTimeout(() => setResultadoSync(null), 9000);
+                      }
+                    })}
+                    disabled={sincronizando}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-4 w-4 text-emerald-600 shrink-0 ${sincronizando ? 'animate-spin' : ''}`} />
+                    Sincronizar agora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(async () => {
+                      setDiagnostico({ etapa: 'Testando conexão…', ok: false, detalhe: '…' });
+                      try {
+                        const conn = await PacoteService.testarConexaoBanco();
+                        const extraInfo = [
+                          `Build: ${VERSAO_HARDCODED_CHAVE}`,
+                          `URL: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
+                          `Anon: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(-8) : '❌ NÃO ENCONTRADA'}`,
+                        ].join('\n');
+                        if (!conn.ok) {
+                          setDiagnostico({ etapa: '❌ Supabase não conectado', ok: false, detalhe: (conn.erro ?? 'erro') + '\n\n' + extraInfo });
+                          return;
+                        }
+                        setDiagnostico({
+                          etapa: '✅ Supabase conectado',
+                          ok: true,
+                          detalhe: `Sacas: ${conn.tabelas.sacas ?? 0} · Pacotes: ${conn.tabelas.pacotes ?? 0}\n\n${extraInfo}`,
+                          tabelasBanco: conn.tabelas,
+                        });
+                        setTimeout(() => setDiagnostico(null), 10000);
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        setDiagnostico({ etapa: '❌ Exceção', ok: false, detalhe: msg });
+                      }
+                    })}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <Database className="h-4 w-4 text-sky-600 shrink-0" />
+                    Diagnóstico banco
+                  </button>
+
+                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Backup</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(() => { PacoteService.baixarArquivoBackup(); setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo.' }); setTimeout(() => setBackupMsg(null), 5000); })}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <FileJson className="h-4 w-4 text-emerald-600 shrink-0" />
+                    Exportar JSON backup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(() => { inputArquivoRef.current?.click(); })}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <Upload className="h-4 w-4 text-neutral-700 shrink-0" />
+                    Restaurar backup…
+                  </button>
+                  <input
+                    ref={inputArquivoRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={async (ev) => {
+                      const arquivo = ev.target.files?.[0];
+                      if (!arquivo) return;
+                      try {
+                        const texto = await arquivo.text();
+                        const obj = JSON.parse(texto);
+                        const r = PacoteService.importarBackupJson(obj);
+                        if (!r.ok) throw new Error(r.erro ?? 'falhou');
+                        setBackupMsg({ ok: true, texto: `✅ ${r.pacotesRestaurados} pacotes restaurados. Recarregando…` });
+                        setTimeout(() => window.location.reload(), 1800);
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : 'arquivo inválido';
+                        setBackupMsg({ ok: false, texto: `❌ Não restaurou: ${msg}` });
+                      } finally {
+                        if (inputArquivoRef.current) inputArquivoRef.current.value = '';
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(async () => {
+                      try {
+                        const sacas = await SacaService.listar();
+                        const pacotes = await PacoteService.listarTodasSacas();
+                        const unicosPorSaca = new Map<string, number>();
+                        for (const p of pacotes) {
+                          const k = p.saca_id ?? '__sem_saca__';
+                          unicosPorSaca.set(k, (unicosPorSaca.get(k) ?? 0) + 1);
+                        }
+                        const detalhe = [
+                          `Sacas locais: ${sacas.length}`,
+                          ...sacas.map((s) => `  · ${s.nome} (${s.status}) — ${unicosPorSaca.get(s.id) ?? 0} pacotes`),
+                          `Pacotes locais: ${pacotes.length}`,
+                        ].join('\n');
+                        setBackupMsg({ ok: true, texto: detalhe });
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        setBackupMsg({ ok: false, texto: `❌ ${msg}` });
+                      }
+                    })}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <HardDrive className="h-4 w-4 text-neutral-600 shrink-0" />
+                    Ver dados locais
+                  </button>
+
+                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Saca</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(() => abrirHistoricoSacas())}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <FolderOpen className="h-4 w-4 text-neutral-600 shrink-0" />
+                    Histórico de sacas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(() => abrirModalSaca())}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <FolderPlus className="h-4 w-4 text-ml-blue shrink-0" />
+                    Criar nova saca
+                  </button>
+                  {sacaAtiva && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuAberto(false);
+                        if (confirm(`Remover TODOS os ${pacotes.length} pacotes da saca "${sacaAtiva.nome}"?`)) void limpar();
+                      }}
+                      disabled={!pacotes.length}
+                      className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-red-700 hover:bg-red-50 transition disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4 shrink-0" />
+                      Limpar saca atual
+                    </button>
+                  )}
+                  {sacaAtiva && sacaAtiva.status === 'aberta' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuAberto(false);
+                        confirmarFecharSaca();
+                      }}
+                      className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    >
+                      <Lock className="h-4 w-4 text-neutral-600 shrink-0" />
+                      Fechar saca atual
+                    </button>
+                  )}
+
+                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Preferências</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSom((s) => !s)}
+                    className="w-full text-left flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      {som ? <Volume2 className="h-4 w-4 text-emerald-600 shrink-0" /> : <VolumeX className="h-4 w-4 text-neutral-500 shrink-0" />}
+                      {som ? 'Som ativado' : 'Som desativado'}
+                    </span>
+                    <div className={`h-5 w-9 rounded-full relative transition ${som ? 'bg-emerald-500' : 'bg-neutral-300'}`}>
+                      <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${som ? 'left-[18px]' : 'left-0.5'}`} />
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* ===== SEM SACA: TELA BOAS-VINDAS MINIMALISTA ===== */}
+        {!sacaAtiva && (
+          <div className="bg-white rounded-2xl border border-neutral-200/70 shadow-sm px-4 sm:px-6 py-6 sm:py-10">
+            <div className="text-center max-w-lg mx-auto">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-lg mx-auto mb-4">
+                <Package className="h-7 w-7" />
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-ml-blue mb-2">
+                {hojeFormatado}
+              </p>
+              <h2 className="text-[22px] sm:text-[26px] font-black tracking-tight text-neutral-900 leading-tight">
+                {sacaHoje ? 'Continue a contagem de hoje' : 'Vamos começar a contagem'}
+              </h2>
+              <p className="text-[13px] text-neutral-500 mt-2 leading-relaxed">
+                {sacaHoje
+                  ? 'Selecione uma saca existente abaixo ou crie uma nova para separar lotes.'
+                  : 'Cada lote/dia é uma "saca" separada. Crie a saca de hoje para começar a escanear.'}
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-5">
                 {sacaHoje && (
                   <Button
                     size="lg"
                     variant="primary"
                     onClick={() => void definirSacaAtiva(sacaHoje.id)}
+                    className="w-full sm:w-auto"
                   >
                     <FolderOpen className="h-4 w-4" />
                     Abrir saca de hoje
@@ -1509,762 +1797,354 @@ export default function ContagemPage() {
                 )}
                 <Button
                   size="lg"
-                  variant="secondary"
+                  variant={sacaHoje ? 'ghost' : 'primary'}
                   onClick={sacaHoje ? abrirModalSaca : criarSacaHoje}
+                  className="w-full sm:w-auto"
                 >
                   <FolderPlus className="h-4 w-4" />
                   {sacaHoje ? 'Criar nova saca' : 'Criar saca de hoje'}
                 </Button>
+                {sacas.length > 0 && (
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    onClick={abrirHistoricoSacas}
+                    className="w-full sm:w-auto"
+                  >
+                    <ListTodo className="h-4 w-4" />
+                    Histórico ({sacas.length})
+                  </Button>
+                )}
               </div>
             </div>
 
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <ListTodo className="h-4 w-4 text-neutral-600" />
-                <h3 className="text-[13px] font-black uppercase tracking-wider text-neutral-700">
-                  Histórico de sacas
-                </h3>
-                {carregandoSacas && (
-                  <span className="text-[11px] font-bold text-neutral-400 inline-flex items-center gap-1.5">
-                    <div className="h-3 w-3 rounded-full border-2 border-neutral-300 border-t-neutral-600 animate-spin" />
-                    sincronizando
-                  </span>
-                )}
-              </div>
-
-              {sacas.length === 0 ? (
-                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-10 text-center">
-                  <Boxes className="h-9 w-9 mx-auto text-neutral-400 mb-2" />
-                  <p className="text-[13px] font-semibold text-neutral-600">
-                    Nenhuma saca registrada ainda.
-                  </p>
-                  <p className="text-[11.5px] text-neutral-500 mt-1">
-                    Clique em "Criar saca de hoje" para começar a contagem.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {sacas.slice(0, 24).map((s) => {
+            {sacas.length > 0 && (
+              <div className="mt-6 sm:mt-8 pt-6 border-t border-neutral-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {sacas.slice(0, 9).map((s) => {
                     const r = resumos.find((x) => x.saca.id === s.id);
                     const d = new Date(s.created_at);
                     const dia = d.toLocaleDateString('pt-BR');
-                    const hor = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                     const ehHoje = s.id === sacaHoje?.id;
                     return (
                       <button
                         type="button"
                         key={s.id}
                         onClick={() => void definirSacaAtiva(s.id)}
-                        className={`group text-left rounded-2xl p-3.5 border transition hover:shadow-md ${
+                        className={`text-left rounded-xl p-3 border transition hover:shadow-sm ${
                           ehHoje
-                            ? 'bg-gradient-to-br from-blue-50 to-emerald-50 border-blue-200/60 hover:border-blue-300'
-                            : 'bg-white border-neutral-200 hover:border-indigo-200'
+                            ? 'bg-sky-50/50 border-sky-200/60'
+                            : 'bg-white border-neutral-200 hover:border-neutral-300'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {ehHoje && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20 text-[10px] font-black uppercase tracking-wider">
-                                  Hoje
-                                </span>
-                              )}
-                              <Badge
-                                variant={s.status === 'aberta' ? 'success' : 'info'}
-                                className="!py-0.5 !px-1.5 !text-[10px]"
-                              >
-                                {s.status === 'aberta' ? 'Aberta' : 'Fechada'}
-                              </Badge>
-                            </div>
-                            <div className={`mt-1.5 font-black tracking-tight leading-tight truncate ${
-                              ehHoje ? 'text-neutral-900 text-[15px]' : 'text-neutral-800 text-[14px]'
-                            }`}>
-                              {s.nome}
-                            </div>
-                            {s.descricao && (
-                              <div className="text-[11px] text-neutral-500 mt-0.5 truncate">{s.descricao}</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {ehHoje && (
+                              <span className="text-[9.5px] font-black uppercase tracking-wider text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded-md shrink-0">
+                                HOJE
+                              </span>
                             )}
+                            <span
+                              className={`font-black tracking-tight truncate ${ehHoje ? 'text-[14px] text-neutral-900' : 'text-[13px] text-neutral-800'}`}
+                            >
+                              {s.nome}
+                            </span>
                           </div>
-                          {s.status === 'aberta' ? (
-                            <Unlock className="h-4 w-4 shrink-0 text-emerald-600" />
-                          ) : (
-                            <Lock className="h-4 w-4 shrink-0 text-neutral-400" />
-                          )}
+                          <span
+                            className={`text-[9.5px] font-black uppercase px-1.5 py-0.5 rounded-md shrink-0 ring-1 ${
+                              s.status === 'aberta'
+                                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                                : 'bg-neutral-100 text-neutral-600 ring-neutral-200'
+                            }`}
+                          >
+                            {s.status === 'aberta' ? 'Aberta' : 'Fechada'}
+                          </span>
                         </div>
-                        <div className="mt-3 flex items-end justify-between gap-2">
+                        <div className="mt-2.5 flex items-end justify-between gap-2">
                           <div>
-                            <div className="text-[18px] font-black tabular-nums leading-none text-neutral-900">
-                              {r ? r.unicos : '…'}
+                            <div className="text-[20px] font-black tabular-nums leading-none text-neutral-900">
+                              {r ? r.unicos : 0}
                             </div>
-                            <div className="text-[10.5px] font-bold text-neutral-500 mt-0.5">IDs únicos</div>
+                            <div className="text-[10px] font-bold text-neutral-500 mt-0.5">IDs</div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-[11px] font-bold text-neutral-600">{dia}</div>
-                            <div className="text-[10px] text-neutral-400">{hor}</div>
+                          <div className="text-right text-[10px] text-neutral-500 font-semibold">
+                            {dia}
                           </div>
-                        </div>
-                        <div className="mt-3 inline-flex items-center gap-1 text-[11.5px] font-black text-indigo-700 opacity-0 group-hover:opacity-100 transition">
-                          Abrir e visualizar <ChevronRight className="h-3.5 w-3.5" />
                         </div>
                       </button>
                     );
                   })}
                 </div>
-              )}
-
-              {sacas.length > 0 && (
-                <div className="pt-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={abrirHistoricoSacas}
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    Ver tudo ({sacas.length}) · Histórico completo
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
-              Contagem de pacotes
-            </h1>
+              </div>
+            )}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {sacaAtiva ? (
-              <button
-                onClick={abrirHistoricoSacas}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200/60 px-3 py-1.5 hover:shadow-sm transition"
-              >
-                <Boxes className="h-4 w-4 text-ml-blue" />
-                <span className="text-[13px] font-black tracking-tight text-neutral-900 truncate max-w-[260px]">
-                  {sacaAtiva.nome}
-                </span>
-                <Badge
-                  variant={sacaAtiva.status === 'aberta' ? 'success' : 'info'}
-                  className="!text-[10px] !py-0.5 !px-1.5"
+        )}
+
+        {sacaAtiva && (
+          <>
+            {/* ===== ESTATÍSTICAS MINIMALISTAS ===== */}
+            <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              {[
+                {
+                  n: escopo.unicos,
+                  lab: filtroEntregador === '__todos__' && filtroStatus === '__todos__' ? 'IDs únicos' : 'Filtrado únicos',
+                  cor: 'text-neutral-900',
+                  corLab: 'text-neutral-500',
+                  badge: ultimoLido ? { txt: 'Último: #' + ultimoLido.codigo_pacote, cor: 'bg-emerald-50 text-emerald-700 ring-emerald-200' } : null,
+                },
+                {
+                  n: escopo.total,
+                  lab: 'Leituras totais',
+                  cor: 'text-ml-blue',
+                  corLab: 'text-neutral-500',
+                  badge: escopo.unicos !== escopo.total
+                    ? { txt: `${escopo.total - escopo.unicos} dup. bloqueadas`, cor: 'bg-amber-50 text-amber-700 ring-amber-200' }
+                    : escopo.total > 0
+                    ? { txt: '100% únicos', cor: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
+                    : null,
+                },
+                {
+                  n: filtroEntregador !== '__todos__' ? (escopo.total > 0 ? 1 : 0) : escopo.entregadores,
+                  lab: 'Entregadores',
+                  cor: 'text-violet-600',
+                  corLab: 'text-neutral-500',
+                  badge: entregadorAtivo ? { txt: 'Ativo: ' + entregadorAtivo, cor: 'bg-violet-50 text-violet-700 ring-violet-200' } : null,
+                },
+                {
+                  n: escopo.retornos,
+                  lab: 'Retornos',
+                  cor: 'text-orange-600',
+                  corLab: 'text-neutral-500',
+                  badge: escopo.retornos > 0 && escopo.total > 0
+                    ? { txt: `${Math.round((escopo.retornos / escopo.total) * 100)}% do total`, cor: 'bg-orange-50 text-orange-700 ring-orange-200' }
+                    : null,
+                },
+              ].map((card, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm"
                 >
-                  {sacaAtiva.status === 'aberta' ? 'Aberta' : 'Fechada'}
-                </Badge>
-                <ChevronDown className="h-3.5 w-3.5 text-neutral-400" />
-              </button>
-            ) : (
-              <button
-                onClick={abrirModalSaca}
-                className="inline-flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-3 py-1.5"
-              >
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <span className="text-[13px] font-bold text-amber-800">Selecione uma saca</span>
-              </button>
-            )}
-            <SeletorEntregador />
-            {sacaAtiva?.descricao && (
-              <p className="text-sm text-neutral-500 truncate max-w-[320px]">
-                {sacaAtiva.descricao}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {sacaAtiva && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                salvarIdSacaAtivaJS(null);
-                window.location.reload();
-              }}
-              title="Todas as sacas"
-            >
-              <Boxes className="h-4 w-4" />
-              Todas
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={abrirHistoricoSacas}
-          >
-            <FolderOpen className="h-4 w-4" />
-            Histórico
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={abrirModalSaca}
-          >
-            <FolderPlus className="h-4 w-4" />
-            Nova saca
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSom((s) => !s)}
-            title={som ? 'Desativar som' : 'Ativar som'}
-          >
-            {som ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            {som ? 'Som ON' : 'Som OFF'}
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={acaoExportar}
-            disabled={!pacotes.length || exportando}
-          >
-            <Download className="h-4 w-4" />
-            {exportando ? 'Exportando...' : 'Exportar Excel'}
-          </Button>
-          <div className="flex gap-1">
-            {sacaAtiva && sacaAtiva.status === 'aberta' && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={confirmarFecharSaca}
-                title="Fechar saca"
-              >
-                <Lock className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={confirmarLimpar}
-              disabled={!pacotes.length}
-              title="Limpar pacotes desta saca"
-            >
-              <Trash2 className="h-4 w-4" /> Limpar
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <section className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <Card className="relative overflow-hidden gradient-card border-emerald-200">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-ml-yellow to-ml-blue" />
-          <CardContent className="!p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                {filtroEntregador === '__todos__' && filtroStatus === '__todos__'
-                  ? 'IDs únicos na saca'
-                  : 'IDs únicos no filtro'}
-                </p>
-                <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums bg-gradient-to-b from-neutral-900 to-blue-800 bg-clip-text text-transparent">
-                  {escopo.unicos}
-                </p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
-                <Package className="h-6 w-6" />
-              </div>
-            </div>
-            {(filtroEntregador !== '__todos__' || filtroStatus !== '__todos__') && (
-              <div className="mt-3 rounded-xl border border-neutral-200 bg-white/60 px-3 py-2 text-[11.5px] font-bold text-neutral-600">
-                {filtroEntregador !== '__todos__' && (
-                  <>
-                    <span>
-                      {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
-                    </span>
-                  </>
-                )}
-                {filtroEntregador !== '__todos__' && filtroStatus === 'retorno' && <span className="mx-1.5">·</span>}
-                {filtroStatus === 'retorno' && <span className="text-orange-700">Apenas retorno</span>}
-              </div>
-            )}
-            {ultimoLido && (
-              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="text-[12px] font-semibold text-emerald-800 truncate">
-                  Último: <span className="font-black text-emerald-900">#{ultimoLido.codigo_pacote}</span>
-                </span>
-              </div>
-            )}
-            {ultimoDuplicado && !ultimoLido && !ultimoMovido && (
-              <div className="mt-3 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
-                <Ban className="h-4 w-4 text-red-600 shrink-0" />
-                <span className="text-[12px] font-semibold text-red-800 truncate">
-                  Duplicado: <span className="font-black text-red-900">#{ultimoDuplicado.codigo_pacote}</span>
-                </span>
-              </div>
-            )}
-            {ultimoMovido && (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 flex items-center gap-2 min-w-0">
-                <ArrowRightLeft className="h-4 w-4 text-amber-600 shrink-0" />
-                <span className="text-[12px] font-semibold text-amber-800 truncate">
-                  Movido: <span className="font-black text-amber-900">#{ultimoMovido.codigo_pacote}</span>
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="!p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  {filtroEntregador === '__todos__' && filtroStatus === '__todos__' ? 'Leituras totais' : 'Leituras no filtro'}
-                </p>
-                <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-ml-blue">
-                  {escopo.total}
-                </p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-ml-blue shadow-sm">
-                <Hash className="h-6 w-6" />
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 space-y-1">
-              <div className="text-[12px] font-semibold text-neutral-600">
-                {escopo.unicos === escopo.total
-                  ? '✨ 100% sem duplicatas'
-                  : `Duplicatas bloqueadas: ${escopo.total - escopo.unicos}`}
-              </div>
-              {escopo.retornos > 0 && (
-                <div className="text-[11.5px] font-black text-orange-700 inline-flex items-center gap-1">
-                  <RefreshCw className="h-3 w-3" /> {escopo.retornos} retorno{escopo.retornos === 1 ? '' : 's'} ·{' '}
-                  {escopo.total ? Math.round((escopo.retornos / escopo.total) * 100) : 0}%
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="!p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  Entregadores
-                </p>
-                <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-violet-600">
-                  {filtroEntregador !== '__todos__' ? (
-                    escopo.total > 0 ? 1 : 0
-                  ) : (
-                    escopo.entregadores
+                  <p className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${card.corLab}`}>
+                    {card.lab}
+                  </p>
+                  <p className={`mt-0.5 text-[26px] sm:text-[30px] font-black tracking-tight tabular-nums leading-tight ${card.cor}`}>
+                    {card.n}
+                  </p>
+                  {card.badge && (
+                    <div className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md ring-1 text-[10.5px] font-bold truncate max-w-full ${card.badge.cor}`}>
+                      <span className="truncate">{card.badge.txt}</span>
+                    </div>
                   )}
-                </p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 shadow-sm">
-                <Users className="h-6 w-6" />
-              </div>
-            </div>
-            {filtroEntregador !== '__todos__' ? (
-              <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
-                <Truck className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span className="text-[12px] font-semibold text-indigo-800 truncate">
-                  Filtrado:{' '}
-                  <span className="font-black text-indigo-900">
-                    {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
-                  </span>
-                </span>
-              </div>
-            ) : entregadorAtivo ? (
-              <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
-                <Truck className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span className="text-[12px] font-semibold text-indigo-800 truncate">
-                  Ativo: <span className="font-black text-indigo-900">{entregadorAtivo}</span>
-                </span>
-              </div>
-            ) : (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 flex items-center gap-2 min-w-0">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                <span className="text-[12px] font-semibold text-amber-800 truncate">
-                  Sem entregador selecionado
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="!p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-neutral-500">
-                  Retornos
-                </p>
-                <p className="mt-1 text-4xl sm:text-5xl font-black tracking-tight tabular-nums text-orange-600">
-                  {escopo.retornos}
-                </p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 shadow-sm">
-                <RefreshCw className="h-6 w-6" />
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50/70 px-3 py-2">
-              <div className="text-[12px] font-bold text-orange-800">
-                {escopo.total ? (
-                  <>
-                    {Math.round((escopo.retornos / escopo.total) * 100)}%
-                    <span className="font-semibold text-orange-700 ml-1">
-                      dos {escopo.total} pacotes
-                    </span>
-                  </>
-                ) : (
-                  <span className="font-semibold">Sem pacotes no filtro</span>
-                )}
-              </div>
-              {escopo.retornos === 0 && (
-                <div className="text-[10.5px] font-bold uppercase tracking-wider text-orange-600/80 mt-0.5">
-                  Zero retornos até agora
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+              ))}
+            </section>
 
-      {contagemEntregadores.length > 0 && (
-        <Card>
-          <CardContent className="!p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4 text-violet-600" />
-                <h3 className="text-[13px] font-black uppercase tracking-wider text-neutral-700">
-                  Por entregador
-                </h3>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setFiltroEntregador('__todos__')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                    filtroEntregador === '__todos__'
-                      ? 'bg-neutral-900 text-white'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                  }`}
-                >
-                  Todos
-                </button>
-                {contagemEntregadores.map(({ nome, qtd, retornos }) => {
-                  const selecionado =
-                    filtroEntregador === (nome === 'Sem entregador' ? '__sem__' : nome);
-                  return (
-                    <button
-                      key={nome}
-                      type="button"
-                      onClick={() =>
-                        setFiltroEntregador(nome === 'Sem entregador' ? '__sem__' : nome)
-                      }
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1.5 ${
-                        selecionado
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : nome === 'Sem entregador'
-                          ? 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
-                      }`}
-                    >
-                      <span className="truncate max-w-[120px]">{nome}</span>
-                      <span
-                        className={`tabular-nums inline-flex items-center gap-0.5 ${
-                          selecionado ? 'text-white/90' : 'opacity-90'
+            {/* ===== POR ENTREGADOR: SÓ CHIPS ===== */}
+            {contagemEntregadores.length > 0 && (
+              <div className="bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Truck className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mr-0.5">
+                    Entregadores
+                  </span>
+                  <div className="w-px h-4 bg-neutral-200 mx-0.5" />
+                  <button
+                    type="button"
+                    onClick={() => setFiltroEntregador('__todos__')}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
+                      filtroEntregador === '__todos__'
+                        ? 'bg-neutral-900 text-white'
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {contagemEntregadores.map(({ nome, qtd, retornos }) => {
+                    const selecionado = filtroEntregador === (nome === 'Sem entregador' ? '__sem__' : nome);
+                    return (
+                      <button
+                        key={nome}
+                        type="button"
+                        onClick={() => setFiltroEntregador(nome === 'Sem entregador' ? '__sem__' : nome)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold transition ${
+                          selecionado
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : nome === 'Sem entregador'
+                            ? 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                            : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
                         }`}
                       >
-                        <span>{qtd}</span>
+                        <span className="truncate max-w-[140px]">{nome}</span>
+                        <span
+                          className={`tabular-nums font-black text-[10.5px] px-1 py-0.5 rounded ${
+                            selecionado ? 'bg-white/20' : 'bg-white/70'
+                          }`}
+                        >
+                          {qtd}
+                        </span>
                         {retornos > 0 && (
                           <span
-                            className={`inline-flex items-center gap-0.5 px-1 rounded ${
-                              selecionado ? 'bg-white/15' : 'bg-orange-100 text-orange-700'
+                            className={`inline-flex items-center gap-0.5 tabular-nums font-black text-[10.5px] px-1 py-0.5 rounded ${
+                              selecionado ? 'bg-orange-400/30 text-white' : 'bg-orange-100 text-orange-700'
                             }`}
                           >
-                            <RefreshCw className="h-2.5 w-2.5" />
+                            <RefreshCw className="h-2 w-2" />
                             {retornos}
                           </span>
                         )}
-                      </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ===== MODO LEITURA ===== */}
+            <div className={`bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm ${bloqueado ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-neutral-100 mb-3">
+                {(Object.keys(MODO_META) as Modo[]).map((m) => {
+                  const meta = MODO_META[m];
+                  const Icon = meta.icon;
+                  const ativo = modo === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setModo(m)}
+                      className={`rounded-lg py-2.5 px-2 flex items-center justify-center gap-1.5 font-bold text-[12px] transition ${
+                        ativo
+                          ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-black/5'
+                          : 'text-neutral-500 hover:text-neutral-700'
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${ativo ? 'text-ml-blue' : ''}`} />
+                      <span className="hidden sm:inline">{meta.label}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {contagemEntregadores.slice(0, 12).map(({ nome, qtd, retornos }) => {
-                const pct = pacotes.length ? Math.round((qtd / pacotes.length) * 100) : 0;
-                const pctRetorno = qtd ? Math.round((retornos / qtd) * 100) : 0;
-                const sem = nome === 'Sem entregador';
-                return (
-                  <div
-                    key={nome}
-                    className={`rounded-2xl p-3 border transition ${
-                      sem
-                        ? 'bg-neutral-50 border-neutral-200'
-                        : 'bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-200/60'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span
-                        className={`text-[11px] font-bold uppercase tracking-wider truncate ${
-                          sem ? 'text-neutral-500' : 'text-violet-600'
-                        }`}
-                      >
-                        {nome}
-                      </span>
-                      {retornos > 0 && (
-                        <span
-                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black ${
-                            sem
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-orange-500/15 text-orange-700 ring-1 ring-orange-500/20'
-                          }`}
-                          title={`${retornos} retorno(s)`}
-                        >
-                          <RefreshCw className="h-2.5 w-2.5" />
-                          {retornos}
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      className={`text-[22px] font-black tabular-nums leading-none ${
-                        sem ? 'text-neutral-800' : 'text-violet-700'
-                      }`}
+
+              {modo === 'camera' && <QrCodeScanner onCodigoLido={onCodigoCamera} />}
+
+              {modo === 'leitor' && (
+                <form onSubmit={onSubmitLeitor} className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      id="leitor-input"
+                      ref={inputLeitorRef}
+                      placeholder="Leitor externo…"
+                      value={codigoLeitor}
+                      onChange={(e) => setCodigoLeitor(e.target.value)}
+                      onBlur={onBlurLeitorCondicional}
+                      className="!h-11 text-base font-bold tabular-nums"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                    />
+                    <Button
+                      type="submit"
+                      size="lg"
+                      variant="primary"
+                      disabled={!codigoLeitor.trim()}
+                      className="!h-11 !px-4"
                     >
-                      {qtd}
-                      <span
-                        className={`text-[12px] font-bold ml-1 align-baseline ${
-                          sem ? 'text-neutral-500' : 'text-violet-500/80'
-                        }`}
-                      >
-                        tot.
-                      </span>
-                    </div>
-                    {retornos > 0 && (
-                      <div className="mt-1 text-[12.5px] font-black tabular-nums text-orange-700 leading-tight">
-                        {retornos}
-                        <span className="text-[10.5px] font-bold text-orange-600/80 ml-0.5">
-                          ret. · {pctRetorno}%
-                        </span>
-                      </div>
-                    )}
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-white/70 overflow-hidden relative">
-                      <div
-                        className={`absolute inset-y-0 left-0 h-full rounded-full ${
-                          sem ? 'bg-neutral-400' : 'bg-violet-500'
-                        }`}
-                        style={{ width: `${pct}%` }}
-                      />
-                      {retornos > 0 && pct > 0 && (
-                        <div
-                          className="absolute inset-y-0 right-0 h-full rounded-full bg-orange-500"
-                          style={{
-                            width: `calc(${pct}% * ${retornos / qtd})`,
-                            right: `calc(100% - ${pct}%)`,
-                            clipPath: 'inset(0 100% - right 0 round 9999px 0 0 9999px)',
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div className={`mt-1 text-[10px] font-bold flex items-center justify-between ${sem ? 'text-neutral-500' : 'text-violet-600/80'}`}>
-                      <span>{pct}% da saca</span>
-                      {retornos > 0 && <span className="text-orange-600">{pctRetorno}% ret.</span>}
-                    </div>
+                      <CheckCircle2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className={bloqueado ? 'opacity-60 pointer-events-none' : ''}>
-        <CardContent className="!p-4 space-y-4">
-          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-neutral-100">
-            {(Object.keys(MODO_META) as Modo[]).map((m) => {
-              const meta = MODO_META[m];
-              const Icon = meta.icon;
-              const ativo = modo === m;
-              return (
-                <button
-                  key={m}
-                  onClick={() => setModo(m)}
-                  className={`rounded-xl py-3 px-2 flex flex-col items-center justify-center gap-1 font-bold text-[12.5px] transition ${
-                    ativo
-                      ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-black/5'
-                      : 'text-neutral-500 hover:text-neutral-700'
-                  }`}
-                >
-                  <Icon className={`h-5 w-5 ${ativo ? 'text-ml-blue' : ''}`} />
-                  {meta.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {modo === 'camera' && <QrCodeScanner onCodigoLido={onCodigoCamera} />}
-
-          {modo === 'leitor' && (
-            <form onSubmit={onSubmitLeitor} className="space-y-2">
-              <Label htmlFor="leitor-input" className="flex items-center gap-1.5">
-                <Usb className="h-3.5 w-3.5 text-neutral-500" />
-                Leitor externo (USB / serial / HID) · campo sempre em foco
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="leitor-input"
-                  ref={inputLeitorRef}
-                  placeholder="Aponte o leitor..."
-                  value={codigoLeitor}
-                  onChange={(e) => setCodigoLeitor(e.target.value)}
-                  onBlur={onBlurLeitorCondicional}
-                  className="!h-14 text-lg font-bold tabular-nums tracking-wide"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                />
-                <Button
-                  type="submit"
-                  size="lg"
-                  variant="primary"
-                  disabled={!codigoLeitor.trim()}
-                >
-                  <CheckCircle2 className="h-5 w-5" /> Contar
-                </Button>
-              </div>
-              <p className="text-[11.5px] text-neutral-500">
-                Dica: leitores externos enviam Enter automaticamente após cada leitura.
-                Se perder o foco, ele volta sozinho em 50ms.
-                {entregadorAtivo && (
-                  <span className="block mt-0.5 font-bold text-violet-700">
-                    ✓ Lançando em: {entregadorAtivo}
-                  </span>
-                )}
-              </p>
-            </form>
-          )}
-
-          {modo === 'manual' && (
-            <form onSubmit={onSubmitManual} className="space-y-2">
-              <Label htmlFor="manual-input" className="flex items-center gap-1.5">
-                <PencilLine className="h-3.5 w-3.5 text-neutral-500" />
-                Digite o(s) ID(s) / código(s) do pacote — <span className="text-neutral-500 font-normal">1 por linha, vírgula, espaço</span>
-              </Label>
-              <div className="flex gap-2 items-start">
-                <div className="flex-1 space-y-1">
-                  <Textarea
-                    id="manual-input"
-                    ref={inputManualRef}
-                    placeholder={'Exemplo:\n47960709702\n47960709703\nou: 47960709702, 47960709703'}
-                    value={codigoManual}
-                    onChange={(e) => setCodigoManual(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        const form = (e.currentTarget.closest('form') ?? null) as HTMLFormElement | null;
-                        form?.requestSubmit();
-                      }
-                    }}
-                    rows={5}
-                    className="text-base font-semibold tabular-nums tracking-wide resize-y"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                  />
-                  {codigoManual.trim() && (
-                    <p className="text-[11.5px] font-bold text-neutral-600">
-                      {(() => {
-                        const qtd = Array.from(
-                          new Set(
-                            codigoManual
-                              .split(/[\s,;\n\r\t]+/)
-                              .map((c) => c.trim())
-                              .filter(Boolean),
-                          ),
-                        ).length;
-                        return (
-                          <>
-                            <span className={qtd > 1 ? 'text-indigo-600' : ''}>
-                              {qtd} ID{qtd !== 1 ? 's' : ''} único{qtd !== 1 ? 's' : ''}
-                            </span>{' '}
-                            pronto{qtd !== 1 ? 's' : ''} para contar
-                          </>
-                        );
-                      })()}
+                  {entregadorAtivo && (
+                    <p className="text-[10.5px] font-bold text-violet-700 inline-flex items-center gap-1">
+                      <Truck className="h-3 w-3" /> Lançando em: {entregadorAtivo}
                     </p>
                   )}
-                </div>
-                <Button
-                  type="submit"
-                  size="lg"
-                  variant="primary"
-                  disabled={!codigoManual.trim()}
-                  className="shrink-0"
-                >
-                  <CheckCircle2 className="h-5 w-5" /> Contar
-                </Button>
-              </div>
-              {entregadorAtivo && (
-                <p className="text-[11.5px] font-bold text-violet-700">
-                  ✓ Lançando em: {entregadorAtivo}
-                </p>
+                </form>
               )}
-            </form>
-          )}
-        </CardContent>
-      </Card>
 
-      <Card className={bloqueado ? 'opacity-60' : ''}>
-        <CardContent className="!p-4 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Search className="h-4 w-4 text-neutral-500 shrink-0" />
-              <Input
-                placeholder={`Buscar nos ${pacotes.length} IDs da saca...`}
-                value={filtro}
-                onChange={(e) => setFiltro(e.target.value)}
-                className="!h-10"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {(() => {
-                const st = statusSincronia;
-                if (st === 'sincronizando') {
-                  return (
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 animate-pulse">
-                      <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                      <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Sincronizando…</span>
+              {modo === 'manual' && (
+                <form onSubmit={onSubmitManual} className="space-y-2">
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-1">
+                      <Textarea
+                        id="manual-input"
+                        ref={inputManualRef}
+                        placeholder="Digite os IDs (1 por linha, vírgula ou espaço)…"
+                        value={codigoManual}
+                        onChange={(e) => setCodigoManual(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            const form = (e.currentTarget.closest('form') ?? null) as HTMLFormElement | null;
+                            form?.requestSubmit();
+                          }
+                        }}
+                        rows={4}
+                        className="text-sm font-semibold tabular-nums resize-y"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                      />
+                      {codigoManual.trim() && (
+                        <p className="text-[10.5px] font-bold text-neutral-600">
+                          {(() => {
+                            const qtd = Array.from(
+                              new Set(
+                                codigoManual
+                                  .split(/[\s,;\n\r\t]+/)
+                                  .map((c) => c.trim())
+                                  .filter(Boolean),
+                              ),
+                            ).length;
+                            return (
+                              <span className={qtd > 1 ? 'text-indigo-600' : ''}>
+                                {qtd} ID{qtd !== 1 ? 's' : ''} pronto{qtd !== 1 ? 's' : ''}
+                              </span>
+                            );
+                          })()}
+                        </p>
+                      )}
                     </div>
-                  );
-                }
-                if (st === 'offline') {
-                  return (
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-orange-50 border border-orange-200 text-orange-800">
-                      <WifiOff className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Fora do ar</span>
-                    </div>
-                  );
-                }
-                if (st === 'erro') {
-                  return (
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-red-50 border border-red-200 text-red-700">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-[10.5px] font-black uppercase tracking-wider px-1">Sem conexão</span>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
-                    <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-[10.5px] font-black uppercase tracking-wider px-1">
-                      {st === 'conectado' ? 'Sincronizado' : 'Realtime'}
-                    </span>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      variant="primary"
+                      disabled={!codigoManual.trim()}
+                      className="!h-11 !px-4 shrink-0"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                );
-              })()}
-              <Filter className="h-4 w-4 text-neutral-400 shrink-0" />
-              <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl">
+                  {entregadorAtivo && (
+                    <p className="text-[10.5px] font-bold text-violet-700 inline-flex items-center gap-1">
+                      <Truck className="h-3 w-3" /> Lançando em: {entregadorAtivo}
+                    </p>
+                  )}
+                </form>
+              )}
+            </div>
+
+            {/* ===== FILTROS COMPACTOS ===== */}
+            <div className="flex items-center gap-2 flex-wrap bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-2.5 shadow-sm">
+              <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
+                <Search className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                <Input
+                  placeholder={`Buscar ${pacotes.length} IDs…`}
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="!h-8 !text-[13px] !px-2 !border-0 !ring-0 !p-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 !bg-transparent"
+                />
+              </div>
+              <div className="w-px h-5 bg-neutral-200 mx-0.5 shrink-0" />
+              <div className={`sm:hidden inline-flex items-center gap-1 px-1.5 py-1 rounded-lg ring-1 ${chipSync.bg} ${chipSync.txt} ${chipSync.ring} ${chipSync.pulse ? 'animate-pulse' : ''}`}>
+                <SyncIcon className={`h-2.5 w-2.5 ${chipSync.spin ? 'animate-spin' : ''}`} />
+              </div>
+              <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg shrink-0">
                 <button
                   type="button"
                   onClick={() => setFiltroStatus('__todos__')}
-                  className={`px-2.5 py-1 rounded-lg text-[11.5px] font-bold transition ${
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold transition ${
                     filtroStatus === '__todos__'
-                      ? 'bg-white shadow-sm ring-1 ring-black/5 text-neutral-900'
-                      : 'text-neutral-600 hover:text-neutral-900'
+                      ? 'bg-white shadow-sm text-neutral-900'
+                      : 'text-neutral-500 hover:text-neutral-800'
                   }`}
                 >
                   Todos
@@ -2272,13 +2152,13 @@ export default function ContagemPage() {
                 <button
                   type="button"
                   onClick={() => setFiltroStatus('retorno')}
-                  className={`px-2.5 py-1 rounded-lg text-[11.5px] font-bold transition inline-flex items-center gap-1 ${
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold transition inline-flex items-center gap-1 ${
                     filtroStatus === 'retorno'
-                      ? 'bg-orange-500 text-white shadow-sm'
-                      : 'text-neutral-600 hover:text-orange-700'
+                      ? 'bg-orange-500 text-white'
+                      : 'text-neutral-500 hover:text-orange-700'
                   }`}
                 >
-                  <RefreshCw className="h-3 w-3" />
+                  <RefreshCw className="h-2.5 w-2.5" />
                   Retorno
                   <span className={`tabular-nums opacity-80 ${
                     filtroStatus === 'retorno' ? 'text-white/90' : 'text-neutral-400'
@@ -2287,440 +2167,187 @@ export default function ContagemPage() {
                   </span>
                 </button>
               </div>
-            </div>
-          </div>
-          <div className="text-[11.5px] font-semibold text-neutral-500 flex flex-wrap items-center gap-x-2">
-            <span>
-              Exibindo {filtrados.length} de {pacotes.length} · UNIQUE por ID na saca
-            </span>
-            {filtroEntregador !== '__todos__' && (
-              <span className="text-violet-700">
-                · Entregador:{' '}
-                {filtroEntregador === '__sem__' ? 'Sem entregador' : filtroEntregador}
-              </span>
-            )}
-            {filtroStatus === 'retorno' && (
-              <span className="text-orange-700">· Apenas retorno</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {!filtrados.length ? (
-        <Card>
-          <CardContent className="!p-10 flex flex-col items-center gap-3 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-              <Package className="h-8 w-8" />
-            </div>
-            <div>
-              <h3 className="text-[16px] font-bold text-neutral-900">
-                {pacotes.length
-                  ? filtroEntregador !== '__todos__'
-                    ? 'Nenhum pacote no filtro de entregador'
-                    : 'Nenhum resultado na busca'
-                  : bloqueado
-                  ? 'Selecione uma saca para começar'
-                  : 'Nenhum pacote contado'}
-              </h3>
-              <p className="text-sm text-neutral-600 mt-1">
-                {pacotes.length
-                  ? 'Ajuste o filtro de busca.'
-                  : bloqueado
-                  ? 'Clique em "Nova saca" ou "Sacas" para escolher um lote.'
-                  : 'Use a câmera, leitor externo ou digite o ID para começar.'}
-              </p>
-            </div>
-            {bloqueado && (
-              <div className="flex gap-2 mt-2">
-                <Button variant="primary" size="sm" onClick={abrirModalSaca}>
-                  <FolderPlus className="h-4 w-4" /> Nova saca
-                </Button>
-                <Button variant="ghost" size="sm" onClick={abrirHistoricoSacas}>
-                  <FolderOpen className="h-4 w-4" /> Abrir existente
-                </Button>
+              <div className="text-[10.5px] font-semibold text-neutral-500 shrink-0">
+                {filtrados.length}/{pacotes.length}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2 max-h-[600px] overflow-auto scrollbar-thin pr-1">
-          {filtrados.map((p, idx) => {
-            const origemMap: Record<OrigemLeitura, { label: string; variant: React.ComponentProps<typeof Badge>['variant']; icon: React.ComponentType<{ className?: string }> }> = {
-              camera: { label: 'Câmera', variant: 'info', icon: QrCode },
-              leitor_externo: { label: 'Leitor', variant: 'success', icon: Usb },
-              manual: { label: 'Manual', variant: 'warning', icon: PencilLine },
-            };
-            const oMeta = origemMap[p.origem];
-            const OIcon = oMeta.icon;
-            const destaque = flashId === p.id;
-            const shaking = shakeId === p.id;
-            const d = new Date(p.created_at);
-            return (
-              <Card
-                key={p.id}
-                className={`overflow-hidden transition-all duration-300 ${
-                  destaque
-                    ? 'ring-2 ring-emerald-400 shadow-lg bg-emerald-50/50 border-emerald-200'
-                    : shaking
-                    ? 'ring-2 ring-red-400 animate-shake border-red-200 bg-red-50/40'
-                    : 'hover:shadow-sm'
-                }`}
-              >
-                <CardContent className="!p-3.5 !pl-4 flex items-center gap-3">
-                  <div className="flex w-12 shrink-0 flex-col items-center justify-center">
-                    <div className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
-                      #{pacotes.length - idx}
-                    </div>
-                    <div
-                      className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${
-                        oMeta.variant === 'info'
-                          ? 'bg-blue-50 text-ml-blue'
-                          : oMeta.variant === 'success'
-                          ? 'bg-emerald-50 text-emerald-600'
-                          : 'bg-amber-50 text-amber-600'
-                      }`}
-                    >
-                      <OIcon className="h-5 w-5" />
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[18px] sm:text-[20px] font-black tracking-tight tabular-nums text-neutral-900 break-all">
-                        {p.codigo_pacote}
-                      </span>
-                      {p.tipo && (
-                        <Badge variant="info" className="!py-0.5">
-                          tipo: {p.tipo}
-                        </Badge>
-                      )}
-                      {p.entregador && (
-                        <Badge
-                          className="!py-0.5 !bg-violet-100 !text-violet-700 !border-violet-200"
-                        >
-                          <Truck className="h-3 w-3 mr-1" />
-                          {p.entregador}
-                        </Badge>
-                      )}
-                      {p.status === 'retorno' && (
-                        <Badge
-                          className="!py-0.5 !bg-orange-100 !text-orange-700 !border-orange-200"
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Retorno
-                        </Badge>
-                      )}
-                      <Badge variant={oMeta.variant} className="!py-0.5">
-                        {oMeta.label}
-                      </Badge>
-                      {p.sincronizado ? (
-                        <Badge variant="success" className="!py-0.5 !text-[10px]">
-                          <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> BD
-                        </Badge>
-                      ) : (
-                        <Badge variant="warning" className="!py-0.5 !text-[10px]">
-                          Local
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[11.5px] text-neutral-500">
-                      <Clock className="h-3 w-3" />
-                      {formatarData(d.getTime())}
-                      <span className="text-neutral-300">·</span>
-                      <span className="truncate">ID: {truncate(p.id, 10)}</span>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => void alternarStatusRetorno(p.id)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
-                        p.status === 'retorno'
-                          ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200 hover:bg-orange-200'
-                          : 'text-neutral-400 hover:bg-orange-50 hover:text-orange-600'
-                      }`}
-                      aria-label={p.status === 'retorno' ? 'Desmarcar retorno' : 'Marcar como retorno'}
-                      title={p.status === 'retorno' ? 'Desmarcar retorno' : 'Marcar como retorno'}
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMoverId(p.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-500 hover:bg-amber-50 hover:text-amber-700 transition"
-                      aria-label="Mover entregador"
-                      title="Alterar rota / entregador"
-                    >
-                      <ArrowRightLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void remover(p.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 transition"
-                      aria-label="Remover"
-                      title="Remover da contagem"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={async () => {
-          if (sincronizando) return;
-          setSincronizando(true);
-          setResultadoSync(null);
-          try {
-            const r = await forcarSincronizacaoCompleta();
-            setResultadoSync(r);
-          } finally {
-            setSincronizando(false);
-            setTimeout(() => setResultadoSync(null), 10000);
-          }
-        }}
-        disabled={sincronizando}
-        className="fixed bottom-4 right-4 z-[90] inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 px-4 py-3 text-[13px] font-black text-white shadow-xl shadow-emerald-900/20 ring-1 ring-emerald-700/10 active:scale-95 transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {sincronizando ? (
-          <RefreshCw className="h-4 w-4 animate-spin" />
-        ) : (
-          <RefreshCw className="h-4 w-4" />
-        )}
-        {sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}
-      </button>
-
-      <div className="fixed bottom-4 left-4 z-[90] flex flex-col gap-2 items-end sm:items-start">
-        <button
-          type="button"
-          onClick={async () => {
-            setDiagnostico({ etapa: 'Testando conexão com Supabase…', ok: false, detalhe: '…' });
-            try {
-              const conn = await PacoteService.testarConexaoBanco();
-              const extraInfo = [
-                `Build: ${VERSAO_HARDCODED_CHAVE}`,
-                `URL carregada: ${NEXT_PUBLIC_SUPABASE_URL_DEBUG ? NEXT_PUBLIC_SUPABASE_URL_DEBUG.slice(0, 40) + '…' : '❌ NÃO ENCONTRADA'}`,
-                `Anon Key: ${NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG ? '✅ carregada (' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(0, 8) + '…' + NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG.slice(-8) + ')' : '❌ NÃO ENCONTRADA'}`,
-              ].join('\n');
-              if (!conn.ok) {
-                setDiagnostico({
-                  etapa: '❌ Supabase NÃO está conectado nesse deploy',
-                  ok: false,
-                  detalhe: (conn.erro ?? 'erro desconhecido') + '\n\n' + extraInfo,
-                });
-                return;
-              }
-              setDiagnostico({
-                etapa: '✅ Supabase conectado',
-                ok: true,
-                detalhe: `Sacas no banco: ${conn.tabelas.sacas ?? 0} · Pacotes no banco: ${conn.tabelas.pacotes ?? 0}\n\n${extraInfo}`,
-                tabelasBanco: conn.tabelas,
-              });
-              setTimeout(() => setDiagnostico(null), 12000);
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : String(e);
-              setDiagnostico({ etapa: '❌ Exceção', ok: false, detalhe: msg });
-            }
-          }}
-          className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-[13px] font-black text-neutral-800 shadow-xl ring-1 ring-neutral-200 active:scale-95 transition-all hover:bg-neutral-50"
-        >
-          <Database className="h-4 w-4 text-sky-600" />
-          Diagnóstico banco
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMostrarBackup(true)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 px-4 py-3 text-[13px] font-black text-white shadow-xl shadow-amber-900/20 ring-1 ring-orange-700/10 active:scale-95 transition-all hover:brightness-110"
-        >
-          <HardDrive className="h-4 w-4" />
-          Backup / Recuperar
-        </button>
-
-        {diagnostico && (
-          <div className={`w-[300px] sm:w-[400px] rounded-2xl p-4 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
-            <div className="flex items-center gap-2">
-              {diagnostico.ok ? (
-                <Database className="h-5 w-5 text-sky-600" />
-              ) : (
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-              )}
-              <p className="text-[13px] font-black text-neutral-900">{diagnostico.etapa}</p>
             </div>
-            <p className="text-[11.5px] text-neutral-700 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
-            {!diagnostico.ok && (
-              <div className="mt-2 rounded-xl bg-amber-50 ring-1 ring-amber-200 p-2.5">
-                <p className="text-[10.5px] font-black uppercase tracking-wider text-amber-800">Como consertar em 2 minutos:</p>
-                <ol className="list-decimal list-inside space-y-0.5 mt-1 text-[10.5px] text-amber-950 leading-snug">
-                  <li>Vercel → seu projeto → Settings → Environment Variables.</li>
-                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_URL</b> (ex: <code className="bg-white/60 px-1 rounded">https://xxxx.supabase.co</code>).</li>
-                  <li>Crie <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b> (a chave pública &quot;anon public&quot; do Supabase Project Settings → API).</li>
-                  <li>Importante: marque a checkbox <b>Production</b> ao salvar (e Preview se quiser).</li>
-                  <li>Vercel menu Deployments → clique &quot;Redeploy&quot; no último deploy (ou faça qualquer novo commit).</li>
-                  <li>Se estiver rodando LOCALMENTE (npm run dev), crie um arquivo <code className="bg-white/60 px-1 rounded">.env.local</code> na pasta do projeto com as mesmas 2 linhas.</li>
-                </ol>
-              </div>
-            )}
-            {diagnostico.tabelasBanco && (
-              <p className="mt-2 text-[10.5px] text-neutral-500">
-                Se aparecerem zeros aqui e sua tela mostrar 274 pacotes → os dados estão só LOCAL. Use o botão
-                laranja &quot;Backup / Recuperar&quot; e clique em &quot;Exportar JSON (BAIXAR AGORA)&quot; para
-                salvar um arquivo com tudo ANTES de qualquer coisa.
-              </p>
-            )}
-          </div>
-        )}
 
-        {mostrarBackup && (
-          <div className="w-[300px] sm:w-[420px] rounded-3xl bg-white shadow-2xl ring-1 ring-neutral-200 p-4 animate-slide-up">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-amber-600" />
-                <p className="text-[14px] font-black text-neutral-900">Backup e recuperação</p>
-              </div>
-              <button
-                onClick={() => { setMostrarBackup(false); setBackupMsg(null); }}
-                className="text-neutral-400 hover:text-neutral-800"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-[11.5px] text-neutral-600 mt-2 leading-snug">
-              Os seus registros de hoje estão &quot;vivos&quot; no armazenamento do seu navegador. Baixe um
-              arquivo JSON AGORA para recuperar os 274 pacotes e a saca mesmo se o navegador limpar o cache.
-            </p>
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <button
-                onClick={() => {
-                  PacoteService.baixarArquivoBackup();
-                  setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo — ele é a cópia de segurança dos seus 274 pacotes!' });
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 px-3 py-2.5 text-[12px] font-black text-white shadow-lg active:scale-95 transition"
-              >
-                <FileJson className="h-4 w-4" />
-                Exportar JSON (BAIXAR AGORA)
-              </button>
-              <button
-                onClick={() => inputArquivoRef.current?.click()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-3 py-2.5 text-[12px] font-black text-white shadow-lg active:scale-95 transition"
-              >
-                <Upload className="h-4 w-4" />
-                Restaurar backup
-              </button>
-              <input
-                ref={inputArquivoRef}
-                type="file"
-                accept="application/json,.json"
-                className="hidden"
-                onChange={async (ev) => {
-                  const arquivo = ev.target.files?.[0];
-                  if (!arquivo) return;
-                  try {
-                    const texto = await arquivo.text();
-                    const obj = JSON.parse(texto);
-                    const r = PacoteService.importarBackupJson(obj);
-                    if (!r.ok) throw new Error(r.erro ?? 'falhou');
-                    setBackupMsg({ ok: true, texto: `✅ ${r.pacotesRestaurados} pacotes restaurados do arquivo. Agora clique em Sincronizar agora para enviar pro banco.` });
-                    setTimeout(() => window.location.reload(), 1800);
-                  } catch (e) {
-                    const msg = e instanceof Error ? e.message : 'arquivo inválido';
-                    setBackupMsg({ ok: false, texto: `❌ Não restaurou: ${msg}` });
-                  } finally {
-                    if (inputArquivoRef.current) inputArquivoRef.current.value = '';
-                  }
-                }}
-              />
-            </div>
-            <button
-              onClick={async () => {
-                try {
-                  const sacas = await SacaService.listar();
-                  const pacotes = await PacoteService.listarTodasSacas();
-                  const unicosPorSaca = new Map<string, number>();
-                  for (const p of pacotes) {
-                    const k = p.saca_id ?? '__sem_saca__';
-                    unicosPorSaca.set(k, (unicosPorSaca.get(k) ?? 0) + 1);
-                  }
-                  const detalhe = [
-                    `Sacas locais: ${sacas.length}`,
-                    ...sacas.map((s) => `  · ${s.nome} (${s.status}) — ${unicosPorSaca.get(s.id) ?? 0} pacotes`),
-                    `Pacotes locais (total lidos): ${pacotes.length}`,
-                  ].join('\n');
-                  setBackupMsg({ ok: true, texto: detalhe });
-                } catch (e) {
-                  const msg = e instanceof Error ? e.message : String(e);
-                  setBackupMsg({ ok: false, texto: `❌ ${msg}` });
-                }
-              }}
-              className="mt-2 w-full rounded-xl bg-neutral-100 px-3 py-2 text-[11.5px] font-black text-neutral-800 hover:bg-neutral-200 transition"
-            >
-              🔍 Verificar quantidade de dados locais
-            </button>
-            {backupMsg && (
-              <div className={`mt-3 rounded-xl p-3 ring-1 whitespace-pre-line ${backupMsg.ok ? 'bg-emerald-50 ring-emerald-200' : 'bg-red-50 ring-red-200'}`}>
-                <p className={`text-[11.5px] font-bold leading-snug ${backupMsg.ok ? 'text-emerald-900' : 'text-red-900'}`}>
-                  {backupMsg.texto}
+            {/* ===== LISTA PACOTES COMPACTA ===== */}
+            {!filtrados.length ? (
+              <div className="bg-white rounded-2xl border border-neutral-200/70 px-4 py-10 text-center shadow-sm">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 mx-auto mb-3">
+                  <Package className="h-6 w-6" />
+                </div>
+                <h3 className="text-[14px] font-bold text-neutral-900">
+                  {pacotes.length
+                    ? 'Nenhum resultado nos filtros'
+                    : 'Nenhum pacote escaneado ainda'}
+                </h3>
+                <p className="text-[12px] text-neutral-500 mt-1">
+                  {pacotes.length
+                    ? 'Ajuste a busca ou os filtros.'
+                    : 'Use câmera, leitor ou digite acima.'}
                 </p>
               </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[65vh] overflow-auto scrollbar-thin pr-0.5">
+                {filtrados.map((p, idx) => {
+                  const origemMap: Record<OrigemLeitura, { label: string; variant: React.ComponentProps<typeof Badge>['variant'] }> = {
+                    camera: { label: 'Câmera', variant: 'info' },
+                    leitor_externo: { label: 'Leitor', variant: 'success' },
+                    manual: { label: 'Manual', variant: 'warning' },
+                  };
+                  const oMeta = origemMap[p.origem];
+                  const destaque = flashId === p.id;
+                  const shaking = shakeId === p.id;
+                  const d = new Date(p.created_at);
+                  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div
+                      key={p.id}
+                      className={`bg-white rounded-xl border transition-all duration-300 flex items-center gap-2.5 px-2.5 py-2 ${
+                        destaque
+                          ? 'ring-2 ring-emerald-400 shadow-md bg-emerald-50/40 border-emerald-200'
+                          : shaking
+                          ? 'ring-2 ring-red-400 animate-shake border-red-200 bg-red-50/40'
+                          : 'border-neutral-200/70 hover:border-neutral-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="shrink-0 text-[10px] font-black tabular-nums text-neutral-400 w-6 sm:w-8 text-center">
+                        {pacotes.length - idx}
+                      </div>
+
+                      <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+                        <span className="text-[15px] sm:text-[16px] font-black tracking-tight tabular-nums text-neutral-900 break-all leading-tight">
+                          {p.codigo_pacote}
+                        </span>
+                        {p.entregador && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-[10.5px] font-black truncate max-w-[160px]">
+                            <Truck className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">{p.entregador}</span>
+                          </span>
+                        )}
+                        {p.status === 'retorno' && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-700 ring-1 ring-orange-200 text-[10.5px] font-black">
+                            <RefreshCw className="h-2.5 w-2.5" />
+                            Retorno
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-black ring-1 ${
+                          oMeta.variant === 'info'
+                            ? 'bg-sky-50 text-sky-700 ring-sky-200'
+                            : oMeta.variant === 'success'
+                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                            : 'bg-amber-50 text-amber-700 ring-amber-200'
+                        }`}>
+                          {oMeta.label}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-black ring-1 ${
+                            p.sincronizado
+                              ? 'bg-emerald-50/60 text-emerald-700 ring-emerald-200/60'
+                              : 'bg-amber-50 text-amber-700 ring-amber-200'
+                          }`}
+                        >
+                          {p.sincronizado ? 'BD' : 'Local'}
+                        </span>
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-0.5 text-[10.5px] text-neutral-500">
+                        <Clock className="h-2.5 w-2.5 hidden sm:inline" />
+                        <span className="tabular-nums hidden sm:inline">{hora}</span>
+                        <button
+                          type="button"
+                          onClick={() => void alternarStatusRetorno(p.id)}
+                          className={`ml-0.5 flex h-7 w-7 items-center justify-center rounded-lg transition ${
+                            p.status === 'retorno'
+                              ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200'
+                              : 'text-neutral-400 hover:bg-orange-50 hover:text-orange-600'
+                          }`}
+                          title={p.status === 'retorno' ? 'Desmarcar retorno' : 'Marcar retorno'}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMoverId(p.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-amber-50 hover:text-amber-600 transition"
+                          title="Mover entregador"
+                        >
+                          <ArrowRightLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void remover(p.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 transition"
+                          title="Remover"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
+          </>
+        )}
+
+        {/* ===== POPUPS MENORES ===== */}
+        {diagnostico && (
+          <div className={`fixed bottom-4 right-4 z-[90] w-[280px] sm:w-[380px] rounded-2xl p-3.5 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
+            <div className="flex items-center gap-2">
+              {diagnostico.ok ? (
+                <Database className="h-4 w-4 text-sky-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+              )}
+              <p className="text-[12px] font-black text-neutral-900">{diagnostico.etapa}</p>
+            </div>
+            <p className="text-[11px] text-neutral-700 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
+          </div>
+        )}
+
+        {backupMsg && (
+          <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[92vw] rounded-2xl px-4 py-3 shadow-2xl ring-1 whitespace-pre-line animate-slide-up ${backupMsg.ok ? 'bg-emerald-50 ring-emerald-200' : 'bg-red-50 ring-red-200'}`}>
+            <p className={`text-[12px] font-bold leading-snug ${backupMsg.ok ? 'text-emerald-900' : 'text-red-900'}`}>
+              {backupMsg.texto}
+            </p>
+          </div>
+        )}
+
+        {resultadoSync && !sincronizando && (
+          <div className="fixed bottom-4 right-4 z-[90] w-[270px] sm:w-[330px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-3.5 animate-slide-up">
+            <div className="flex items-center gap-2 mb-2">
+              {resultadoSync.sacas.falhas === 0 && resultadoSync.pacotes.falhas === 0 ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <p className="text-[12px] font-black text-neutral-900">Sincronização OK</p>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <p className="text-[12px] font-black text-neutral-900">Sincronização com falhas</p>
+                </>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
+                <p className="text-neutral-500 font-black uppercase tracking-wider text-[9.5px]">Sacas</p>
+                <p className="text-neutral-900 font-black tabular-nums mt-0.5">
+                  {resultadoSync.sacas.sincronizados}/{resultadoSync.sacas.total}
+                </p>
+              </div>
+              <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
+                <p className="text-neutral-500 font-black uppercase tracking-wider text-[9.5px]">Pacotes</p>
+                <p className="text-neutral-900 font-black tabular-nums mt-0.5">
+                  {resultadoSync.pacotes.sincronizados}/{resultadoSync.pacotes.total}
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {resultadoSync && !sincronizando && (
-        <div className="fixed bottom-20 right-4 z-[90] w-[290px] sm:w-[360px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-4 animate-slide-up">
-          <div className="flex items-center gap-2 mb-2">
-            {resultadoSync.sacas.falhas === 0 && resultadoSync.pacotes.falhas === 0 ? (
-              <>
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                <p className="text-[13px] font-black text-neutral-900">Sincronização concluída</p>
-              </>
-            ) : (
-              <>
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                <p className="text-[13px] font-black text-neutral-900">Sincronização finalizada com falhas</p>
-              </>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-[11.5px]">
-            <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
-              <p className="text-neutral-500 font-bold uppercase tracking-wider text-[10px]">Sacas</p>
-              <p className="text-neutral-900 font-black tabular-nums mt-0.5">
-                {resultadoSync.sacas.sincronizados}/{resultadoSync.sacas.total} ok
-              </p>
-              {resultadoSync.sacas.falhas > 0 && (
-                <p className="text-red-600 font-bold text-[11px] mt-0.5">{resultadoSync.sacas.falhas} falha</p>
-              )}
-            </div>
-            <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
-              <p className="text-neutral-500 font-bold uppercase tracking-wider text-[10px]">Pacotes</p>
-              <p className="text-neutral-900 font-black tabular-nums mt-0.5">
-                {resultadoSync.pacotes.sincronizados}/{resultadoSync.pacotes.total} ok
-              </p>
-              {resultadoSync.pacotes.falhas > 0 && (
-                <p className="text-red-600 font-bold text-[11px] mt-0.5">{resultadoSync.pacotes.falhas} falha</p>
-              )}
-            </div>
-          </div>
-          {(resultadoSync.sacas.primeiroErro || resultadoSync.pacotes.primeiroErro) && (
-            <div className="mt-2 rounded-xl bg-red-50 ring-1 ring-red-100 p-2.5">
-              <p className="text-[10.5px] font-black uppercase tracking-wider text-red-700">Primeiro erro:</p>
-              <p className="text-[11px] text-red-900 mt-0.5 break-all leading-snug">
-                {resultadoSync.sacas.primeiroErro ?? resultadoSync.pacotes.primeiroErro}
-              </p>
-            </div>
-          )}
-          <p className="text-[10.5px] text-neutral-500 mt-2 leading-snug">
-            Abra no outro aparelho ou clique em &quot;Todas&quot; para atualizar o histórico.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
