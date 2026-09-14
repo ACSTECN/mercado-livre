@@ -1,6 +1,6 @@
 import type { EntregadorCadastrado, PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
-import { gerarId } from '@/lib/utils';
+import { gerarId, normalizarCodigoPacote, codigosIguaisNormalizados } from '@/lib/utils';
 import { exportarParaCsv, exportarParaXlsx } from '../spreadsheet/ExcelService';
 import { pegarIdSacaAtiva } from './SacaService';
 
@@ -283,8 +283,58 @@ function salvarLocal(lista: PacoteLidoLocal[]) {
 }
 
 function encontrarPorCodigo(lista: PacoteLidoLocal[], codigo: string, sacaId: string | null): PacoteLidoLocal | undefined {
-  const alvo = codigo.trim();
-  return lista.find((p) => p.codigo_pacote.trim() === alvo && (sacaId ? p.saca_id === sacaId : !p.saca_id));
+  return lista.find((p) => codigosIguaisNormalizados(p.codigo_pacote, codigo) && (sacaId ? p.saca_id === sacaId : !p.saca_id));
+}
+
+async function buscarNoBancoPorCodigo(codigo: string, sacaId: string | null): Promise<PacoteLidoLocal | null> {
+  if (!isSupabaseConfigurado) return null;
+  const sb = getSupabase();
+  if (!sb) return null;
+  const codNorm = normalizarCodigoPacote(codigo);
+  try {
+    let query = sb
+      .from('pacotes_lidos')
+      .select('*');
+    if (sacaId) query = query.eq('saca_id', sacaId);
+    else query = query.is('saca_id', null);
+    const { data } = await query;
+    if (!data || !Array.isArray(data)) return null;
+    const match = (data as PacoteLido[]).find((p) => codigosIguaisNormalizados(p.codigo_pacote, codNorm));
+    if (!match) return null;
+    return { ...match, sincronizado: true };
+  } catch {
+    return null;
+  }
+}
+
+async function buscarHistoricoStatusPorCodigo(codigo: string, sacaAtualId: string | null): Promise<StatusPacote | null> {
+  const alvo = normalizarCodigoPacote(codigo);
+  if (!alvo) return null;
+  const locais = lerLocal();
+  const mesmosCodigosLocal = locais.filter((p) =>
+    codigosIguaisNormalizados(p.codigo_pacote, alvo) &&
+    (sacaAtualId ? p.saca_id !== sacaAtualId : true),
+  );
+  const maisRecente = [...mesmosCodigosLocal].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  if (maisRecente?.status === 'retorno') return 'retorno';
+
+  if (isSupabaseConfigurado && getSupabase()) {
+    const sb = getSupabase()!;
+    try {
+      let q = sb.from('pacotes_lidos').select('status,created_at,codigo_pacote,saca_id');
+      if (sacaAtualId) q = q.neq('saca_id', sacaAtualId);
+      q = q.order('created_at', { ascending: false }).limit(10);
+      const { data } = await q;
+      if (data && Array.isArray(data)) {
+        for (const row of data as Array<{ status?: unknown; created_at?: string; codigo_pacote?: string | null; saca_id?: string | null }>) {
+          if (row.status === 'retorno' && codigosIguaisNormalizados(row.codigo_pacote, alvo)) return 'retorno';
+        }
+      }
+    } catch {
+      /* noop */
+    }
+  }
+  return maisRecente?.status ?? null;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -381,55 +431,6 @@ async function sincronizarComSupabase(): Promise<{ sincronizados: number; falhas
   return { sincronizados: ok, falhas: falha, total: locais.length, primeiroErro };
 }
 
-async function buscarNoBancoPorCodigo(codigo: string, sacaId: string | null): Promise<PacoteLidoLocal | null> {
-  if (!isSupabaseConfigurado) return null;
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    let query = sb
-      .from('pacotes_lidos')
-      .select('*')
-      .eq('codigo_pacote', codigo.trim());
-    if (sacaId) query = query.eq('saca_id', sacaId);
-    else query = query.is('saca_id', null);
-    const { data } = await query.limit(1).maybeSingle();
-    if (!data) return null;
-    return { ...(data as PacoteLido), sincronizado: true };
-  } catch {
-    return null;
-  }
-}
-
-async function buscarHistoricoStatusPorCodigo(codigo: string, sacaAtualId: string | null): Promise<StatusPacote | null> {
-  const alvo = codigo.trim();
-  if (!alvo) return null;
-  const locais = lerLocal();
-  const mesmosCodigosLocal = locais.filter((p) =>
-    p.codigo_pacote.trim() === alvo &&
-    (sacaAtualId ? p.saca_id !== sacaAtualId : true),
-  );
-  const maisRecente = [...mesmosCodigosLocal].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  if (maisRecente?.status === 'retorno') return 'retorno';
-
-  if (isSupabaseConfigurado && getSupabase()) {
-    const sb = getSupabase()!;
-    try {
-      let q = sb.from('pacotes_lidos').select('status,created_at').eq('codigo_pacote', alvo);
-      if (sacaAtualId) q = q.neq('saca_id', sacaAtualId);
-      q = q.order('created_at', { ascending: false }).limit(10);
-      const { data } = await q;
-      if (data && Array.isArray(data)) {
-        for (const row of data as Array<{ status?: unknown; created_at?: string }>) {
-          if (row.status === 'retorno') return 'retorno';
-        }
-      }
-    } catch {
-      /* noop */
-    }
-  }
-  return maisRecente?.status ?? null;
-}
-
 export const PacoteService = {
   async listarTodasSacas(): Promise<PacoteLidoLocal[]> {
     if (!isSupabaseConfigurado) {
@@ -463,24 +464,37 @@ export const PacoteService = {
 
       const todos: PacoteLidoLocal[] = [];
       const idsVistos = new Set<string>();
-      const keyUnica = (p: PacoteLido) => `${p.codigo_pacote}::${p.saca_id ?? '__null__'}`;
-      const chavesVistas = new Set<string>();
+      const chavesNormVistas = new Map<string | null, Set<string>>();
+      const getSacaKey = (s: string | null) => s ?? '__null__';
+      const temChaveDuplicadaNormalizada = (p: PacoteLido): boolean => {
+        const sk = getSacaKey(p.saca_id ?? null);
+        const set = chavesNormVistas.get(sk);
+        if (!set) return false;
+        const codNorm = normalizarCodigoPacote(p.codigo_pacote);
+        return !!(codNorm && set.has(codNorm));
+      };
+      const registrarChaveNormalizada = (p: PacoteLido): void => {
+        const sk = getSacaKey(p.saca_id ?? null);
+        if (!chavesNormVistas.has(sk)) chavesNormVistas.set(sk, new Set());
+        const codNorm = normalizarCodigoPacote(p.codigo_pacote);
+        if (codNorm) chavesNormVistas.get(sk)!.add(codNorm);
+      };
 
       for (const item of data as PacoteLido[]) {
-        const k = keyUnica(item);
-        if (chavesVistas.has(k)) continue;
+        if (idsVistos.has(item.id)) continue;
+        if (temChaveDuplicadaNormalizada(item)) continue;
         idsVistos.add(item.id);
-        chavesVistas.add(k);
+        registrarChaveNormalizada(item);
         const local = mapaLocal.get(item.id);
         todos.push({ ...item, sincronizado: true });
       }
 
       for (const local of locais) {
-        const k = keyUnica(local);
-        if (!idsVistos.has(local.id) && !chavesVistas.has(k)) {
-          chavesVistas.add(k);
-          todos.push(local);
-        }
+        if (idsVistos.has(local.id)) continue;
+        if (temChaveDuplicadaNormalizada(local)) continue;
+        idsVistos.add(local.id);
+        registrarChaveNormalizada(local);
+        todos.push(local);
       }
 
       todos.sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -501,25 +515,25 @@ export const PacoteService = {
     origem: OrigemLeitura,
     extra: Partial<PacoteLido> = {},
   ): Promise<ResultadoAdicaoPacote> {
-    const trimmed = codigo_pacote.trim();
-    if (!trimmed) {
+    const codExtraido = normalizarCodigoPacote(codigo_pacote);
+    if (!codExtraido) {
       return { sucesso: false, duplicado: false, mensagem: 'Código vazio' };
     }
 
     const saca_id = extra.saca_id ?? pegarIdSacaAtiva() ?? null;
     const entregador = extra.entregador ?? null;
     const locais = lerLocal();
-    const jaExisteLocal = encontrarPorCodigo(locais, trimmed, saca_id);
+    const jaExisteLocal = encontrarPorCodigo(locais, codExtraido, saca_id);
     if (jaExisteLocal) {
       return {
         sucesso: false,
         duplicado: true,
         existente: jaExisteLocal,
-        mensagem: `ID ${trimmed} já foi contado nesta saca`,
+        mensagem: `ID ${codExtraido} já foi contado nesta saca`,
       };
     }
 
-    const jaExisteBanco = await buscarNoBancoPorCodigo(trimmed, saca_id);
+    const jaExisteBanco = await buscarNoBancoPorCodigo(codExtraido, saca_id);
     if (jaExisteBanco) {
       if (!jaExisteLocal) {
         locais.unshift(jaExisteBanco);
@@ -529,20 +543,20 @@ export const PacoteService = {
         sucesso: false,
         duplicado: true,
         existente: jaExisteBanco,
-        mensagem: `ID ${trimmed} já está nesta saca no banco`,
+        mensagem: `ID ${codExtraido} já está nesta saca no banco`,
       };
     }
 
     let statusHerado: StatusPacote | null = null;
     const locaisHist = lerLocal();
     const mesmoCodigoLocalSemSaca = locaisHist
-      .filter((p) => p.codigo_pacote.trim() === trimmed && (saca_id ? p.saca_id !== saca_id : true))
+      .filter((p) => codigosIguaisNormalizados(p.codigo_pacote, codExtraido) && (saca_id ? p.saca_id !== saca_id : true))
       .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     if (mesmoCodigoLocalSemSaca?.status === 'retorno') statusHerado = 'retorno';
 
     const novo: PacoteLidoLocal = {
       id: extra.id ?? gerarId(),
-      codigo_pacote: trimmed,
+      codigo_pacote: codExtraido,
       tipo: extra.tipo ?? null,
       origem,
       metadados: extra.metadados ?? null,
@@ -559,7 +573,7 @@ export const PacoteService = {
 
     void (async () => {
       try {
-        const bancoHist = await buscarHistoricoStatusPorCodigo(trimmed, saca_id);
+        const bancoHist = await buscarHistoricoStatusPorCodigo(codExtraido, saca_id);
         if (bancoHist === 'retorno' && novo.status !== 'retorno') {
           const reais = lerLocal();
           const idx = reais.findIndex((p) => p.id === novo.id);
@@ -602,8 +616,8 @@ export const PacoteService = {
           };
           const { error } = await sb.from('pacotes_lidos').insert(payload);
           if (error && /duplicate|unique|23505/i.test(error.message ?? error.code ?? '')) {
-            const atualizados = lerLocal().filter((p) => !(p.codigo_pacote === trimmed && p.saca_id === saca_id));
-            const noBanco = await buscarNoBancoPorCodigo(trimmed, saca_id);
+            const atualizados = lerLocal().filter((p) => !(codigosIguaisNormalizados(p.codigo_pacote, codExtraido) && p.saca_id === saca_id));
+            const noBanco = await buscarNoBancoPorCodigo(codExtraido, saca_id);
             if (noBanco) {
               atualizados.unshift(noBanco);
               salvarLocal(atualizados);
@@ -611,7 +625,7 @@ export const PacoteService = {
                 sucesso: false,
                 duplicado: true,
                 existente: noBanco,
-                mensagem: `ID ${trimmed} já está nesta saca no banco`,
+                mensagem: `ID ${codExtraido} já está nesta saca no banco`,
               };
             }
           }
@@ -634,7 +648,7 @@ export const PacoteService = {
       sucesso: true,
       duplicado: false,
       pacote: novo,
-      mensagem: `ID ${trimmed} contado com sucesso`,
+      mensagem: `ID ${codExtraido} contado com sucesso`,
       statusHerdado: statusHerado,
     };
   },
@@ -778,7 +792,7 @@ export const PacoteService = {
 
   async contar(sacaIdArg?: string | null): Promise<{ total: number; unicos: number }> {
     const lista = await PacoteService.listar(sacaIdArg);
-    const unicos = new Set(lista.map((p) => p.codigo_pacote));
+    const unicos = new Set(lista.map((p) => normalizarCodigoPacote(p.codigo_pacote)).filter(Boolean));
     return { total: lista.length, unicos: unicos.size };
   },
 

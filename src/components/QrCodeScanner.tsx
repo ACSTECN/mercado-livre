@@ -34,19 +34,42 @@ function isLocalhost(): boolean {
   );
 }
 
+import { normalizarCodigoPacote } from '@/lib/utils';
+
 function extrairCodigoDoJson(raw: string): { codigo: string; tipo?: string } {
   const trimmed = raw.trim();
+  if (!trimmed) return { codigo: '' };
+  let tipoEncontrado: string | undefined;
   try {
     const obj = JSON.parse(trimmed);
     if (typeof obj === 'object' && obj !== null) {
-      const cod = String(obj.id ?? obj.codigo ?? obj.code ?? obj.pacote ?? '');
-      const tipo = typeof obj.t === 'string' ? obj.t : typeof obj.type === 'string' ? obj.type : undefined;
-      if (cod) return { codigo: cod, tipo };
+      const entries = Object.entries(obj as Record<string, unknown>);
+      const chavesCod = new Set(['id', 'codigo', 'code', 'cod', 'pacote', 'package', 'nfe', 'numero', 'number']);
+      const chavesTipo = new Set(['t', 'type', 'tipo', 'tp']);
+      for (const [k, v] of entries) {
+        const kl = k.trim().toLowerCase();
+        if (chavesTipo.has(kl) && typeof v === 'string') tipoEncontrado = v;
+      }
+      for (const [k, v] of entries) {
+        const kl = k.trim().toLowerCase();
+        if (chavesCod.has(kl) && v != null) {
+          const c = normalizarCodigoPacote(String(v));
+          if (c) return { codigo: c, tipo: tipoEncontrado };
+        }
+      }
+      for (const [k, v] of entries) {
+        const kl = k.trim().toLowerCase();
+        if (!chavesTipo.has(kl)) {
+          const c = normalizarCodigoPacote(String(v ?? ''));
+          if (c) return { codigo: c, tipo: tipoEncontrado };
+        }
+      }
     }
   } catch {
-    /* não é JSON */
+    /* não é JSON válido, segue fallback */
   }
-  return { codigo: trimmed.replace(/\s+/g, '') };
+  const norm = normalizarCodigoPacote(trimmed);
+  return { codigo: norm, tipo: tipoEncontrado };
 }
 
 export function QrCodeScanner({ onCodigoLido, onClose, className, autoStart = true }: Props) {

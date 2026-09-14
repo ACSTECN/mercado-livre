@@ -84,6 +84,50 @@ export function truncate(str: string, n: number): string {
   return str.length > n ? str.slice(0, n - 1) + '…' : str;
 }
 
+export function normalizarCodigoPacote(raw: string | null | undefined): string {
+  if (!raw) return '';
+  let s = String(raw).trim();
+  if (!s) return '';
+  s = s.replace(/^\uFEFF/, '').trim();
+  try {
+    const obj = JSON.parse(s);
+    if (typeof obj === 'object' && obj !== null) {
+      const entries = Object.entries(obj as Record<string, unknown>);
+      const chavesCod = new Set(['id', 'codigo', 'code', 'cod', 'pacote', 'package', 'nfe', 'numero', 'number']);
+      const chavesTipo = new Set(['t', 'type', 'tipo', 'tp']);
+      for (const [k, v] of entries) {
+        const kl = k.trim().toLowerCase();
+        if (chavesCod.has(kl) && v != null) {
+          const c = String(v).trim();
+          if (c) return c;
+        }
+      }
+      for (const [k, v] of entries) {
+        const kl = k.trim().toLowerCase();
+        if (!chavesTipo.has(kl) && typeof v === 'string' && /^\d{4,}$/.test(v.trim())) return v.trim();
+      }
+    }
+  } catch {
+    /* não é JSON válido, ignora e segue o fallback */
+  }
+  const digitos = s.match(/\d{4,}/g);
+  if (digitos && digitos.length) {
+    const maior = digitos.reduce((a, b) => (a.length >= b.length ? a : b));
+    if (maior.length >= 6) return maior;
+  }
+  return s.replace(/\s+/g, '');
+}
+
+export function codigosIguaisNormalizados(a: string | null | undefined, b: string | null | undefined): boolean {
+  const na = normalizarCodigoPacote(a);
+  const nb = normalizarCodigoPacote(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const da = na.replace(/\D/g, '');
+  const db = nb.replace(/\D/g, '');
+  return !!da && da === db;
+}
+
 export function classNamesConfianca(score: number) {
   if (score >= 85) return 'bg-success/15 text-success border-success/30';
   if (score >= 60) return 'bg-warning/15 text-warning border-warning/30';
