@@ -170,6 +170,42 @@ export async function removerEntregador(nome: string): Promise<string[]> {
   return offlineAgora;
 }
 
+export async function renomearEntregador(nomeAntigo: string, nomeNovo: string): Promise<string[]> {
+  const limpoAntigo = nomeAntigo.trim();
+  const limpoNovo = nomeNovo.trim();
+  if (!limpoAntigo || !limpoNovo) return listarEntregadores();
+  if (limpoAntigo.toLowerCase() === limpoNovo.toLowerCase()) return listarEntregadores();
+
+  const offlineAgora = lerLocalEntregadoresOffline();
+  const existeConflito = offlineAgora.some((e) => e.toLowerCase() === limpoNovo.toLowerCase());
+  if (existeConflito) return ordenarNomes(offlineAgora);
+
+  const localAtualizado = ordenarNomes(
+    offlineAgora.map((e) => (e.toLowerCase() === limpoAntigo.toLowerCase() ? limpoNovo : e)),
+  );
+  salvarLocalEntregadoresOffline(localAtualizado);
+  _cacheEntregadores = localAtualizado;
+  _cacheEntregadoresTs = Date.now();
+
+  if (isSupabaseConfigurado && getSupabase()) {
+    void (async () => {
+      const sb = getSupabase()!;
+      try {
+        await sb.from('entregadores').update({ nome: limpoNovo }).ilike('nome', limpoAntigo);
+      } catch { /* noop */ }
+      try {
+        const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
+        const arr: EntregadorCadastrado[] = raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
+        const atualizado = arr.map((e) =>
+          e.nome.toLowerCase() === limpoAntigo.toLowerCase() ? { ...e, nome: limpoNovo } : e,
+        );
+        localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(atualizado));
+      } catch { /* noop */ }
+    })();
+  }
+  return localAtualizado;
+}
+
 export function invalidarCacheEntregadores() {
   _cacheEntregadores = null;
   _cacheEntregadoresTs = 0;

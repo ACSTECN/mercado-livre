@@ -454,7 +454,7 @@ function ModalHistoricoSacas() {
   );
 }
 
-function SeletorEntregador() {
+function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
   const store = usePacoteStore();
   const [aberto, setAberto] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -533,8 +533,6 @@ function SeletorEntregador() {
       escolher(filtrados[0]);
       return;
     }
-    void store.definirEntregador(q);
-    fechar();
   };
 
   return (
@@ -588,10 +586,10 @@ function SeletorEntregador() {
         <div className="absolute z-50 top-full mt-2 left-0 right-0 sm:w-[340px] bg-white rounded-2xl shadow-2xl border border-neutral-100 p-3 animate-slide-up">
           <div className="space-y-2.5">
             <div className="flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-neutral-400 shrink-0" />
+              <Search className="h-4 w-4 text-neutral-400 shrink-0" />
               <Input
                 autoFocus
-                placeholder="Digite o nome do entregador..."
+                placeholder="Buscar entregador..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -600,112 +598,128 @@ function SeletorEntregador() {
                     confirmar();
                   }
                 }}
-                className="!h-11 !text-[14px]"
+                className="!h-10 !text-[13.5px]"
               />
             </div>
 
-            {q && (
-              <div className="space-y-1.5">
-                {matchExato ? (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full !h-10 justify-start gap-2"
-                    onClick={confirmar}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <div className="text-left flex-1 min-w-0">
-                      <div className="text-[13px] font-black leading-tight truncate">Selecionar "{matchExato}"</div>
-                      <div className="text-[10.5px] font-bold uppercase tracking-wider opacity-80">existente · Enter</div>
-                    </div>
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full !h-10 justify-start gap-2"
-                    onClick={confirmar}
-                  >
-                    <Plus className="h-4 w-4 shrink-0" />
-                    <div className="text-left flex-1 min-w-0">
-                      <div className="text-[13px] font-black leading-tight truncate">Cadastrar "{q}"</div>
-                      <div className="text-[10.5px] font-bold uppercase tracking-wider opacity-85">novo entregador · Enter</div>
-                    </div>
-                  </Button>
-                )}
-
-                {filtrados.length === 1 && !matchExato && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full !h-9 justify-start"
-                    onClick={() => escolher(filtrados[0])}
-                  >
-                    <span className="text-neutral-400 mr-1">ou</span>
-                    <span className="font-bold truncate">{filtrados[0]}</span>
-                  </Button>
-                )}
+            {q && !matchExato && filtrados.length === 0 && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-black text-amber-800 leading-tight">
+                    Nenhum entregador encontrado
+                  </div>
+                  <div className="text-[11px] text-amber-700 mt-0.5">
+                    Toque em "Gerenciar entregadores" abaixo para cadastrar.
+                  </div>
+                </div>
               </div>
             )}
 
             <div className="max-h-64 overflow-auto space-y-1 pr-1 pt-1">
               {todos.length === 0 && !q ? (
-                <div className="py-6 text-center text-[12.5px] text-neutral-500">
-                  Digite o nome acima para criar o primeiro entregador.
+                <div className="py-6 text-center">
+                  <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
+                    <Users className="h-6 w-6" />
+                  </div>
+                  <div className="text-[13px] font-bold text-neutral-700">Sem entregadores</div>
+                  <div className="text-[11.5px] text-neutral-500 mt-0.5">
+                    Toque em Gerenciar abaixo para cadastrar.
+                  </div>
                 </div>
               ) : (
-                filtrados.map((nome) => {
-                  const selecionado = ativo === nome;
-                  const counts = mapaContagem.get(nome);
-                  return (
+                <>
+                  {matchExato && (
                     <button
-                      key={nome}
+                      key={matchExato}
                       type="button"
-                      onClick={() => escolher(nome)}
-                      className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
-                        selecionado
-                          ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
-                          : 'hover:bg-neutral-50 text-neutral-800'
-                      }`}
+                      onClick={() => escolher(matchExato)}
+                      className="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-[13.5px] font-bold truncate">{nome}</span>
+                        <span className="text-[13.5px] font-black truncate">{matchExato}</span>
                       </div>
                       <div className="shrink-0 inline-flex items-center gap-1.5">
-                        {counts && counts.qtd > 0 && (
-                          <span
-                            className={`text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
-                              selecionado
-                                ? 'bg-indigo-100 text-indigo-700'
-                                : 'bg-violet-50 text-violet-700'
-                            }`}
-                          >
-                            {counts.qtd}
-                          </span>
-                        )}
-                        {counts && counts.retornos > 0 && (
-                          <span
-                            className={`inline-flex items-center gap-0.5 text-[10.5px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
-                              selecionado
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/60'
-                            }`}
-                            title={`${counts.retornos} retorno(s)`}
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                            {counts.retornos}
-                          </span>
-                        )}
-                        {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />}
+                        {(() => {
+                          const counts = mapaContagem.get(matchExato);
+                          return counts && counts.qtd > 0 ? (
+                            <span className="text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700">
+                              {counts.qtd}
+                            </span>
+                          ) : null;
+                        })()}
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
                       </div>
                     </button>
-                  );
-                })
+                  )}
+                  {filtrados.map((nome) => {
+                    const selecionado = ativo === nome;
+                    const counts = mapaContagem.get(nome);
+                    return (
+                      <button
+                        key={nome}
+                        type="button"
+                        onClick={() => escolher(nome)}
+                        className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
+                          selecionado
+                            ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                            : 'hover:bg-neutral-50 text-neutral-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[13.5px] font-bold truncate">{nome}</span>
+                        </div>
+                        <div className="shrink-0 inline-flex items-center gap-1.5">
+                          {counts && counts.qtd > 0 && (
+                            <span
+                              className={`text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
+                                selecionado
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : 'bg-violet-50 text-violet-700'
+                              }`}
+                            >
+                              {counts.qtd}
+                            </span>
+                          )}
+                          {counts && counts.retornos > 0 && (
+                            <span
+                              className={`inline-flex items-center gap-0.5 text-[10.5px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
+                                selecionado
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/60'
+                              }`}
+                              title={`${counts.retornos} retorno(s)`}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              {counts.retornos}
+                            </span>
+                          )}
+                          {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
               )}
             </div>
 
-            {ativo && (
-              <div className="pt-1 border-t border-neutral-100">
+            <div className="pt-1 border-t border-neutral-100 space-y-1.5">
+              {aoGerenciar && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full !h-9 justify-start gap-2 !text-indigo-700 hover:!bg-indigo-50"
+                  onClick={() => {
+                    aoGerenciar();
+                    fechar();
+                  }}
+                >
+                  <Users className="h-4 w-4 shrink-0" />
+                  <span className="text-[12.5px] font-black">Gerenciar entregadores</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 ml-auto" />
+                </Button>
+              )}
+              {ativo && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -717,8 +731,8 @@ function SeletorEntregador() {
                 >
                   <Ban className="h-3.5 w-3.5" /> Limpar seleção
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -908,6 +922,364 @@ function ModalMoverPacote({
             </Button>
           </div>
         </div>
+      </div>
+    </ModalBase>
+  );
+}
+
+function ModalGerenciarEntregadores({
+  aberto,
+  aoFechar,
+}: {
+  aberto: boolean;
+  aoFechar: () => void;
+}) {
+  const store = usePacoteStore();
+  const entregadores = usePacoteStore((s) => s.entregadores);
+  const entregadorAtivo = usePacoteStore((s) => s.entregadorAtivo);
+  const contagensEntregadores = usePacoteStore((s) => s.contagensEntregadores);
+  const mapaContagem = React.useMemo(() => {
+    const m = new Map<string, { qtd: number; retornos: number }>();
+    for (const c of contagensEntregadores) m.set(c.nome, { qtd: c.qtd, retornos: c.retornos });
+    return m;
+  }, [contagensEntregadores]);
+
+  const [query, setQuery] = React.useState('');
+  const [novoNome, setNovoNome] = React.useState('');
+  const [editando, setEditando] = React.useState<{ nomeAntigo: string; valor: string } | null>(null);
+  const [processando, setProcessando] = React.useState<string | null>(null);
+
+  const q = query.trim().toLowerCase();
+
+  const filtrados = React.useMemo(() => {
+    if (!q) return entregadores;
+    return entregadores.filter((n) => n.toLowerCase().includes(q));
+  }, [entregadores, q]);
+
+  const podeCriar = React.useMemo(() => {
+    const s = novoNome.trim();
+    if (!s) return false;
+    const low = s.toLowerCase();
+    return !entregadores.some((e) => e.toLowerCase() === low);
+  }, [novoNome, entregadores]);
+
+  const confirmarCriar = async () => {
+    const s = novoNome.trim();
+    if (!s || !podeCriar) return;
+    setProcessando('criar');
+    try {
+      await store.cadastrarEntregador(s);
+      setNovoNome('');
+    } finally {
+      setProcessando(null);
+    }
+  };
+
+  const iniciarEditar = (nome: string) => {
+    setEditando({ nomeAntigo: nome, valor: nome });
+  };
+
+  const cancelarEditar = () => setEditando(null);
+
+  const confirmarEditar = async () => {
+    if (!editando) return;
+    const novo = editando.valor.trim();
+    if (!novo) return;
+    if (novo.toLowerCase() === editando.nomeAntigo.toLowerCase()) {
+      cancelarEditar();
+      return;
+    }
+    const conflito = entregadores.some(
+      (e) => e.toLowerCase() === novo.toLowerCase() && e.toLowerCase() !== editando.nomeAntigo.toLowerCase(),
+    );
+    if (conflito) return;
+    setProcessando(`edit:${editando.nomeAntigo}`);
+    try {
+      await store.renomearEntregador(editando.nomeAntigo, novo);
+      cancelarEditar();
+    } finally {
+      setProcessando(null);
+    }
+  };
+
+  const excluir = async (nome: string) => {
+    const c = mapaContagem.get(nome);
+    const msg = c && c.qtd > 0
+      ? `Tem certeza que deseja excluir "${nome}"?\n\nEsse entregador possui ${c.qtd} pacote(s) na saca atual.\n\nA exclusão remove só o cadastro, os pacotes continuam existindo.`
+      : `Tem certeza que deseja excluir o entregador "${nome}"?`;
+    if (!window.confirm(msg)) return;
+    setProcessando(`del:${nome}`);
+    try {
+      await store.removerEntregador(nome);
+      if (entregadorAtivo && entregadorAtivo.toLowerCase() === nome.toLowerCase()) {
+        store.definirEntregador(null);
+      }
+    } finally {
+      setProcessando(null);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!aberto) {
+      setQuery('');
+      setNovoNome('');
+      cancelarEditar();
+    }
+  }, [aberto]);
+
+  return (
+    <ModalBase aberto={aberto} aoFechar={aoFechar} maxW="max-w-lg">
+      <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center shadow-sm">
+            <Users className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-black tracking-tight text-neutral-900 leading-tight">Entregadores</h2>
+            <p className="text-[11.5px] text-neutral-500 font-semibold mt-0.5">Gerencie a lista de entregadores cadastrados</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={aoFechar}
+          className="h-9 w-9 shrink-0 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition"
+          aria-label="Fechar"
+        >
+          <X className="h-4.5 w-4.5" />
+        </button>
+      </div>
+
+      <div className="p-4 sm:p-5 space-y-4 overflow-auto">
+        {/* NOVO ENTREGADOR */}
+        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-violet-50/40 p-3.5">
+          <div className="text-[10.5px] font-black uppercase tracking-[0.12em] text-indigo-600 mb-2">Novo entregador</div>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 pointer-events-none" />
+              <Input
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void confirmarCriar();
+                  }
+                }}
+                placeholder="Nome completo (ex: João Silva)"
+                className="!h-11 !pl-9 !text-[14px] !bg-white"
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={!podeCriar || processando === 'criar'}
+              onClick={() => void confirmarCriar()}
+              className="!h-11 shrink-0 !px-3.5"
+            >
+              {processando === 'criar' ? (
+                <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline text-[12px] font-black">Cadastrar</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* BUSCAR */}
+        <div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar entregador..."
+              className="!h-10 !pl-9 !text-[13.5px] !bg-neutral-50/60"
+            />
+          </div>
+        </div>
+
+        {/* LISTA */}
+        <div className="rounded-2xl border border-neutral-200/70 bg-white overflow-hidden">
+          <div className="px-4 py-2.5 bg-neutral-50/70 border-b border-neutral-200/60 flex items-center justify-between">
+            <span className="text-[10.5px] font-black uppercase tracking-[0.12em] text-neutral-500">
+              {filtrados.length} entregador{filtrados.length !== 1 ? 'es' : ''}
+            </span>
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="text-[11px] font-bold text-neutral-500 hover:text-neutral-700 transition"
+              >
+                Limpar busca
+              </button>
+            )}
+          </div>
+
+          <div className="divide-y divide-neutral-100 max-h-[48vh] overflow-auto">
+            {filtrados.length === 0 ? (
+              <div className="py-12 text-center">
+                <div className="h-14 w-14 mx-auto rounded-2xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-3">
+                  {entregadores.length === 0 ? <UserRound className="h-7 w-7" /> : <Search className="h-7 w-7" />}
+                </div>
+                <div className="text-[13.5px] font-bold text-neutral-700">
+                  {entregadores.length === 0 ? 'Nenhum entregador cadastrado' : 'Nenhum resultado encontrado'}
+                </div>
+                <div className="text-[11.5px] text-neutral-500 mt-1">
+                  {entregadores.length === 0 ? 'Cadastre o primeiro acima.' : 'Tente buscar por outro nome.'}
+                </div>
+              </div>
+            ) : (
+              filtrados.map((nome) => {
+                const contagem = mapaContagem.get(nome);
+                const eAtivo = entregadorAtivo && entregadorAtivo.toLowerCase() === nome.toLowerCase();
+                const isEdit = editando && editando.nomeAntigo.toLowerCase() === nome.toLowerCase();
+                const procDel = processando === `del:${nome}`;
+                const procEdit = processando === `edit:${nome}`;
+
+                return (
+                  <div
+                    key={nome}
+                    className={`px-4 py-3 flex items-center gap-3 transition ${
+                      eAtivo ? 'bg-gradient-to-r from-indigo-50/60 to-violet-50/40' : 'hover:bg-neutral-50/60'
+                    }`}
+                  >
+                    <div
+                      className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center ${
+                        eAtivo ? 'bg-indigo-100 text-indigo-600' : 'bg-neutral-100 text-neutral-500'
+                      }`}
+                    >
+                      <Truck className="h-4 w-4" />
+                    </div>
+
+                    {isEdit ? (
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <Input
+                          autoFocus
+                          value={editando!.valor}
+                          onChange={(e) => setEditando({ ...editando!, valor: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              void confirmarEditar();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              cancelarEditar();
+                            }
+                          }}
+                          className="!h-9 !text-[13.5px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={cancelarEditar}
+                          className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition"
+                          title="Cancelar"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void confirmarEditar()}
+                          disabled={procEdit || !editando!.valor.trim()}
+                          className="h-9 px-3 shrink-0 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition inline-flex items-center gap-1.5"
+                          title="Salvar"
+                        >
+                          {procEdit ? (
+                            <div className="h-3.5 w-3.5 border-2 border-emerald-400/40 border-t-emerald-700 rounded-full animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4" />
+                          )}
+                          <span className="text-[12px] font-black hidden sm:inline">Salvar</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[14px] font-black truncate ${
+                              eAtivo ? 'text-indigo-900' : 'text-neutral-800'
+                            }`}>
+                              {nome}
+                            </span>
+                            {eAtivo && (
+                              <span className="shrink-0 text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200/60">
+                                Ativo
+                              </span>
+                            )}
+                          </div>
+                          {contagem && contagem.qtd > 0 && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[11px] font-bold tabular-nums text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded">
+                                {contagem.qtd} nesta saca
+                              </span>
+                              {contagem.retornos > 0 && (
+                                <span
+                                  className="text-[11px] font-bold tabular-nums bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5"
+                                  title="Retornos"
+                                >
+                                  <RefreshCw className="h-3 w-3" />
+                                  {contagem.retornos}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="shrink-0 flex items-center gap-1">
+                          {!eAtivo && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void store.definirEntregador(nome);
+                              }}
+                              className="h-8 px-2 rounded-lg text-[11px] font-black text-indigo-600 hover:bg-indigo-50 transition inline-flex items-center gap-1"
+                              title="Definir como ativo"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Usar</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => iniciarEditar(nome)}
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-amber-50 hover:text-amber-600 transition"
+                            title="Renomear"
+                          >
+                            <PencilLine className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void excluir(nome)}
+                            disabled={procDel}
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition"
+                            title="Excluir"
+                          >
+                            {procDel ? (
+                              <div className="h-3.5 w-3.5 border-2 border-red-400/40 border-t-red-600 rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 sm:px-6 py-3.5 border-t border-neutral-100 flex items-center justify-end gap-2 bg-neutral-50/40">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={aoFechar}
+          className="!h-9 !px-3.5"
+        >
+          Fechar
+        </Button>
       </div>
     </ModalBase>
   );
@@ -1423,6 +1795,7 @@ export default function ContagemPage() {
   };
 
   const [menuAberto, setMenuAberto] = React.useState(false);
+  const [gerenciarEntregadoresAberto, setGerenciarEntregadoresAberto] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -1460,6 +1833,10 @@ export default function ContagemPage() {
         aberto={!!pacoteParaMover}
         pacote={pacoteParaMover}
         aoFechar={() => setMoverId(null)}
+      />
+      <ModalGerenciarEntregadores
+        aberto={gerenciarEntregadoresAberto}
+        aoFechar={() => setGerenciarEntregadoresAberto(false)}
       />
 
       {feedback && (
@@ -1538,7 +1915,7 @@ export default function ContagemPage() {
               <span className="text-[10px] font-black uppercase tracking-wider">{chipSync.label}</span>
             </div>
 
-            <SeletorEntregador />
+            <SeletorEntregador aoGerenciar={() => setGerenciarEntregadoresAberto(true)} />
 
             <Button
               size="sm"
@@ -1624,6 +2001,18 @@ export default function ContagemPage() {
                   >
                     <Database className="h-4 w-4 text-sky-600 shrink-0" />
                     Diagnóstico banco
+                  </button>
+
+                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Entregadores</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(() => setGerenciarEntregadoresAberto(true))}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <Users className="h-4 w-4 text-indigo-600 shrink-0" />
+                    Gerenciar entregadores
                   </button>
 
                   <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">

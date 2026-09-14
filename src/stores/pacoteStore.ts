@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote, StatusPacote } from '@/types';
-import { PacoteService, adicionarEntregador, removerEntregador, listarEntregadores, listarEntregadoresSyncOffline, invalidarCacheEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
+import { PacoteService, adicionarEntregador, removerEntregador, renomearEntregador, listarEntregadores, listarEntregadoresSyncOffline, invalidarCacheEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 
 type ContagemEntregador = { nome: string; qtd: number; retornos: number };
@@ -42,6 +42,7 @@ type PacoteState = {
   definirEntregador: (nome: string | null) => void;
   cadastrarEntregador: (nome: string) => Promise<string[]>;
   removerEntregador: (nome: string) => Promise<string[]>;
+  renomearEntregador: (nomeAntigo: string, nomeNovo: string) => Promise<string[]>;
   carregarEntregadoresBanco: () => Promise<void>;
 
   adicionar: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<ResultadoAdicaoPacote>;
@@ -325,6 +326,21 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     const arr = await removerEntregador(nome);
     const antigos = get().entregadores;
     if (!arraysIguais(antigos, arr)) set({ entregadores: arr });
+    return arr;
+  },
+  renomearEntregador: async (nomeAntigo, nomeNovo) => {
+    const arr = await renomearEntregador(nomeAntigo, nomeNovo);
+    const antigos = get().entregadores;
+    if (!arraysIguais(antigos, arr)) {
+      const patch: Partial<PacoteState> = { entregadores: arr };
+      const ativo = get().entregadorAtivo;
+      if (ativo && ativo.toLowerCase() === nomeAntigo.trim().toLowerCase()) {
+        const novoLimpo = nomeNovo.trim();
+        salvarCacheEntregadorAtivo(novoLimpo);
+        patch.entregadorAtivo = novoLimpo;
+      }
+      set(patch as PacoteState);
+    }
     return arr;
   },
 
