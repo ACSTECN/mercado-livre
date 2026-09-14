@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { QrCodeScanner, extrairCodigoDoJson } from '@/components/QrCodeScanner';
 import { usePacoteStore } from '@/stores/pacoteStore';
@@ -993,7 +993,7 @@ export default function ContagemPage() {
   });
   const [feedback, setFeedback] = React.useState<{ tipo: TipoFeedback; mensagem: string; codigo?: string } | null>(null);
   const inputLeitorRef = React.useRef<HTMLInputElement>(null);
-  const inputManualRef = React.useRef<HTMLInputElement>(null);
+  const inputManualRef = React.useRef<HTMLTextAreaElement>(null);
   const sacaCriadaRef = React.useRef(false);
 
   const pacoteParaMover = React.useMemo(() => {
@@ -1255,7 +1255,55 @@ export default function ContagemPage() {
     e.preventDefault();
     const val = codigoManual.trim();
     if (!val) return;
-    await processarCodigo(val, 'manual');
+    const codigosBrutos = val
+      .split(/[\s,;\n\r\t]+/)
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (!codigosBrutos.length) return;
+    const unicosNoLote = Array.from(new Set(codigosBrutos));
+    let adicionados = 0;
+    let movidos = 0;
+    let duplicadosMesmoEntregador = 0;
+    let erros = 0;
+    const ultimos: Array<{ tipo: string; codigo: string }> = [];
+    for (const raw of unicosNoLote) {
+      try {
+        const extraido = extrairCodigoDoJson(raw);
+        if (!extraido.codigo) { erros++; continue; }
+        const r = await adicionarOuMover(extraido.codigo, 'manual', { tipo: extraido.tipo });
+        if (r.tipo === 'adicao') {
+          adicionados++;
+          ultimos.unshift({ tipo: 'adicao', codigo: extraido.codigo });
+        } else if (r.tipo === 'movimento') {
+          movidos++;
+          ultimos.unshift({ tipo: 'movimento', codigo: extraido.codigo });
+        } else if (r.tipo === 'duplicado_mesmo_entregador') {
+          duplicadosMesmoEntregador++;
+          ultimos.unshift({ tipo: 'duplicado', codigo: extraido.codigo });
+        } else {
+          erros++;
+          ultimos.unshift({ tipo: 'erro', codigo: extraido.codigo });
+        }
+      } catch {
+        erros++;
+      }
+      if (ultimos.length > 3) ultimos.pop();
+    }
+    const total = unicosNoLote.length;
+    const partes: string[] = [];
+    if (adicionados) partes.push(`${adicionados} novo${adicionados > 1 ? 's' : ''}`);
+    if (movidos) partes.push(`${movidos} movido${movidos > 1 ? 's' : ''}`);
+    if (duplicadosMesmoEntregador) partes.push(`${duplicadosMesmoEntregador} duplicado${duplicadosMesmoEntregador > 1 ? 's' : ''}`);
+    if (erros) partes.push(`${erros} erro${erros > 1 ? 's' : ''}`);
+    const resumo = partes.join(' · ') || '0 processados';
+    setFeedback({
+      tipo: erros > 0 ? 'erro' : duplicadosMesmoEntregador > 0 ? 'duplicado' : movidos > 0 ? 'movido' : 'sucesso',
+      mensagem: total > 1
+        ? `${total} ID${total > 1 ? 's' : ''} processados → ${resumo}`
+        : resumo,
+      codigo: ultimos[0]?.codigo,
+    });
+    if (som) beep(adicionados > 0 ? 'sucesso' : movidos > 0 ? 'movido' : 'erro');
     setCodigoManual('');
     inputManualRef.current?.focus();
   };
@@ -2093,26 +2141,59 @@ export default function ContagemPage() {
             <form onSubmit={onSubmitManual} className="space-y-2">
               <Label htmlFor="manual-input" className="flex items-center gap-1.5">
                 <PencilLine className="h-3.5 w-3.5 text-neutral-500" />
-                Digite o ID / código do pacote
+                Digite o(s) ID(s) / código(s) do pacote — <span className="text-neutral-500 font-normal">1 por linha, vírgula, espaço</span>
               </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="manual-input"
-                  ref={inputManualRef}
-                  placeholder="Ex: 47960709702"
-                  value={codigoManual}
-                  onChange={(e) => setCodigoManual(e.target.value)}
-                  className="!h-14 text-lg font-bold tabular-nums tracking-wide"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                />
+              <div className="flex gap-2 items-start">
+                <div className="flex-1 space-y-1">
+                  <Textarea
+                    id="manual-input"
+                    ref={inputManualRef}
+                    placeholder={'Exemplo:\n47960709702\n47960709703\nou: 47960709702, 47960709703'}
+                    value={codigoManual}
+                    onChange={(e) => setCodigoManual(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const form = (e.currentTarget.closest('form') ?? null) as HTMLFormElement | null;
+                        form?.requestSubmit();
+                      }
+                    }}
+                    rows={5}
+                    className="text-base font-semibold tabular-nums tracking-wide resize-y"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                  />
+                  {codigoManual.trim() && (
+                    <p className="text-[11.5px] font-bold text-neutral-600">
+                      {(() => {
+                        const qtd = Array.from(
+                          new Set(
+                            codigoManual
+                              .split(/[\s,;\n\r\t]+/)
+                              .map((c) => c.trim())
+                              .filter(Boolean),
+                          ),
+                        ).length;
+                        return (
+                          <>
+                            <span className={qtd > 1 ? 'text-indigo-600' : ''}>
+                              {qtd} ID{qtd !== 1 ? 's' : ''} único{qtd !== 1 ? 's' : ''}
+                            </span>{' '}
+                            pronto{qtd !== 1 ? 's' : ''} para contar
+                          </>
+                        );
+                      })()}
+                    </p>
+                  )}
+                </div>
                 <Button
                   type="submit"
                   size="lg"
                   variant="primary"
                   disabled={!codigoManual.trim()}
+                  className="shrink-0"
                 >
                   <CheckCircle2 className="h-5 w-5" /> Contar
                 </Button>
