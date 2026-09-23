@@ -28,6 +28,9 @@ import {
   Users,
   ChevronDown,
   Filter,
+  Search,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import { useSpreadsheetStore } from '@/stores/spreadsheetStore';
 import { SpreadsheetStatus } from '@/components/SpreadsheetStatus';
@@ -60,6 +63,7 @@ export default function HomePage() {
   const [countHistorico, setCountHistorico] = React.useState(0);
   const [inicializado, setInicializado] = React.useState(false);
   const [sacaSelecionadaId, setSacaSelecionadaId] = React.useState<string>('__todas__');
+  const [buscaPacote, setBuscaPacote] = React.useState('');
 
   React.useEffect(() => {
     try { setCountHistorico(HistoryService.listar().length); } catch { /* noop */ }
@@ -119,6 +123,24 @@ export default function HomePage() {
     arr.sort((a, b) => b.qtd - a.qtd);
     return arr;
   }, [pacotesFiltrados]);
+
+  const nomeSacaPorId = React.useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of sacasStore) m.set(s.id, s.nome);
+    return m;
+  }, [sacasStore]);
+
+  const resultadoBusca = React.useMemo(() => {
+    const q = buscaPacote.trim().toLowerCase();
+    if (!q) return null;
+    const r = pacotesFiltrados.filter((p) =>
+      p.codigo_pacote.toLowerCase().includes(q) ||
+      p.id.toLowerCase().includes(q) ||
+      (p.entregador ?? '').toLowerCase().includes(q) ||
+      (p.tipo ?? '').toLowerCase().includes(q),
+    );
+    return { total: r.length, itens: r.slice(0, 50) };
+  }, [pacotesFiltrados, buscaPacote]);
 
   const dadosBarrasStatus = React.useMemo(() => ([
     { status: 'Lido',      valor: st.lido,      fill: '#0ea5e9', chave: 'lido' },
@@ -224,7 +246,116 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
+          {/* ===== BUSCA RÁPIDA PACOTES ===== */}
+          <div className="bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-2.5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-neutral-400 shrink-0" />
+              <input
+                type="text"
+                value={buscaPacote}
+                onChange={(e) => setBuscaPacote(e.target.value)}
+                placeholder="Buscar pacote por ID, código, entregador..."
+                className="flex-1 min-w-0 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-[13.5px] text-neutral-900 placeholder:text-neutral-400 font-medium h-9 px-0"
+              />
+              {buscaPacote && (
+                <button
+                  type="button"
+                  onClick={() => setBuscaPacote('')}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 transition shrink-0"
+                  title="Limpar busca"
+                >
+                  <XCircle className="h-4 w-4" />
+                </button>
+              )}
+              {resultadoBusca && (
+                <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black ring-1 ${
+                  resultadoBusca.total === 0
+                    ? 'bg-red-50 text-red-700 ring-red-200'
+                    : resultadoBusca.total <= 50
+                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                    : 'bg-amber-50 text-amber-700 ring-amber-200'
+                }`}>
+                  {resultadoBusca.total === 0 ? (
+                    <>
+                      <XCircle className="h-3 w-3" /> Nenhum resultado
+                    </>
+                  ) : resultadoBusca.total <= 50 ? (
+                    <>
+                      <CheckCheck className="h-3 w-3" /> {resultadoBusca.total} encontrado{resultadoBusca.total !== 1 ? 's' : ''}
+                    </>
+                  ) : (
+                    <>
+                      <Layers className="h-3 w-3" /> Mostrando {resultadoBusca.itens.length}/{resultadoBusca.total}
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {resultadoBusca && resultadoBusca.itens.length > 0 && (
+            <Card className="!rounded-2xl overflow-hidden">
+              <CardContent className="!p-0">
+                <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-neutral-200/70 bg-neutral-50/60">
+                  <h3 className="text-[11.5px] font-black uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1.5">
+                    <FileSearch className="h-3.5 w-3.5" /> Resultados da busca
+                  </h3>
+                  <span className="text-[10px] font-bold text-neutral-400 tabular-nums hidden sm:inline">
+                    cliques nos 50 primeiros
+                  </span>
+                </div>
+                <div className="divide-y divide-neutral-200/70 max-h-[45vh] overflow-auto scrollbar-thin">
+                  {resultadoBusca.itens.map((p, idx) => {
+                    const d = new Date(p.created_at);
+                    const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const data = d.toLocaleDateString('pt-BR');
+                    return (
+                      <div
+                        key={p.id}
+                        className="px-3 sm:px-4 py-2.5 hover:bg-indigo-50/40 transition flex items-center gap-2 sm:gap-2.5 flex-wrap"
+                      >
+                        <div className="shrink-0 text-[10px] font-black tabular-nums text-neutral-400 w-5 sm:w-7 text-center">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+                          <span className="text-[14.5px] font-black tracking-tight tabular-nums text-neutral-900 break-all leading-tight">
+                            {p.codigo_pacote}
+                          </span>
+                          {p.entregador && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-[10.5px] font-black truncate max-w-[160px]">
+                              <Truck className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">{p.entregador}</span>
+                            </span>
+                          )}
+                          {p.status && (
+                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10.5px] font-black ring-1 ${STATUS_PACOTE_META[p.status].bg} ${STATUS_PACOTE_META[p.status].txt} ${STATUS_PACOTE_META[p.status].ring}`}>
+                              {STATUS_PACOTE_META[p.status].icone === 'check' && <CheckCheck className="h-2.5 w-2.5" />}
+                              {STATUS_PACOTE_META[p.status].icone === 'truck' && <Truck className="h-2.5 w-2.5" />}
+                              {STATUS_PACOTE_META[p.status].icone === 'refresh' && <RefreshCw className="h-2.5 w-2.5" />}
+                              {STATUS_PACOTE_META[p.status].icone === 'undo' && <Undo2 className="h-2.5 w-2.5" />}
+                              {STATUS_PACOTE_META[p.status].badge}
+                            </span>
+                          )}
+                          {p.saca_id && nomeSacaPorId.get(p.saca_id) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200 text-[10.5px] font-black truncate max-w-[160px]">
+                              <Layers className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">{nomeSacaPorId.get(p.saca_id)}</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="shrink-0 inline-flex items-center gap-1 text-[10.5px] font-bold text-neutral-500 tabular-nums">
+                          <Clock className="h-2.5 w-2.5 text-neutral-400" />
+                          {hora} <span className="hidden sm:inline">· {data}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
             <HomeKpi
               label="Pacotes lidos"
               valor={totalPacotes}
@@ -232,14 +363,6 @@ export default function HomePage() {
               grad="from-indigo-500 to-violet-500"
               icon={Package}
               badge={totalPacotes !== unicosPacotes ? `${totalPacotes - unicosPacotes} dup` : null}
-            />
-            <HomeKpi
-              label="Lidos"
-              valor={st.lido}
-              sub={STATUS_PACOTE_META.lido.label}
-              grad="from-sky-500 to-blue-500"
-              icon={CheckCheck}
-              badge={st.lido > 0 ? `${pct(st.lido, totalPacotes)}%` : null}
             />
             <HomeKpi
               label="Entregues"
