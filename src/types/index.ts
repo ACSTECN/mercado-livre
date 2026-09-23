@@ -117,7 +117,14 @@ export const LIMIAR_BAIXA_CONFIANCA = 60;
 
 export type OrigemLeitura = 'camera' | 'leitor_externo' | 'manual';
 export type StatusSaca = 'aberta' | 'fechada';
-export type StatusPacote = 'retorno';
+export type StatusPacote = 'lido' | 'entregue' | 'retorno' | 'devolucao';
+
+export const STATUS_PACOTE_META: Record<StatusPacote, { label: string; badge: string; bg: string; txt: string; ring: string; icone: 'check' | 'truck' | 'refresh' | 'undo' }> = {
+  lido:      { label: 'Lido',      badge: 'Lido',      bg: 'bg-sky-50',     txt: 'text-sky-700',     ring: 'ring-sky-200',     icone: 'check' },
+  entregue:  { label: 'Entregue',  badge: 'Entregue',  bg: 'bg-emerald-50', txt: 'text-emerald-700', ring: 'ring-emerald-200', icone: 'truck' },
+  retorno:   { label: 'Retorno',   badge: 'Retorno',   bg: 'bg-orange-50',  txt: 'text-orange-700',  ring: 'ring-orange-200',  icone: 'refresh' },
+  devolucao: { label: 'Devolução', badge: 'Devolução', bg: 'bg-rose-50',    txt: 'text-rose-700',    ring: 'ring-rose-200',    icone: 'undo' },
+};
 
 export type EntregadorCadastrado = {
   id: string;

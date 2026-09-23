@@ -352,7 +352,7 @@ async function buscarHistoricoStatusPorCodigo(codigo: string, sacaAtualId: strin
     (sacaAtualId ? p.saca_id !== sacaAtualId : true),
   );
   const maisRecente = [...mesmosCodigosLocal].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  if (maisRecente?.status === 'retorno') return 'retorno';
+  if (maisRecente?.status && ['retorno', 'lido', 'entregue', 'devolucao'].includes(maisRecente.status)) return maisRecente.status;
 
   if (isSupabaseConfigurado && getSupabase()) {
     const sb = getSupabase()!;
@@ -363,14 +363,16 @@ async function buscarHistoricoStatusPorCodigo(codigo: string, sacaAtualId: strin
       const { data } = await q;
       if (data && Array.isArray(data)) {
         for (const row of data as Array<{ status?: unknown; created_at?: string; codigo_pacote?: string | null; saca_id?: string | null }>) {
-          if (row.status === 'retorno' && codigosIguaisNormalizados(row.codigo_pacote, alvo)) return 'retorno';
+          const s = row.status as StatusPacote | null | undefined;
+          if (s && ['retorno', 'lido', 'entregue', 'devolucao'].includes(s) && codigosIguaisNormalizados(row.codigo_pacote, alvo)) return s;
         }
       }
     } catch {
       /* noop */
     }
   }
-  return maisRecente?.status ?? null;
+  const ultimoStatus = maisRecente?.status as StatusPacote | null | undefined;
+  return (ultimoStatus && ['retorno', 'lido', 'entregue', 'devolucao'].includes(ultimoStatus)) ? ultimoStatus : null;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -588,7 +590,9 @@ export const PacoteService = {
     const mesmoCodigoLocalSemSaca = locaisHist
       .filter((p) => codigosIguaisNormalizados(p.codigo_pacote, codExtraido) && (saca_id ? p.saca_id !== saca_id : true))
       .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-    if (mesmoCodigoLocalSemSaca?.status === 'retorno') statusHerado = 'retorno';
+    if (mesmoCodigoLocalSemSaca?.status && ['retorno', 'lido', 'entregue', 'devolucao'].includes(mesmoCodigoLocalSemSaca.status)) {
+      statusHerado = mesmoCodigoLocalSemSaca.status;
+    }
 
     const novo: PacoteLidoLocal = {
       id: extra.id ?? gerarId(),
@@ -610,16 +614,16 @@ export const PacoteService = {
     void (async () => {
       try {
         const bancoHist = await buscarHistoricoStatusPorCodigo(codExtraido, saca_id);
-        if (bancoHist === 'retorno' && novo.status !== 'retorno') {
+        if (bancoHist && bancoHist !== (novo.status ?? null)) {
           const reais = lerLocal();
           const idx = reais.findIndex((p) => p.id === novo.id);
           if (idx >= 0) {
-            reais[idx] = { ...reais[idx], status: 'retorno', sincronizado: false };
+            reais[idx] = { ...reais[idx], status: bancoHist, sincronizado: false };
             salvarLocal(reais);
             try {
               const sb = getSupabase();
               if (sb) {
-                await sb.from('pacotes_lidos').update({ status: 'retorno' }).eq('id', novo.id);
+                await sb.from('pacotes_lidos').update({ status: bancoHist }).eq('id', novo.id);
                 const ok = lerLocal();
                 const i2 = ok.findIndex((p) => p.id === novo.id);
                 if (i2 >= 0) {

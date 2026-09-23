@@ -3,7 +3,7 @@ import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, Resum
 import { PacoteService, adicionarEntregador, removerEntregador, renomearEntregador, listarEntregadores, listarEntregadoresSyncOffline, invalidarCacheEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 
-type ContagemEntregador = { nome: string; qtd: number; retornos: number };
+type ContagemEntregador = { nome: string; qtd: number; retornos: number; entregues: number; devolucoes: number; lidos: number };
 
 type PacoteState = {
   pacotes: PacoteLidoLocal[];
@@ -50,10 +50,12 @@ type PacoteState = {
   adicionarOuMover: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<{ tipo: 'adicao' | 'movimento' | 'duplicado_mesmo_entregador' | 'erro'; resultado: ResultadoAdicaoPacote | ResultadoMoverPacote }>;
   definirStatus: (id: string, status: StatusPacote | null) => Promise<void>;
   alternarStatusRetorno: (id: string) => Promise<void>;
+  ciclarStatus: (id: string) => Promise<void>;
   remover: (id: string) => Promise<void>;
   limpar: () => Promise<void>;
   total: () => number;
   unicos: () => number;
+  contarPorStatus: () => { lido: number; entregue: number; retorno: number; devolucao: number; semStatus: number };
   exportar: (listaFiltrada?: PacoteLidoLocal[], sufixoNomeArquivo?: string) => Promise<void>;
   limparFeedback: () => void;
   inscreverRealtime: () => () => void;
@@ -71,14 +73,27 @@ const CHAVE_CACHE_ENTREGADOR_ATIVO = 'ml_entregador_ativo_v1';
 function recalcular(pacotes: PacoteLidoLocal[]): { entregadoresSaca: string[]; contagens: ContagemEntregador[] } {
   const mapaQtd = new Map<string, number>();
   const mapaRetornos = new Map<string, number>();
+  const mapaEntregues = new Map<string, number>();
+  const mapaDevolucoes = new Map<string, number>();
+  const mapaLidos = new Map<string, number>();
   for (const p of pacotes) {
     const k = p.entregador ?? 'Sem entregador';
     mapaQtd.set(k, (mapaQtd.get(k) ?? 0) + 1);
     if (p.status === 'retorno') mapaRetornos.set(k, (mapaRetornos.get(k) ?? 0) + 1);
+    if (p.status === 'entregue') mapaEntregues.set(k, (mapaEntregues.get(k) ?? 0) + 1);
+    if (p.status === 'devolucao') mapaDevolucoes.set(k, (mapaDevolucoes.get(k) ?? 0) + 1);
+    if (p.status === 'lido') mapaLidos.set(k, (mapaLidos.get(k) ?? 0) + 1);
   }
   const contagens: ContagemEntregador[] = [];
   for (const [nome, qtd] of mapaQtd.entries()) {
-    contagens.push({ nome, qtd, retornos: mapaRetornos.get(nome) ?? 0 });
+    contagens.push({
+      nome,
+      qtd,
+      retornos: mapaRetornos.get(nome) ?? 0,
+      entregues: mapaEntregues.get(nome) ?? 0,
+      devolucoes: mapaDevolucoes.get(nome) ?? 0,
+      lidos: mapaLidos.get(nome) ?? 0,
+    });
   }
   contagens.sort((a, b) => b.qtd - a.qtd);
 
@@ -613,6 +628,14 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     await get().definirStatus(id, novo);
   },
 
+  ciclarStatus: async (id) => {
+    const atual = get().pacotes.find((p) => p.id === id);
+    const ordem: Array<StatusPacote | null> = [null, 'lido', 'entregue', 'retorno', 'devolucao'];
+    const idx = ordem.indexOf(atual?.status ?? null);
+    const prox = ordem[(idx + 1) % ordem.length];
+    await get().definirStatus(id, prox);
+  },
+
   limpar: async () => {
     const sacaAtual = get().sacaAtiva;
     await PacoteService.limpar(sacaAtual?.id ?? null);
@@ -633,6 +656,19 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   total: () => get().pacotes.length,
 
   unicos: () => new Set(get().pacotes.map((p) => p.codigo_pacote)).size,
+
+  contarPorStatus: () => {
+    const arr = get().pacotes;
+    let lido = 0, entregue = 0, retorno = 0, devolucao = 0, semStatus = 0;
+    for (const p of arr) {
+      if (p.status === 'lido') lido++;
+      else if (p.status === 'entregue') entregue++;
+      else if (p.status === 'retorno') retorno++;
+      else if (p.status === 'devolucao') devolucao++;
+      else semStatus++;
+    }
+    return { lido, entregue, retorno, devolucao, semStatus };
+  },
 
   exportar: async (listaFiltrada?: Parameters<typeof PacoteService.exportarCsv>[2], sufixoNomeArquivo?: string) => {
     const sacaAtual = get().sacaAtiva;

@@ -11,7 +11,8 @@ import { Input, Textarea } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { QrCodeScanner, extrairCodigoDoJson } from '@/components/QrCodeScanner';
 import { usePacoteStore } from '@/stores/pacoteStore';
-import type { OrigemLeitura, ResultadoAdicaoPacote, Saca, PacoteLidoLocal, ResultadoMoverPacote } from '@/types';
+import type { OrigemLeitura, ResultadoAdicaoPacote, Saca, PacoteLidoLocal, ResultadoMoverPacote, StatusPacote } from '@/types';
+import { STATUS_PACOTE_META } from '@/types';
 import {
   Package,
   QrCode,
@@ -47,6 +48,8 @@ import {
   ArrowRightLeft,
   Users,
   RefreshCw,
+  Undo2,
+  CheckCheck,
   Filter,
   HardDrive,
   Database,
@@ -1311,8 +1314,9 @@ const PALETA_DASH = [
   '#d946ef', '#64748b',
 ];
 
-type ContagemEntregador = { nome: string; qtd: number; retornos: number };
+type ContagemEntregador = { nome: string; qtd: number; retornos: number; entregues: number; devolucoes: number; lidos: number };
 type ResumoSacaDash = { saca: { id: string; nome: string; created_at: string; status: string }; total: number; unicos: number };
+const pctDash = (n: number, tot: number): string => (!tot ? '0' : ((n / tot) * 100).toFixed(0));
 
 function TelaDashboard({
   pacotes,
@@ -1335,6 +1339,18 @@ function TelaDashboard({
 }) {
   const retornos = React.useMemo(
     () => contagensEntregadores.reduce((acc, c) => acc + (c.retornos ?? 0), 0),
+    [contagensEntregadores],
+  );
+  const entregues = React.useMemo(
+    () => contagensEntregadores.reduce((acc, c) => acc + (c.entregues ?? 0), 0),
+    [contagensEntregadores],
+  );
+  const devolucoes = React.useMemo(
+    () => contagensEntregadores.reduce((acc, c) => acc + (c.devolucoes ?? 0), 0),
+    [contagensEntregadores],
+  );
+  const lidosMarcados = React.useMemo(
+    () => contagensEntregadores.reduce((acc, c) => acc + (c.lidos ?? 0), 0),
     [contagensEntregadores],
   );
 
@@ -1417,14 +1433,16 @@ function TelaDashboard({
   return (
     <div className="space-y-3 sm:space-y-4 animate-fade-in">
       {/* ===== KPIs ===== */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
         {[
           { label: 'Total lidos', valor: total, sub: 'registros recebidos', icon: Package, grad: 'from-indigo-500 to-violet-500', badge: null },
-          { label: 'Únicos', valor: unicos, sub: `${taxaUnicos.toFixed(1)}% de aproveitamento`, icon: CheckCircle2, grad: 'from-emerald-500 to-teal-500', badge: duplicadosBloqueados > 0 ? `${duplicadosBloqueados} dup` : null },
+          { label: 'Únicos', valor: unicos, sub: `${taxaUnicos.toFixed(1)}% aproveit.`, icon: CheckCircle2, grad: 'from-emerald-500 to-teal-500', badge: duplicadosBloqueados > 0 ? `${duplicadosBloqueados} dup` : null },
+          { label: 'Lidos', valor: lidosMarcados, sub: 'marcados lido', icon: CheckCheck, grad: 'from-sky-500 to-blue-500', badge: lidosMarcados > 0 ? `${pctDash(lidosMarcados,total)}%` : null },
+          { label: 'Entregues', valor: entregues, sub: 'marcados entregue', icon: Truck, grad: 'from-teal-500 to-emerald-600', badge: entregues > 0 ? `${pctDash(entregues,total)}%` : null },
           { label: 'Retornos', valor: retornos, sub: `${taxaRetornos.toFixed(1)}% do total`, icon: RefreshCw, grad: 'from-orange-500 to-amber-500', badge: taxaRetornos > 15 ? 'ALTO' : null },
-          { label: 'Média / Entr.', valor: mediaPorEntregador.toFixed(mediaPorEntregador >= 10 ? 0 : 1), sub: `${entregadoresAtivos} ativo${entregadoresAtivos !== 1 ? 's' : ''}`, icon: Users, grad: 'from-sky-500 to-blue-500', badge: null },
-          { label: 'Cadastrados', valor: entregadoresCadastrados.length, sub: 'entregadores na base', icon: Truck, grad: 'from-fuchsia-500 to-pink-500', badge: entregadoresAtivos > 0 && entregadoresCadastrados.length > 0 ? `${Math.round((entregadoresAtivos / entregadoresCadastrados.length) * 100)}% ativos` : null },
-          { label: 'Sacas', valor: resumos.length, sub: sacaAtiva ? sacaAtiva.status === 'aberta' ? '1 aberta agora' : 'todas fechadas' : 'sem ativa', icon: Layers, grad: 'from-rose-500 to-red-500', badge: sacaAtiva?.status === 'aberta' ? 'ABERTA' : null },
+          { label: 'Devoluções', valor: devolucoes, sub: 'marcados devolução', icon: Undo2, grad: 'from-rose-500 to-pink-500', badge: devolucoes > 0 ? `${pctDash(devolucoes,total)}%` : null },
+          { label: 'Média / Entr.', valor: mediaPorEntregador.toFixed(mediaPorEntregador >= 10 ? 0 : 1), sub: `${entregadoresAtivos} ativo${entregadoresAtivos !== 1 ? 's' : ''}`, icon: Users, grad: 'from-violet-500 to-fuchsia-500', badge: null },
+          { label: 'Sacas', valor: resumos.length, sub: sacaAtiva ? sacaAtiva.status === 'aberta' ? '1 aberta agora' : 'todas fechadas' : 'sem ativa', icon: Layers, grad: 'from-fuchsia-500 to-purple-600', badge: sacaAtiva?.status === 'aberta' ? 'ABERTA' : null },
         ].map((k, i) => {
           const KIcon = k.icon;
           const BadgeComp = k.badge;
@@ -1886,6 +1904,8 @@ export default function ContagemPage() {
   const entregadores = usePacoteStore((s) => s.entregadores);
   const contagensEntregadoresStore = usePacoteStore((s) => s.contagensEntregadores);
   const alternarStatusRetorno = usePacoteStore((s) => s.alternarStatusRetorno);
+  const ciclarStatus = usePacoteStore((s) => s.ciclarStatus);
+  const definirStatus = usePacoteStore((s) => s.definirStatus);
   const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
   const forcarSincronizacaoCompleta = usePacoteStore((s) => s.forcarSincronizacaoCompleta);
   const carregarEntregadoresBanco = usePacoteStore((s) => s.carregarEntregadoresBanco);
@@ -1895,7 +1915,7 @@ export default function ContagemPage() {
   const [codigoLeitor, setCodigoLeitor] = React.useState('');
   const [filtro, setFiltro] = React.useState('');
   const [filtroEntregador, setFiltroEntregador] = React.useState<string>('__todos__');
-  const [filtroStatus, setFiltroStatus] = React.useState<'__todos__' | 'retorno'>('__todos__');
+  const [filtroStatus, setFiltroStatus] = React.useState<'__todos__' | '__sem_status__' | StatusPacote>('__todos__');
   type StatusSincronia = 'ocioso' | 'sincronizando' | 'conectado' | 'erro' | 'offline';
   const [statusSincronia, setStatusSincronia] = React.useState<StatusSincronia>('ocioso');
   const [exportando, setExportando] = React.useState(false);
@@ -2283,8 +2303,9 @@ export default function ContagemPage() {
         lista = lista.filter((p) => p.entregador === filtroEntregador);
       }
     }
-    if (filtroStatus === 'retorno') {
-      lista = lista.filter((p) => p.status === 'retorno');
+    if (filtroStatus !== '__todos__') {
+      if (filtroStatus === '__sem_status__') lista = lista.filter((p) => !p.status);
+      else lista = lista.filter((p) => p.status === filtroStatus);
     }
     if (!filtro.trim()) return lista;
     const q = filtro.trim().toLowerCase();
@@ -2306,7 +2327,8 @@ export default function ContagemPage() {
       else base = base.filter((p) => p.entregador === filtroEntregador);
     }
     if (filtroStatus !== '__todos__') {
-      base = base.filter((p) => p.status === filtroStatus);
+      if (filtroStatus === '__sem_status__') base = base.filter((p) => !p.status);
+      else base = base.filter((p) => p.status === filtroStatus);
     }
     const unicos = new Set(base.map((p) => p.codigo_pacote));
     const retornos = base.filter((p) => p.status === 'retorno').length;
@@ -3111,35 +3133,34 @@ export default function ContagemPage() {
                   <div className={`sm:hidden inline-flex items-center gap-1 px-1.5 py-1 rounded-lg ring-1 ${chipSync.bg} ${chipSync.txt} ${chipSync.ring} ${chipSync.pulse ? 'animate-pulse' : ''}`}>
                     <SyncIcon className={`h-2.5 w-2.5 ${chipSync.spin ? 'animate-spin' : ''}`} />
                   </div>
-                  <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setFiltroStatus('__todos__')}
-                      className={`px-2 py-1 rounded-md text-[11px] font-bold transition ${
-                        filtroStatus === '__todos__'
-                          ? 'bg-white shadow-sm text-neutral-900'
-                          : 'text-neutral-500 hover:text-neutral-800'
-                      }`}
-                    >
-                      Todos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFiltroStatus('retorno')}
-                      className={`px-2 py-1 rounded-md text-[11px] font-bold transition inline-flex items-center gap-1 ${
-                        filtroStatus === 'retorno'
-                          ? 'bg-orange-500 text-white'
-                          : 'text-neutral-500 hover:text-orange-700'
-                      }`}
-                    >
-                      <RefreshCw className="h-2.5 w-2.5" />
-                      Retorno
-                      <span className={`tabular-nums opacity-80 ${
-                        filtroStatus === 'retorno' ? 'text-white/90' : 'text-neutral-400'
-                      }`}>
-                        {pacotes.filter((p) => p.status === 'retorno').length}
-                      </span>
-                    </button>
+                  <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg shrink-0 flex-wrap">
+                    {[
+                      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: pacotes.length, icon: null },
+                      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: pacotes.filter((p) => !p.status).length, icon: null },
+                      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: pacotes.filter((p) => p.status === 'lido').length, icon: CheckCheck },
+                      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: pacotes.filter((p) => p.status === 'entregue').length, icon: Truck },
+                      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: pacotes.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
+                      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: pacotes.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
+                    ].map((b) => {
+                      const Icon = b.icon;
+                      const sel = filtroStatus === b.k;
+                      return (
+                        <button
+                          key={b.k}
+                          type="button"
+                          onClick={() => setFiltroStatus(b.k as typeof filtroStatus)}
+                          className={`px-2 py-1 rounded-md text-[11px] font-bold transition inline-flex items-center gap-1 ${
+                            sel ? b.colorSel : `text-neutral-500 ${b.colorHover}`
+                          }`}
+                        >
+                          {Icon && <Icon className="h-2.5 w-2.5" />}
+                          {b.label}
+                          <span className={`tabular-nums opacity-80 ${sel ? 'text-white/90' : 'text-neutral-400'}`}>
+                            {b.count}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="text-[10.5px] font-semibold text-neutral-500 shrink-0">
                     {filtrados.length}/{pacotes.length}
@@ -3201,10 +3222,13 @@ export default function ContagemPage() {
                                 <span className="truncate">{p.entregador}</span>
                               </span>
                             )}
-                            {p.status === 'retorno' && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-700 ring-1 ring-orange-200 text-[10.5px] font-black">
-                                <RefreshCw className="h-2.5 w-2.5" />
-                                Retorno
+                            {p.status && (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10.5px] font-black ring-1 ${STATUS_PACOTE_META[p.status].bg} ${STATUS_PACOTE_META[p.status].txt} ${STATUS_PACOTE_META[p.status].ring}`}>
+                                {STATUS_PACOTE_META[p.status].icone === 'check' && <CheckCheck className="h-2.5 w-2.5" />}
+                                {STATUS_PACOTE_META[p.status].icone === 'truck' && <Truck className="h-2.5 w-2.5" />}
+                                {STATUS_PACOTE_META[p.status].icone === 'refresh' && <RefreshCw className="h-2.5 w-2.5" />}
+                                {STATUS_PACOTE_META[p.status].icone === 'undo' && <Undo2 className="h-2.5 w-2.5" />}
+                                {STATUS_PACOTE_META[p.status].badge}
                               </span>
                             )}
                             <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-black ring-1 ${
@@ -3230,18 +3254,27 @@ export default function ContagemPage() {
                           <div className="shrink-0 flex items-center gap-0.5 text-[10.5px] text-neutral-500">
                             <Clock className="h-2.5 w-2.5 hidden sm:inline" />
                             <span className="tabular-nums hidden sm:inline">{hora}</span>
-                            <button
-                              type="button"
-                              onClick={() => void alternarStatusRetorno(p.id)}
-                              className={`ml-0.5 flex h-7 w-7 items-center justify-center rounded-lg transition ${
-                                p.status === 'retorno'
-                                  ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200'
-                                  : 'text-neutral-400 hover:bg-orange-50 hover:text-orange-600'
-                              }`}
-                              title={p.status === 'retorno' ? 'Desmarcar retorno' : 'Marcar retorno'}
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            </button>
+                            {([
+                              { st: 'lido',      Icon: CheckCheck, bgOn: 'bg-sky-100 text-sky-700 ring-sky-200',      bgOff: 'hover:bg-sky-50 hover:text-sky-600',       title: 'Marcar como lido' },
+                              { st: 'entregue',  Icon: Truck,     bgOn: 'bg-emerald-100 text-emerald-700 ring-emerald-200', bgOff: 'hover:bg-emerald-50 hover:text-emerald-600', title: 'Marcar entregue' },
+                              { st: 'retorno',   Icon: RefreshCw, bgOn: 'bg-orange-100 text-orange-700 ring-orange-200',  bgOff: 'hover:bg-orange-50 hover:text-orange-600',  title: 'Marcar retorno' },
+                              { st: 'devolucao', Icon: Undo2,     bgOn: 'bg-rose-100 text-rose-700 ring-rose-200',        bgOff: 'hover:bg-rose-50 hover:text-rose-600',      title: 'Marcar devolução' },
+                            ] as const).map(({ st, Icon, bgOn, bgOff, title }) => {
+                              const ativo = p.status === st;
+                              return (
+                                <button
+                                  key={st}
+                                  type="button"
+                                  onClick={() => void definirStatus(p.id, ativo ? null : st)}
+                                  className={`ml-0.5 flex h-7 w-7 items-center justify-center rounded-lg transition ring-1 ${
+                                    ativo ? `${bgOn}` : `text-neutral-400 ring-transparent ${bgOff}`
+                                  }`}
+                                  title={ativo ? `Desmarcar ${STATUS_PACOTE_META[st].label}` : title}
+                                >
+                                  <Icon className="h-3.5 w-3.5" />
+                                </button>
+                              );
+                            })}
                             <button
                               type="button"
                               onClick={() => setMoverId(p.id)}
