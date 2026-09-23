@@ -27,6 +27,7 @@ type PacoteState = {
   contagensEntregadores: ContagemEntregador[];
 
   carregar: () => Promise<void>;
+  carregarTodasSacas: () => Promise<void>;
   carregarSacas: () => Promise<void>;
   definirSacaAtiva: (sacaId: string) => Promise<void>;
   criarSaca: (nome: string, descricao?: string) => Promise<Saca>;
@@ -49,6 +50,7 @@ type PacoteState = {
   moverPacote: (id: string, novoEntregador: string, origemMovimento?: 'manual' | 're_scan') => Promise<ResultadoMoverPacote>;
   adicionarOuMover: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<{ tipo: 'adicao' | 'movimento' | 'duplicado_mesmo_entregador' | 'erro'; resultado: ResultadoAdicaoPacote | ResultadoMoverPacote }>;
   definirStatus: (id: string, status: StatusPacote | null) => Promise<void>;
+  definirStatusEmLote: (ids: string[], status: StatusPacote | null) => Promise<void>;
   alternarStatusRetorno: (id: string) => Promise<void>;
   ciclarStatus: (id: string) => Promise<void>;
   remover: (id: string) => Promise<void>;
@@ -108,6 +110,21 @@ function arraysIguais(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
+}
+
+function mesclarPreservandoNaoSincronizados(doBanco: PacoteLidoLocal[], atuaisLocal: PacoteLidoLocal[]): PacoteLidoLocal[] {
+  const mapaLocal = new Map(atuaisLocal.map((p) => [p.id, p]));
+  const mapaBanco = new Map(doBanco.map((p) => [p.id, p]));
+  const saida: PacoteLidoLocal[] = [];
+  for (const p of doBanco) {
+    const local = mapaLocal.get(p.id);
+    if (local && local.sincronizado === false) saida.push(local);
+    else saida.push(p);
+  }
+  for (const local of atuaisLocal) {
+    if (!mapaBanco.has(local.id)) saida.push(local);
+  }
+  return saida;
 }
 
 function ordenarNomes(arr: string[]): string[] {
@@ -369,10 +386,37 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         catch { return listarEntregadoresSyncOffline(); }
       })();
       const [lista, entregadores] = await Promise.all([pacotesP, entregadoresP]);
-      salvarCache(lista);
-      const r = recalcular(lista);
+      const mesclados = mesclarPreservandoNaoSincronizados(lista, get().pacotes);
+      salvarCache(mesclados);
+      const r = recalcular(mesclados);
       const patch: Partial<PacoteState> = {
-        pacotes: lista,
+        pacotes: mesclados,
+        carregando: false,
+        entregadoresSaca: r.entregadoresSaca,
+        contagensEntregadores: r.contagens,
+      };
+      if (!arraysIguais(get().entregadores, entregadores)) patch.entregadores = entregadores;
+      set(patch as PacoteState);
+    } catch {
+      set({ carregando: false });
+    }
+  },
+
+  carregarTodasSacas: async () => {
+    set({ carregando: true });
+    try {
+      if (!get().sacas.length) await get().carregarSacas();
+      const pacotesP = PacoteService.listarTodasSacas();
+      const entregadoresP = (async () => {
+        try { return await listarEntregadores(false); }
+        catch { return listarEntregadoresSyncOffline(); }
+      })();
+      const [lista, entregadores] = await Promise.all([pacotesP, entregadoresP]);
+      const mesclados = mesclarPreservandoNaoSincronizados(lista, get().pacotes);
+      salvarCache(mesclados);
+      const r = recalcular(mesclados);
+      const patch: Partial<PacoteState> = {
+        pacotes: mesclados,
         carregando: false,
         entregadoresSaca: r.entregadoresSaca,
         contagensEntregadores: r.contagens,
@@ -617,6 +661,30 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
             entregadoresSaca: r2.entregadoresSaca,
             contagensEntregadores: r2.contagens,
           });
+        }
+      } catch { /* noop */ }
+    })();
+  },
+
+  definirStatusEmLote: async (ids, status) => {
+    if (!ids.length) return;
+    const idSet = new Set(ids);
+    const atual = get().pacotes;
+    const nova: PacoteLidoLocal[] = atual.map((p) => {
+      if (idSet.has(p.id)) return { ...p, status, sincronizado: false };
+      return p;
+    });
+    salvarCache(nova);
+    const r = recalcular(nova);
+    set({
+      pacotes: nova,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+    });
+    void (async () => {
+      try {
+        for (const id of ids) {
+          try { await PacoteService.definirStatus(id, status); } catch { /* noop */ }
         }
       } catch { /* noop */ }
     })();

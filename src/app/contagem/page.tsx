@@ -50,6 +50,7 @@ import {
   RefreshCw,
   Undo2,
   CheckCheck,
+  CheckSquare,
   Filter,
   HardDrive,
   Database,
@@ -1906,6 +1907,7 @@ export default function ContagemPage() {
   const alternarStatusRetorno = usePacoteStore((s) => s.alternarStatusRetorno);
   const ciclarStatus = usePacoteStore((s) => s.ciclarStatus);
   const definirStatus = usePacoteStore((s) => s.definirStatus);
+  const definirStatusEmLote = usePacoteStore((s) => s.definirStatusEmLote);
   const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
   const forcarSincronizacaoCompleta = usePacoteStore((s) => s.forcarSincronizacaoCompleta);
   const carregarEntregadoresBanco = usePacoteStore((s) => s.carregarEntregadoresBanco);
@@ -1916,6 +1918,17 @@ export default function ContagemPage() {
   const [filtro, setFiltro] = React.useState('');
   const [filtroEntregador, setFiltroEntregador] = React.useState<string>('__todos__');
   const [filtroStatus, setFiltroStatus] = React.useState<'__todos__' | '__sem_status__' | StatusPacote>('__todos__');
+  const [selecionados, setSelecionados] = React.useState<Set<string>>(new Set());
+  const toggleSelecionado = React.useCallback((id: string) => {
+    setSelecionados((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  }, []);
+  const limparSelecao = React.useCallback(() => setSelecionados(new Set()), []);
+  const idsSelecionadosArray = React.useMemo(() => Array.from(selecionados), [selecionados]);
   type StatusSincronia = 'ocioso' | 'sincronizando' | 'conectado' | 'erro' | 'offline';
   const [statusSincronia, setStatusSincronia] = React.useState<StatusSincronia>('ocioso');
   const [exportando, setExportando] = React.useState(false);
@@ -2311,12 +2324,20 @@ export default function ContagemPage() {
     const q = filtro.trim().toLowerCase();
     return lista.filter(
       (p) =>
-        p.codigo_pacote.toLowerCase().includes(q) ||
-        (p.tipo ?? '').toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q) ||
-        (p.entregador ?? '').toLowerCase().includes(q),
-    );
+          p.codigo_pacote.toLowerCase().includes(q) ||
+          (p.tipo ?? '').toLowerCase().includes(q) ||
+          p.id.toLowerCase().includes(q) ||
+          (p.entregador ?? '').toLowerCase().includes(q),
+      );
   }, [pacotes, filtro, filtroEntregador, filtroStatus]);
+
+  const selecionarTodosFiltrados = React.useCallback(() => {
+    setSelecionados(new Set(filtrados.map((p) => p.id)));
+  }, [filtrados]);
+  const todosFiltradosSelecionados = React.useMemo(
+    () => filtrados.length > 0 && filtrados.every((p) => selecionados.has(p.id)),
+    [filtrados, selecionados],
+  );
 
   const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
 
@@ -3120,6 +3141,25 @@ export default function ContagemPage() {
               <>
                 {/* ===== FILTROS COMPACTOS ===== */}
                 <div className="flex items-center gap-2 flex-wrap bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-2.5 shadow-sm">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={selecionados.size > 0 ? todosFiltradosSelecionados : false}
+                      ref={(el) => {
+                        if (!el) return;
+                        el.indeterminate = selecionados.size > 0 && !todosFiltradosSelecionados && filtrados.some((p) => selecionados.has(p.id));
+                      }}
+                      onChange={(e) => {
+                        if (e.target.checked) selecionarTodosFiltrados();
+                        else limparSelecao();
+                      }}
+                      className="h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-black text-neutral-700 hidden sm:inline">
+                      {selecionados.size > 0 ? `${selecionados.size} selec.` : 'Selecionar'}
+                    </span>
+                  </label>
+                  <div className="w-px h-5 bg-neutral-200 mx-0.5 shrink-0" />
                   <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
                     <Search className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                     <Input
@@ -3167,6 +3207,65 @@ export default function ContagemPage() {
                   </div>
                 </div>
 
+                {selecionados.size > 0 && (
+                  <div className="sticky top-0 z-20 bg-gradient-to-r from-indigo-50 via-violet-50 to-fuchsia-50 rounded-2xl border border-indigo-200 px-3 sm:px-4 py-2.5 shadow-sm flex items-center gap-2 sm:gap-3 flex-wrap animate-fade-in">
+                    <div className="inline-flex items-center gap-1.5 shrink-0">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+                        <CheckSquare className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="leading-tight">
+                        <div className="text-[12px] font-black text-indigo-900">
+                          {selecionados.size} pacote{selecionados.size !== 1 ? 's' : ''} selecionado{selecionados.size !== 1 ? 's' : ''}
+                        </div>
+                        <div className="text-[10px] font-bold text-indigo-600/80">
+                          Clique num status abaixo para marcar todos de uma vez
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-5 w-px bg-indigo-200/80 shrink-0 hidden sm:block" />
+                    <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap flex-1 min-w-0">
+                      {([
+                        { st: 'lido' as const,      Icon: CheckCheck, bg: 'bg-sky-600 hover:bg-sky-700', label: 'Marcar lidos' },
+                        { st: 'entregue' as const,  Icon: Truck,     bg: 'bg-emerald-600 hover:bg-emerald-700', label: 'Marcar entregues' },
+                        { st: 'retorno' as const,   Icon: RefreshCw, bg: 'bg-orange-500 hover:bg-orange-600', label: 'Marcar retornos' },
+                        { st: 'devolucao' as const, Icon: Undo2,     bg: 'bg-rose-600 hover:bg-rose-700', label: 'Marcar devoluções' },
+                      ]).map(({ st, Icon, bg, label }) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => {
+                            void definirStatusEmLote(idsSelecionadosArray, st);
+                          }}
+                          className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg text-white text-[11px] font-black shadow-sm transition ${bg}`}
+                          title={label}
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="hidden sm:inline">{STATUS_PACOTE_META[st].label}</span>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void definirStatusEmLote(idsSelecionadosArray, null);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-neutral-700 hover:bg-neutral-800 text-white text-[11px] font-black shadow-sm transition"
+                        title="Remover status de todos selecionados"
+                      >
+                        <X className="h-3.5 w-3.5 shrink-0" />
+                        <span className="hidden sm:inline">Sem status</span>
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={limparSelecao}
+                      className="ml-auto inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white ring-1 ring-indigo-200 text-indigo-700 hover:bg-indigo-50 text-[11px] font-black shadow-sm transition shrink-0"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Limpar</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* ===== LISTA PACOTES COMPACTA ===== */}
                 {!filtrados.length ? (
                   <div className="bg-white rounded-2xl border border-neutral-200/70 px-4 py-10 text-center shadow-sm">
@@ -3197,18 +3296,28 @@ export default function ContagemPage() {
                       const shaking = shakeId === p.id;
                       const d = new Date(p.created_at);
                       const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      const sel = selecionados.has(p.id);
                       return (
                         <div
                           key={p.id}
-                          className={`bg-white rounded-xl border transition-all duration-300 flex items-center gap-2.5 px-2.5 py-2 ${
-                            destaque
+                          className={`bg-white rounded-xl border transition-all duration-300 flex items-center gap-2 sm:gap-2.5 px-2 sm:px-2.5 py-2 ${
+                            sel
+                              ? 'ring-2 ring-indigo-400/80 border-indigo-200 bg-indigo-50/40 shadow-sm'
+                              : destaque
                               ? 'ring-2 ring-emerald-400 shadow-md bg-emerald-50/40 border-emerald-200'
                               : shaking
                               ? 'ring-2 ring-red-400 animate-shake border-red-200 bg-red-50/40'
                               : 'border-neutral-200/70 hover:border-neutral-300 hover:shadow-sm'
                           }`}
                         >
-                          <div className="shrink-0 text-[10px] font-black tabular-nums text-neutral-400 w-6 sm:w-8 text-center">
+                          <input
+                            type="checkbox"
+                            checked={sel}
+                            onChange={(e) => toggleSelecionado(p.id)}
+                            className="h-4 w-4 shrink-0 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            title={sel ? 'Desmarcar' : 'Marcar para lote'}
+                          />
+                          <div className="shrink-0 text-[10px] font-black tabular-nums text-neutral-400 w-5 sm:w-7 text-center">
                             {pacotes.length - idx}
                           </div>
 

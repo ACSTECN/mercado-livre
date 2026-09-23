@@ -26,6 +26,8 @@ import {
   CheckCheck,
   Layers,
   Users,
+  ChevronDown,
+  Filter,
 } from 'lucide-react';
 import { useSpreadsheetStore } from '@/stores/spreadsheetStore';
 import { SpreadsheetStatus } from '@/components/SpreadsheetStatus';
@@ -49,16 +51,15 @@ export default function HomePage() {
   const router = useRouter();
   const planilha = useSpreadsheetStore((s) => s.planilha);
   const totalPlanilha = useSpreadsheetStore((s) => s.totalRegistros());
-  const carregarPacotes = usePacoteStore((s) => s.carregar);
+  const carregarPacotes = usePacoteStore((s) => s.carregarTodasSacas);
   const carregarSacas = usePacoteStore((s) => s.carregarSacas);
-  const totalPacotes = usePacoteStore((s) => s.total());
-  const unicosPacotes = usePacoteStore((s) => s.unicos());
-  const contarPorStatus = usePacoteStore((s) => s.contarPorStatus);
+  const pacotesStore = usePacoteStore((s) => s.pacotes);
+  const sacasStore = usePacoteStore((s) => s.sacas);
   const resumos = usePacoteStore((s) => s.resumos);
-  const entregadores = usePacoteStore((s) => s.contagensEntregadores);
   const sacaAtiva = usePacoteStore((s) => s.sacaAtiva);
   const [countHistorico, setCountHistorico] = React.useState(0);
   const [inicializado, setInicializado] = React.useState(false);
+  const [sacaSelecionadaId, setSacaSelecionadaId] = React.useState<string>('__todas__');
 
   React.useEffect(() => {
     try { setCountHistorico(HistoryService.listar().length); } catch { /* noop */ }
@@ -69,7 +70,55 @@ export default function HomePage() {
     })();
   }, [carregarPacotes, carregarSacas]);
 
-  const st = React.useMemo(() => contarPorStatus(), [contarPorStatus, totalPacotes]);
+  const opcoesSacas = React.useMemo(() => {
+    const porSaca = new Map<string, number>();
+    for (const p of pacotesStore) {
+      if (!p.saca_id) continue;
+      porSaca.set(p.saca_id, (porSaca.get(p.saca_id) ?? 0) + 1);
+    }
+    const opts: Array<{ id: string; nome: string; qtd: number; aberta: boolean }> = [];
+    opts.push({ id: '__todas__', nome: 'Todas as sacas', qtd: pacotesStore.length, aberta: false });
+    for (const saca of sacasStore) {
+      opts.push({ id: saca.id, nome: saca.nome, qtd: porSaca.get(saca.id) ?? 0, aberta: saca.status === 'aberta' });
+    }
+    return opts;
+  }, [sacasStore, pacotesStore]);
+
+  const pacotesFiltrados = React.useMemo(() => {
+    if (sacaSelecionadaId === '__todas__') return pacotesStore;
+    return pacotesStore.filter((p) => p.saca_id === sacaSelecionadaId);
+  }, [pacotesStore, sacaSelecionadaId]);
+
+  const st = React.useMemo(() => {
+    let lido = 0, entregue = 0, retorno = 0, devolucao = 0, semStatus = 0;
+    for (const p of pacotesFiltrados) {
+      if (p.status === 'lido') lido++;
+      else if (p.status === 'entregue') entregue++;
+      else if (p.status === 'retorno') retorno++;
+      else if (p.status === 'devolucao') devolucao++;
+      else semStatus++;
+    }
+    return { lido, entregue, retorno, devolucao, semStatus };
+  }, [pacotesFiltrados]);
+  const totalPacotes = pacotesFiltrados.length;
+  const unicosPacotes = React.useMemo(() => new Set(pacotesFiltrados.map((p) => p.codigo_pacote)).size, [pacotesFiltrados]);
+
+  const entregadores = React.useMemo(() => {
+    const mapa = new Map<string, { nome: string; qtd: number; retornos: number; entregues: number; devolucoes: number; lidos: number }>();
+    for (const p of pacotesFiltrados) {
+      const nome = p.entregador ?? 'Sem entregador';
+      const ant = mapa.get(nome) ?? { nome, qtd: 0, retornos: 0, entregues: 0, devolucoes: 0, lidos: 0 };
+      ant.qtd++;
+      if (p.status === 'retorno') ant.retornos++;
+      else if (p.status === 'entregue') ant.entregues++;
+      else if (p.status === 'devolucao') ant.devolucoes++;
+      else if (p.status === 'lido') ant.lidos++;
+      mapa.set(nome, ant);
+    }
+    const arr = Array.from(mapa.values());
+    arr.sort((a, b) => b.qtd - a.qtd);
+    return arr;
+  }, [pacotesFiltrados]);
 
   const dadosBarrasStatus = React.useMemo(() => ([
     { status: 'Lido',      valor: st.lido,      fill: '#0ea5e9', chave: 'lido' },
@@ -135,22 +184,42 @@ export default function HomePage() {
       </section>
 
       {/* ===== DASHBOARD PRINCIPAL ===== */}
-      {inicializado && totalPacotes > 0 ? (
+      {inicializado && pacotesStore.length > 0 ? (
         <section className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-ml-blue" />
+          <div className="flex items-center gap-2 flex-wrap px-1">
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+              <BarChart3 className="h-4 w-4 text-ml-blue shrink-0" />
               <h2 className="text-[14.5px] font-black tracking-tight text-neutral-900">
                 Visão geral · operações
               </h2>
-              {sacaAtiva && (
+              {sacaAtiva && sacaSelecionadaId === '__todas__' && (
                 <Badge variant="info" className="!text-[10px] !px-2 !py-0.5">
                   <Layers className="h-2.5 w-2.5" />
-                  {sacaAtiva.nome}
+                  Ativa: {sacaAtiva.nome}
                 </Badge>
               )}
             </div>
-            <Link href="/contagem" className="text-[11.5px] font-bold text-ml-blue hover:underline inline-flex items-center gap-0.5">
+            <label className="inline-flex items-center gap-1.5 shrink-0">
+              <span className="inline-flex items-center gap-0.5 text-[10.5px] font-black text-neutral-500 hidden sm:inline">
+                <Filter className="h-3 w-3" /> Saca
+              </span>
+              <div className="relative">
+                <select
+                  value={sacaSelecionadaId}
+                  onChange={(e) => setSacaSelecionadaId(e.target.value)}
+                  className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-white border border-neutral-200 shadow-sm text-[11.5px] font-bold text-neutral-800 cursor-pointer focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-400 transition hover:border-neutral-300 tabular-nums"
+                >
+                  {opcoesSacas.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.id === '__todas__' ? '📋 ' : o.aberta ? '🟢 ' : '⚪ '}
+                      {o.nome} ({o.qtd})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-1.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+              </div>
+            </label>
+            <Link href="/contagem" className="text-[11.5px] font-bold text-ml-blue hover:underline inline-flex items-center gap-0.5 shrink-0">
               Ir para contagem <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
@@ -198,11 +267,11 @@ export default function HomePage() {
             />
             <HomeKpi
               label="Sacas"
-              valor={resumos.length}
+              valor={sacaSelecionadaId === '__todas__' ? resumos.length : 1}
               sub={`${entregadores.length} entreg.`}
               grad="from-fuchsia-500 to-violet-500"
               icon={Users}
-              badge={sacaAtiva?.status === 'aberta' ? 'ABERTA' : null}
+              badge={sacaSelecionadaId === '__todas__' ? (sacaAtiva?.status === 'aberta' ? 'ABERTA' : null) : (opcoesSacas.find((o) => o.id === sacaSelecionadaId)?.aberta ? 'ABERTA' : null)}
             />
           </div>
 
