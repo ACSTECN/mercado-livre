@@ -1918,6 +1918,12 @@ export default function ContagemPage() {
   const [filtro, setFiltro] = React.useState('');
   const [filtroEntregador, setFiltroEntregador] = React.useState<string>('__todos__');
   const [filtroStatus, setFiltroStatus] = React.useState<'__todos__' | '__sem_status__' | StatusPacote>('__todos__');
+  const [autoFiltraEntregadorAtivo, setAutoFiltraEntregadorAtivo] = React.useState(true);
+  React.useEffect(() => {
+    if (!autoFiltraEntregadorAtivo) return;
+    if (entregadorAtivo) setFiltroEntregador(entregadorAtivo);
+    else setFiltroEntregador('__todos__');
+  }, [entregadorAtivo, autoFiltraEntregadorAtivo]);
   const [selecionados, setSelecionados] = React.useState<Set<string>>(new Set());
   const toggleSelecionado = React.useCallback((id: string) => {
     setSelecionados((prev) => {
@@ -2951,6 +2957,18 @@ export default function ContagemPage() {
                   <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mr-0.5">
                     Entregadores
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setAutoFiltraEntregadorAtivo((v) => !v)}
+                    title={autoFiltraEntregadorAtivo ? 'Desligar: selecionar entregador no header NÃO filtra mais a lista' : 'Ligar: selecionar entregador no header automaticamente filtra a lista'}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-black transition ring-1 ${
+                      autoFiltraEntregadorAtivo
+                        ? 'bg-violet-100 text-violet-800 ring-violet-300'
+                        : 'bg-neutral-100 text-neutral-500 ring-neutral-200 hover:bg-neutral-200'
+                    }`}
+                  >
+                    {autoFiltraEntregadorAtivo ? '🔗 AUTO' : '⛓️ OFF'}
+                  </button>
                   <div className="w-px h-4 bg-neutral-200 mx-0.5" />
                   <button
                     type="button"
@@ -3163,7 +3181,7 @@ export default function ContagemPage() {
                   <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
                     <Search className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                     <Input
-                      placeholder={`Buscar ${pacotes.length} IDs…`}
+                      placeholder={`Buscar ${filtrados.length} ${filtrados.length === 1 ? 'ID…' : 'IDs…'}`}
                       value={filtro}
                       onChange={(e) => setFiltro(e.target.value)}
                       className="!h-8 !text-[13px] !px-2 !border-0 !ring-0 !p-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 !bg-transparent"
