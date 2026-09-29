@@ -61,6 +61,10 @@ import {
   PieChart as PieIcon,
   TrendingUp,
   Layers,
+  Route,
+  FileText,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 import {
@@ -85,6 +89,7 @@ import {
 } from '@/lib/supabase';
 import { PacoteService } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
+import { parsearJsonRotasML, type ResultadoParseRotas } from '@/services/routes/MlRoutesImportService';
 
 type Modo = 'camera' | 'leitor' | 'manual' | 'dashboard';
 
@@ -1309,6 +1314,360 @@ function ModalGerenciarEntregadores({
   );
 }
 
+function ModalImportarJsonRotas({
+  aberto,
+  aoFechar,
+  jsonTexto,
+  setJsonTexto,
+  abaImport,
+  setAbaImport,
+  parseResultado,
+  setParseResultado,
+  importandoRodando,
+  setImportandoRodando,
+  importandoStatus,
+  setImportandoStatus,
+  onConfirmar,
+  fileInputRef,
+}: {
+  aberto: boolean;
+  aoFechar: () => void;
+  jsonTexto: string;
+  setJsonTexto: (s: string) => void;
+  abaImport: 'colar' | 'upload';
+  setAbaImport: (a: 'colar' | 'upload') => void;
+  parseResultado: ResultadoParseRotas | null;
+  setParseResultado: (r: ResultadoParseRotas | null) => void;
+  importandoRodando: boolean;
+  setImportandoRodando: (b: boolean) => void;
+  importandoStatus: null | { importados: number; duplicados: number; falhas: number; total: number };
+  setImportandoStatus: (s: null | { importados: number; duplicados: number; falhas: number; total: number }) => void;
+  onConfirmar: (porEntregador: Record<string, string[]>) => Promise<void>;
+  fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
+}) {
+  const [copiado, setCopiado] = React.useState(false);
+  const copiarEsqueleto = () => {
+    const modelo = JSON.stringify({
+      id: 447616030,
+      status: 'active',
+      driver: 'Nome do Entregador Exemplo',
+      stops: [
+        {
+          id: 20427248346,
+          address: {
+            id: 16538169400,
+            address_line: 'Rua Exemplo, 100',
+            street_name: 'Rua Exemplo',
+            street_number: '100',
+          },
+          neighborhood: 'Bairro Exemplo',
+          city: 'São Paulo',
+          state: 'São Paulo',
+          zip_code: '00000-000',
+        },
+      ],
+    }, null, 2);
+    void navigator.clipboard.writeText(modelo);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1800);
+  };
+  const handleUpload = async (ev: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = ev.target.files?.[0];
+    if (!arquivo) return;
+    try {
+      const txt = await arquivo.text();
+      setJsonTexto(txt);
+      const r = parsearJsonRotasML(txt);
+      setParseResultado(r);
+      setAbaImport('colar');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+  const fazerParse = () => {
+    setParseResultado(null);
+    const r = parsearJsonRotasML(jsonTexto);
+    setParseResultado(r);
+  };
+  const totalPrevisto = parseResultado?.ok ? parseResultado.totalIds : 0;
+  const porEntregadorEntries = parseResultado?.ok ? Object.entries(parseResultado.porEntregador).sort((a, b) => b[1].length - a[1].length) : [];
+  return (
+    <ModalBase aberto={aberto} aoFechar={importandoRodando ? () => {} : aoFechar} maxW="max-w-3xl">
+      <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-md">
+            <Route className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-[17px] font-black tracking-tight text-neutral-900">
+              Importar rotas Mercado Livre
+            </h3>
+            <p className="text-[12.5px] text-neutral-500 mt-0.5 leading-relaxed">
+              Cole o JSON da API de monitoring do ML (Postman). Extrai o entregador (driver) e os IDs dos pacotes (address.id de cada stop).
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={importandoRodando ? undefined : aoFechar}
+          disabled={importandoRodando}
+          className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100 transition disabled:opacity-50"
+          title="Fechar"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="px-5 sm:px-6 py-3 border-b border-neutral-100 flex items-center gap-1.5 bg-neutral-50/50">
+        <button
+          type="button"
+          onClick={() => setAbaImport('colar')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-black transition ${
+            abaImport === 'colar'
+              ? 'bg-white shadow-sm text-violet-700 ring-1 ring-violet-200'
+              : 'text-neutral-500 hover:text-neutral-800'
+          }`}
+        >
+          <Copy className="h-3.5 w-3.5" /> Colar JSON
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbaImport('upload')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-black transition ${
+            abaImport === 'upload'
+              ? 'bg-white shadow-sm text-violet-700 ring-1 ring-violet-200'
+              : 'text-neutral-500 hover:text-neutral-800'
+          }`}
+        >
+          <Upload className="h-3.5 w-3.5" /> Subir arquivo .json
+        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={copiarEsqueleto}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-[10.5px] font-black text-neutral-700 transition"
+            title="Copia um JSON exemplo (esqueleto do formato da API ML)"
+          >
+            {copiado ? <Check className="h-3 w-3 text-emerald-600" /> : <FileText className="h-3 w-3" />}
+            {copiado ? 'Copiado!' : 'Copiar modelo (esqueleto)'}
+          </button>
+        </div>
+      </div>
+
+      <div className="px-5 sm:px-6 py-4 space-y-3 max-h-[62vh] overflow-auto">
+        {abaImport === 'colar' ? (
+          <>
+            <div>
+              <Label className="!text-[11px] !font-black uppercase tracking-wider text-neutral-500 mb-1.5">
+                Cole o JSON aqui
+              </Label>
+              <Textarea
+                placeholder={`{\n  \"id\": 447616030,\n  \"driver\": \"Nome do Entregador\",\n  \"stops\": [\n    { \"address\": { \"id\": 16538169400 } }\n  ]\n}`}
+                value={jsonTexto}
+                onChange={(e) => { setJsonTexto(e.target.value); if (parseResultado) setParseResultado(null); }}
+                className="!min-h-[210px] !text-[12px] font-mono leading-relaxed !p-3"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={fazerParse}
+                disabled={!jsonTexto.trim() || importandoRodando}
+                className="!h-9"
+              >
+                <Search className="h-3.5 w-3.5" />
+                Analisar JSON
+              </Button>
+              {jsonTexto && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setJsonTexto(''); setParseResultado(null); }}
+                  disabled={importandoRodando}
+                  className="!h-9"
+                >
+                  Limpar
+                </Button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50/40 p-6 sm:p-8 text-center hover:bg-violet-50/30 hover:border-violet-300 transition cursor-pointer"
+               onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="h-14 w-14 rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200 inline-flex items-center justify-center mx-auto mb-3">
+              <Upload className="h-6 w-6 text-violet-600" />
+            </div>
+            <h4 className="text-[14px] font-black text-neutral-900 mb-1">Selecione ou arraste o arquivo .json</h4>
+            <p className="text-[12px] text-neutral-500 mb-3">Formatos aceitos: .json da API de rotas Mercado Livre (monitoring/routes/...)</p>
+            <Button size="sm" variant="primary" onClick={() => fileInputRef.current?.click()} className="!h-9">
+              <FileJson className="h-3.5 w-3.5" /> Escolher arquivo
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleUpload}
+              className="hidden"
+            />
+          </div>
+        )}
+
+        {parseResultado && !parseResultado.ok && (
+          <div className="rounded-xl bg-red-50 ring-1 ring-red-200 px-3.5 py-2.5 flex items-start gap-2">
+            <XCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-[11.5px] font-black text-red-800">Não consegui importar</p>
+              <p className="text-[11.5px] text-red-700 mt-0.5 leading-relaxed">{parseResultado.erro}</p>
+            </div>
+          </div>
+        )}
+
+        {parseResultado?.ok && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="rounded-xl bg-emerald-50 ring-1 ring-emerald-200 px-3 py-2">
+                <div className="text-[9.5px] font-black uppercase tracking-wider text-emerald-700">IDs</div>
+                <div className="text-[18px] font-black tabular-nums text-emerald-800 leading-tight">{parseResultado.totalIds}</div>
+              </div>
+              <div className="rounded-xl bg-violet-50 ring-1 ring-violet-200 px-3 py-2">
+                <div className="text-[9.5px] font-black uppercase tracking-wider text-violet-700">Entregadores</div>
+                <div className="text-[18px] font-black tabular-nums text-violet-800 leading-tight">{parseResultado.totalEntregadoresUnicos}</div>
+              </div>
+              <div className="rounded-xl bg-amber-50 ring-1 ring-amber-200 px-3 py-2">
+                <div className="text-[9.5px] font-black uppercase tracking-wider text-amber-700">Duplicados</div>
+                <div className="text-[18px] font-black tabular-nums text-amber-800 leading-tight">{parseResultado.duplicadosInternos}</div>
+              </div>
+              <div className="rounded-xl bg-sky-50 ring-1 ring-sky-200 px-3 py-2">
+                <div className="text-[9.5px] font-black uppercase tracking-wider text-sky-700">Rotas</div>
+                <div className="text-[18px] font-black tabular-nums text-sky-800 leading-tight">{parseResultado.rotas.length}</div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mb-1.5">Por entregador</p>
+              <div className="rounded-xl bg-white ring-1 ring-neutral-200 divide-y divide-neutral-100 overflow-hidden">
+                {porEntregadorEntries.length === 0 && (
+                  <div className="px-3 py-3 text-[12px] text-neutral-400 text-center">Nenhum ID encontrado</div>
+                )}
+                {porEntregadorEntries.map(([nome, ids], idx) => {
+                  const maxQtd = Math.max(...porEntregadorEntries.map(([, x]) => x.length), 1);
+                  return (
+                    <div key={nome} className="px-3 py-2 sm:px-3.5 sm:py-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="inline-flex items-center gap-1.5 min-w-0">
+                          <Truck className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                          <span className="text-[12.5px] font-black text-neutral-900 truncate">{nome}</span>
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-[10px] font-black tabular-nums">
+                            {ids.length}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-neutral-500 tabular-nums">
+                          {((ids.length / totalPrevisto) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-violet-100/80 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full"
+                          style={{ width: `${(ids.length / maxQtd) * 100}%` }}
+                        />
+                      </div>
+                      {idx === 0 && ids.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1 max-h-[60px] overflow-auto">
+                          {ids.slice(0, 12).map((id) => (
+                            <span key={id} className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 ring-1 ring-neutral-200 text-[10px] font-bold tabular-nums text-neutral-700">
+                              {truncate(id, 14)}
+                            </span>
+                          ))}
+                          {ids.length > 12 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-50 text-neutral-500 text-[10px] font-bold tabular-nums">
+                              +{ids.length - 12} mais
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {importandoStatus && (
+              <div className={`rounded-xl ring-1 px-3.5 py-3 ${
+                importandoRodando
+                  ? 'bg-sky-50 ring-sky-200'
+                  : 'bg-emerald-50 ring-emerald-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {importandoRodando ? (
+                    <div className="h-4 w-4 border-2 border-sky-500/30 border-t-sky-600 rounded-full animate-spin shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-black text-neutral-900">
+                      {importandoRodando
+                        ? `Importando ${importandoStatus.importados} de ${importandoStatus.total}...`
+                        : 'Importação concluída! 🎉'}
+                    </p>
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/60 ring-1 ring-neutral-200/60 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${importandoRodando ? 'bg-sky-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${importandoStatus.total ? ((importandoStatus.importados + importandoStatus.duplicados + importandoStatus.falhas) / importandoStatus.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <p className="text-[10.5px] font-bold text-neutral-600 mt-1.5 inline-flex items-center gap-2 flex-wrap">
+                      <span className="text-emerald-700">✅ {importandoStatus.importados} novos</span>
+                      <span className="text-amber-700">🔄 {importandoStatus.duplicados} duplicados</span>
+                      {importandoStatus.falhas > 0 && (
+                        <span className="text-red-700">❌ {importandoStatus.falhas} falhas</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="px-5 sm:px-6 py-3.5 border-t border-neutral-100 flex items-center justify-end gap-2 bg-neutral-50/40">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={aoFechar}
+          disabled={importandoRodando}
+          className="!h-9 !px-3.5"
+        >
+          Fechar
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!parseResultado?.ok || !totalPrevisto || importandoRodando}
+          onClick={() => {
+            if (!parseResultado?.ok) return;
+            void onConfirmar(parseResultado.porEntregador);
+          }}
+          className="!h-9 !px-3.5"
+        >
+          {importandoRodando ? (
+            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" />
+          )}
+          {importandoRodando
+            ? 'Importando...'
+            : totalPrevisto > 0
+            ? `Importar ${totalPrevisto} ID${totalPrevisto !== 1 ? 's' : ''}`
+            : 'Nenhum ID para importar'}
+        </Button>
+      </div>
+    </ModalBase>
+  );
+}
+
 const PALETA_DASH = [
   '#6366f1', '#10b981', '#8b5cf6', '#f59e0b', '#0ea5e9',
   '#ec4899', '#14b8a6', '#f43f5e', '#84cc16', '#3b82f6',
@@ -2417,6 +2776,14 @@ export default function ContagemPage() {
 
   const [menuAberto, setMenuAberto] = React.useState(false);
   const [gerenciarEntregadoresAberto, setGerenciarEntregadoresAberto] = React.useState(false);
+  const [modalImportJsonAberto, setModalImportJsonAberto] = React.useState(false);
+  const [abaImport, setAbaImport] = React.useState<'colar' | 'upload'>('colar');
+  const [jsonTexto, setJsonTexto] = React.useState('');
+  const [parseResultado, setParseResultado] = React.useState<ResultadoParseRotas | null>(null);
+  const [importandoStatus, setImportandoStatus] = React.useState<null | { importados: number; duplicados: number; falhas: number; total: number }>(null);
+  const [importandoRodando, setImportandoRodando] = React.useState(false);
+  const fileInputJsonRef = React.useRef<HTMLInputElement | null>(null);
+  const importarLotePorEntregador = usePacoteStore((s) => s.importarLotePorEntregador);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -2458,6 +2825,43 @@ export default function ContagemPage() {
       <ModalGerenciarEntregadores
         aberto={gerenciarEntregadoresAberto}
         aoFechar={() => setGerenciarEntregadoresAberto(false)}
+      />
+      <ModalImportarJsonRotas
+        aberto={modalImportJsonAberto}
+        aoFechar={() => setModalImportJsonAberto(false)}
+        jsonTexto={jsonTexto}
+        setJsonTexto={setJsonTexto}
+        abaImport={abaImport}
+        setAbaImport={setAbaImport}
+        parseResultado={parseResultado}
+        setParseResultado={setParseResultado}
+        importandoRodando={importandoRodando}
+        setImportandoRodando={setImportandoRodando}
+        importandoStatus={importandoStatus}
+        setImportandoStatus={setImportandoStatus}
+        onConfirmar={async (porEntregador) => {
+          if (importandoRodando) return;
+          const total = Object.values(porEntregador).reduce((a, b) => a + b.length, 0);
+          setImportandoRodando(true);
+          setImportandoStatus({ importados: 0, duplicados: 0, falhas: 0, total });
+          try {
+            const res = await importarLotePorEntregador(porEntregador);
+            setImportandoStatus({ importados: res.importados, duplicados: res.duplicados, falhas: res.falhas, total });
+            setMenuAberto(false);
+            setTimeout(() => {
+              setImportandoRodando(false);
+            }, 1500);
+          } catch (e) {
+            setImportandoStatus({
+              importados: 0,
+              duplicados: 0,
+              falhas: total,
+              total,
+            });
+            setImportandoRodando(false);
+          }
+        }}
+        fileInputRef={fileInputJsonRef}
       />
 
       {feedback && (
@@ -2634,6 +3038,26 @@ export default function ContagemPage() {
                   >
                     <Users className="h-4 w-4 text-indigo-600 shrink-0" />
                     Gerenciar entregadores
+                  </button>
+
+                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Importação de rotas ML</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => acaoMenu(() => {
+                      setJsonTexto('');
+                      setParseResultado(null);
+                      setImportandoStatus(null);
+                      setModalImportJsonAberto(true);
+                    })}
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                  >
+                    <Route className="h-4 w-4 text-violet-600 shrink-0" />
+                    Importar JSON rotas
+                    <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-[9.5px] font-black uppercase">
+                      NEW
+                    </span>
                   </button>
 
                   <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">

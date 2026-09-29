@@ -51,6 +51,12 @@ type PacoteState = {
   adicionarOuMover: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<{ tipo: 'adicao' | 'movimento' | 'duplicado_mesmo_entregador' | 'erro'; resultado: ResultadoAdicaoPacote | ResultadoMoverPacote }>;
   definirStatus: (id: string, status: StatusPacote | null) => Promise<void>;
   definirStatusEmLote: (ids: string[], status: StatusPacote | null) => Promise<void>;
+  importarLotePorEntregador: (porEntregador: Record<string, string[]>, origem?: string) => Promise<{
+    importados: number;
+    duplicados: number;
+    falhas: number;
+    porEntregador: Record<string, { importados: number; duplicados: number }>;
+  }>;
   alternarStatusRetorno: (id: string) => Promise<void>;
   ciclarStatus: (id: string) => Promise<void>;
   remover: (id: string) => Promise<void>;
@@ -688,6 +694,35 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         }
       } catch { /* noop */ }
     })();
+  },
+
+  importarLotePorEntregador: async (porEntregador, origem = 'import_json_rotas') => {
+    const origemLeitura = origem as OrigemLeitura;
+    const resumoPorEntregador: Record<string, { importados: number; duplicados: number }> = {};
+    let importados = 0;
+    let duplicados = 0;
+    let falhas = 0;
+
+    const nomesEntregadores = Object.keys(porEntregador);
+    for (const nome of nomesEntregadores) {
+      resumoPorEntregador[nome] = { importados: 0, duplicados: 0 };
+      const ids = porEntregador[nome] ?? [];
+      for (const cod of ids) {
+        try {
+          const r = await get().adicionar(cod, origemLeitura, { entregador: nome, status: 'lido' });
+          if (r.duplicado) {
+            duplicados++;
+            resumoPorEntregador[nome].duplicados++;
+          } else {
+            importados++;
+            resumoPorEntregador[nome].importados++;
+          }
+        } catch {
+          falhas++;
+        }
+      }
+    }
+    return { importados, duplicados, falhas, porEntregador: resumoPorEntregador };
   },
 
   alternarStatusRetorno: async (id) => {
