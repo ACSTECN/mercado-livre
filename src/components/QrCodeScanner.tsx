@@ -72,13 +72,15 @@ function extrairCodigoDoJson(raw: string): { codigo: string; tipo?: string } {
   return { codigo: norm, tipo: tipoEncontrado };
 }
 
-export function QrCodeScanner({ onCodigoLido, onClose, className, autoStart = true }: Props) {
+function QrCodeScannerRaw({ onCodigoLido, onClose, className, autoStart = true }: Props) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const readerRef = React.useRef<BrowserMultiFormatReader | null>(null);
   const scanningRef = React.useRef(false);
   const ultimoLidoRef = React.useRef<{ codigo: string; ts: number } | null>(null);
   const frameTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCodigoLidoRef = React.useRef<Props['onCodigoLido']>(onCodigoLido);
+  React.useEffect(() => { onCodigoLidoRef.current = onCodigoLido; }, [onCodigoLido]);
 
   const [ativo, setAtivo] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -209,7 +211,7 @@ export function QrCodeScanner({ onCodigoLido, onClose, className, autoStart = tr
               ultimoLidoRef.current = { codigo: extraido.codigo, ts: agora };
               setFlashDetect(true);
               setTimeout(() => setFlashDetect(false), 200);
-              onCodigoLido(extraido.codigo, raw);
+              onCodigoLidoRef.current(extraido.codigo, raw);
             }
           }
         } catch {
@@ -235,14 +237,18 @@ export function QrCodeScanner({ onCodigoLido, onClose, className, autoStart = tr
     } finally {
       setInicializando(false);
     }
-  }, [facing, parar, onCodigoLido]);
+  }, [facing]);
+
+  const iniciarRef = React.useRef(iniciar);
+  React.useEffect(() => { iniciarRef.current = iniciar; }, [iniciar]);
 
   React.useEffect(() => {
     if (autoStart) {
-      iniciar();
+      void iniciarRef.current();
     }
-    return () => parar();
-  }, [iniciar, autoStart, parar]);
+    return () => { void parar(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   return (
     <div className={cn('w-full overflow-hidden rounded-2xl border border-black/5 bg-neutral-900', className)}>
@@ -355,4 +361,5 @@ export function QrCodeScanner({ onCodigoLido, onClose, className, autoStart = tr
   );
 }
 
-export { extrairCodigoDoJson };
+const QrCodeScannerMemo = React.memo(QrCodeScannerRaw);
+export { QrCodeScannerMemo as QrCodeScanner, QrCodeScannerRaw, extrairCodigoDoJson };

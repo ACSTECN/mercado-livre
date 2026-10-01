@@ -2441,14 +2441,19 @@ export default function ContagemPage() {
         } catch { /* noop */ }
       }
       const t = setTimeout(() => { void sincronizarAgoraAuto(true); }, 1200);
-      return () => clearTimeout(t);
-    });
-    const id1 = setInterval(() => {
-      void carregarSacas().then(() => void carregar());
-    }, 6000);
-    const id2 = setInterval(() => {
-      void sincronizarAgoraAuto(false);
-    }, 30000);
+    return () => clearTimeout(t);
+  });
+  const cameraAtiva = modo === 'camera';
+  const pausarPolling = React.useRef<boolean>(cameraAtiva);
+  pausarPolling.current = cameraAtiva;
+  const id1 = setInterval(() => {
+    if (pausarPolling.current) return;
+    void carregarSacas().then(() => void carregar());
+  }, 6000);
+  const id2 = setInterval(() => {
+    if (pausarPolling.current) return;
+    void sincronizarAgoraAuto(false);
+  }, 30000);
     return () => {
       cancelado = true;
       clearInterval(id1);
