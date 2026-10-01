@@ -2272,6 +2272,8 @@ export default function ContagemPage() {
   const carregarEntregadoresBanco = usePacoteStore((s) => s.carregarEntregadoresBanco);
 
   const [modo, setModo] = React.useState<Modo>('leitor');
+  const modoRef = React.useRef<Modo>(modo);
+  React.useEffect(() => { modoRef.current = modo; }, [modo]);
   const [codigoManual, setCodigoManual] = React.useState('');
   const [codigoLeitor, setCodigoLeitor] = React.useState('');
   const [filtro, setFiltro] = React.useState('');
@@ -2440,26 +2442,29 @@ export default function ContagemPage() {
           await carregar();
         } catch { /* noop */ }
       }
-      const t = setTimeout(() => { void sincronizarAgoraAuto(true); }, 1200);
-    return () => clearTimeout(t);
-  });
-  const cameraAtiva = modo === 'camera';
-  const pausarPolling = React.useRef<boolean>(cameraAtiva);
-  pausarPolling.current = cameraAtiva;
-  const id1 = setInterval(() => {
-    if (pausarPolling.current) return;
-    void carregarSacas().then(() => void carregar());
-  }, 6000);
-  const id2 = setInterval(() => {
-    if (pausarPolling.current) return;
-    void sincronizarAgoraAuto(false);
-  }, 30000);
+      setTimeout(() => { void sincronizarAgoraAuto(true); }, 1200);
+    });
+    const pausarPolling = { current: false };
+    const atualizarPausa = () => {
+      pausarPolling.current = modoRef.current === 'camera';
+    };
+    atualizarPausa();
+    const idPausa = setInterval(atualizarPausa, 500);
+    const id1 = setInterval(() => {
+      if (pausarPolling.current) return;
+      void carregarSacas().then(() => void carregar());
+    }, 6000);
+    const id2 = setInterval(() => {
+      if (pausarPolling.current) return;
+      void sincronizarAgoraAuto(false);
+    }, 30000);
     return () => {
       cancelado = true;
+      clearInterval(idPausa);
       clearInterval(id1);
       clearInterval(id2);
     };
-  }, [carregarSacas, carregar, carregarEntregadoresBanco, sincronizarAgoraAuto, criarSaca, definirSacaAtiva]);
+  }, [carregarSacas, carregar, carregarEntregadoresBanco, sincronizarAgoraAuto, criarSaca, definirSacaAtiva, modoRef]);
 
   React.useEffect(() => {
     const onVis = () => {
