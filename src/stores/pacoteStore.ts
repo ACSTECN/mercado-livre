@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote, StatusPacote } from '@/types';
 import { PacoteService, adicionarEntregador, removerEntregador, renomearEntregador, listarEntregadores, listarEntregadoresSyncOffline, invalidarCacheEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
+import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 
 type ContagemEntregador = { nome: string; qtd: number; retornos: number; entregues: number; devolucoes: number; lidos: number };
 
@@ -51,11 +52,18 @@ type PacoteState = {
   adicionarOuMover: (codigo: string, origem: OrigemLeitura, extra?: Partial<PacoteLidoLocal>) => Promise<{ tipo: 'adicao' | 'movimento' | 'duplicado_mesmo_entregador' | 'erro'; resultado: ResultadoAdicaoPacote | ResultadoMoverPacote }>;
   definirStatus: (id: string, status: StatusPacote | null) => Promise<void>;
   definirStatusEmLote: (ids: string[], status: StatusPacote | null) => Promise<void>;
+  definirEntregadorEmLote: (ids: string[], entregador: string | null) => Promise<{ atualizados: number; falhas: number }>;
   importarLotePorEntregador: (porEntregador: Record<string, string[]>, origem?: string) => Promise<{
     importados: number;
     duplicados: number;
     falhas: number;
     porEntregador: Record<string, { importados: number; duplicados: number }>;
+  }>;
+  importarLotePorZona: (porZona: Record<string, string[]>, origem?: string) => Promise<{
+    importados: number;
+    duplicados: number;
+    falhas: number;
+    porZona: Record<string, { importados: number; duplicados: number }>;
   }>;
   alternarStatusRetorno: (id: string) => Promise<void>;
   ciclarStatus: (id: string) => Promise<void>;
@@ -694,6 +702,80 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         }
       } catch { /* noop */ }
     })();
+  },
+
+  definirEntregadorEmLote: async (ids, entregador) => {
+    if (!ids.length) return { atualizados: 0, falhas: 0 };
+    const entregadorLimpo = entregador == null ? '' : entregador.trim();
+    const idSet = new Set(ids);
+    const atual = get().pacotes;
+    let atualizados = 0;
+    let falhas = 0;
+    const nova: PacoteLidoLocal[] = atual.map((p) => {
+      if (idSet.has(p.id)) {
+        const novoValor = entregadorLimpo || undefined;
+        if (p.entregador !== novoValor) atualizados++;
+        return { ...p, entregador: novoValor, sincronizado: false };
+      }
+      return p;
+    });
+    if (atualizados === 0) return { atualizados: 0, falhas: 0 };
+    salvarCache(nova);
+    const r = recalcular(nova);
+    set({
+      pacotes: nova,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+    });
+    if (entregadorLimpo) adicionarEntregador(entregadorLimpo);
+    void (async () => {
+      try {
+        for (const id of ids) {
+          try {
+            if (entregadorLimpo) {
+              await get().moverPacote(id, entregadorLimpo, 'manual');
+            } else if (isSupabaseConfigurado) {
+              const sb = getSupabase();
+              if (sb) {
+                const { error } = await sb.from('pacotes_lidos').update({ entregador: null }).eq('id', id);
+                if (!error) {
+                  const locais = carregarDoCache();
+                  const idx = locais.findIndex((p) => p.id === id);
+                  if (idx >= 0) {
+                    locais[idx] = { ...locais[idx], entregador: undefined, sincronizado: true };
+                    salvarCache(locais);
+                  }
+                }
+              }
+            }
+          } catch { falhas++; }
+        }
+      } catch { /* noop */ }
+    })();
+    return { atualizados, falhas };
+  },
+
+  importarLotePorZona: async (porZona, origem = 'import_json_zona') => {
+    const origemLeitura = origem as OrigemLeitura;
+    const resumoPorZona: Record<string, { importados: number; duplicados: number }> = {};
+    let importados = 0;
+    let duplicados = 0;
+    let falhas = 0;
+    const nomesZonas = Object.keys(porZona);
+    for (const nome of nomesZonas) {
+      resumoPorZona[nome] = { importados: 0, duplicados: 0 };
+      const ids = porZona[nome] ?? [];
+      for (const cod of ids) {
+        try {
+          const r = await get().adicionar(cod, origemLeitura, { entregador: nome, status: 'lido' });
+          if (r.duplicado) { duplicados++; resumoPorZona[nome].duplicados++; }
+          else { importados++; resumoPorZona[nome].importados++; }
+        } catch {
+          falhas++;
+        }
+      }
+    }
+    return { importados, duplicados, falhas, porZona: resumoPorZona };
   },
 
   importarLotePorEntregador: async (porEntregador, origem = 'import_json_rotas') => {
