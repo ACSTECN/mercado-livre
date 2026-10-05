@@ -761,20 +761,77 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     let importados = 0;
     let duplicados = 0;
     let falhas = 0;
+
+    const sacaAtual = get().sacaAtiva;
+    const sacaIdComparar = sacaAtual?.id ?? null;
+    const listaOriginal = get().pacotes;
+    const pacotesAdicionar: PacoteLidoLocal[] = [];
+    const codigosVistosLocal = new Set<string>();
+    const novosEntregadores: string[] = [];
+
     const nomesZonas = Object.keys(porZona);
     for (const nome of nomesZonas) {
       resumoPorZona[nome] = { importados: 0, duplicados: 0 };
       const ids = porZona[nome] ?? [];
       for (const cod of ids) {
         try {
-          const r = await get().adicionar(cod, origemLeitura, { entregador: nome, status: 'lido' });
-          if (r.duplicado) { duplicados++; resumoPorZona[nome].duplicados++; }
-          else { importados++; resumoPorZona[nome].importados++; }
+          const resultado = await PacoteService.adicionar(cod, origemLeitura, {
+            saca_id: sacaAtual?.id ?? undefined,
+            entregador: nome,
+            status: 'lido',
+          });
+          let pacoteParaLista: PacoteLidoLocal | null = null;
+          if (resultado.sucesso && resultado.pacote) {
+            pacoteParaLista = resultado.pacote;
+            importados++;
+            resumoPorZona[nome].importados++;
+          } else if (resultado.duplicado && resultado.existente) {
+            pacoteParaLista = resultado.existente;
+            duplicados++;
+            resumoPorZona[nome].duplicados++;
+          }
+          if (pacoteParaLista) {
+            const chaveDedup = `${pacoteParaLista.codigo_pacote}__${pacoteParaLista.saca_id ?? 'null'}`;
+            if (codigosVistosLocal.has(chaveDedup)) continue;
+            codigosVistosLocal.add(chaveDedup);
+            pacotesAdicionar.push(pacoteParaLista);
+            const entNome = pacoteParaLista.entregador;
+            if (entNome && !novosEntregadores.some((x) => x.toLowerCase() === entNome.toLowerCase()) && !get().entregadores.some((x) => x.toLowerCase() === entNome.toLowerCase())) {
+              novosEntregadores.push(entNome);
+            }
+          }
         } catch {
           falhas++;
         }
       }
     }
+
+    if (pacotesAdicionar.length > 0) {
+      const codigosNovos = new Map<string, PacoteLidoLocal>();
+      for (const p of pacotesAdicionar) {
+        codigosNovos.set(`${p.codigo_pacote}__${p.saca_id ?? 'null'}`, p);
+      }
+      const listaFiltrada = listaOriginal.filter((p) => {
+        const chave = `${p.codigo_pacote}__${p.saca_id ?? 'null'}`;
+        return !codigosNovos.has(chave);
+      });
+      const nova = [...pacotesAdicionar, ...listaFiltrada];
+      salvarCache(nova);
+      const r = recalcular(nova);
+      const patch: Partial<PacoteState> = {
+        pacotes: nova,
+        entregadoresSaca: r.entregadoresSaca,
+        contagensEntregadores: r.contagens,
+      };
+      if (novosEntregadores.length > 0) {
+        const atuais = get().entregadores;
+        const proximos = ordenarNomes([...atuais, ...novosEntregadores]);
+        patch.entregadores = proximos;
+        novosEntregadores.forEach((n) => adicionarEntregador(n));
+      }
+      set(patch as PacoteState);
+    }
+
     return { importados, duplicados, falhas, porZona: resumoPorZona };
   },
 
@@ -785,25 +842,76 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     let duplicados = 0;
     let falhas = 0;
 
+    const sacaAtual = get().sacaAtiva;
+    const sacaIdComparar = sacaAtual?.id ?? null;
+    const listaOriginal = get().pacotes;
+    const pacotesAdicionar: PacoteLidoLocal[] = [];
+    const codigosVistosLocal = new Set<string>();
+    const novosEntregadores: string[] = [];
+
     const nomesEntregadores = Object.keys(porEntregador);
     for (const nome of nomesEntregadores) {
       resumoPorEntregador[nome] = { importados: 0, duplicados: 0 };
       const ids = porEntregador[nome] ?? [];
       for (const cod of ids) {
         try {
-          const r = await get().adicionar(cod, origemLeitura, { entregador: nome, status: 'lido' });
-          if (r.duplicado) {
-            duplicados++;
-            resumoPorEntregador[nome].duplicados++;
-          } else {
+          const resultado = await PacoteService.adicionar(cod, origemLeitura, {
+            saca_id: sacaAtual?.id ?? undefined,
+            entregador: nome,
+            status: 'lido',
+          });
+          let pacoteParaLista: PacoteLidoLocal | null = null;
+          if (resultado.sucesso && resultado.pacote) {
+            pacoteParaLista = resultado.pacote;
             importados++;
             resumoPorEntregador[nome].importados++;
+          } else if (resultado.duplicado && resultado.existente) {
+            pacoteParaLista = resultado.existente;
+            duplicados++;
+            resumoPorEntregador[nome].duplicados++;
+          }
+          if (pacoteParaLista) {
+            const chaveDedup = `${pacoteParaLista.codigo_pacote}__${pacoteParaLista.saca_id ?? 'null'}`;
+            if (codigosVistosLocal.has(chaveDedup)) continue;
+            codigosVistosLocal.add(chaveDedup);
+            pacotesAdicionar.push(pacoteParaLista);
+            const entNome = pacoteParaLista.entregador;
+            if (entNome && !novosEntregadores.some((x) => x.toLowerCase() === entNome.toLowerCase()) && !get().entregadores.some((x) => x.toLowerCase() === entNome.toLowerCase())) {
+              novosEntregadores.push(entNome);
+            }
           }
         } catch {
           falhas++;
         }
       }
     }
+
+    if (pacotesAdicionar.length > 0) {
+      const codigosNovos = new Map<string, PacoteLidoLocal>();
+      for (const p of pacotesAdicionar) {
+        codigosNovos.set(`${p.codigo_pacote}__${p.saca_id ?? 'null'}`, p);
+      }
+      const listaFiltrada = listaOriginal.filter((p) => {
+        const chave = `${p.codigo_pacote}__${p.saca_id ?? 'null'}`;
+        return !codigosNovos.has(chave);
+      });
+      const nova = [...pacotesAdicionar, ...listaFiltrada];
+      salvarCache(nova);
+      const r = recalcular(nova);
+      const patch: Partial<PacoteState> = {
+        pacotes: nova,
+        entregadoresSaca: r.entregadoresSaca,
+        contagensEntregadores: r.contagens,
+      };
+      if (novosEntregadores.length > 0) {
+        const atuais = get().entregadores;
+        const proximos = ordenarNomes([...atuais, ...novosEntregadores]);
+        patch.entregadores = proximos;
+        novosEntregadores.forEach((n) => adicionarEntregador(n));
+      }
+      set(patch as PacoteState);
+    }
+
     return { importados, duplicados, falhas, porEntregador: resumoPorEntregador };
   },
 
