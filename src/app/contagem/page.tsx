@@ -4053,12 +4053,14 @@ export default function ContagemPage() {
                 ) : (
                   <div className="space-y-1.5 max-h-[65vh] overflow-auto scrollbar-thin pr-0.5">
                     {filtrados.map((p, idx) => {
-                      const origemMap: Record<OrigemLeitura, { label: string; variant: React.ComponentProps<typeof Badge>['variant'] }> = {
+                      const origemMap: Partial<Record<OrigemLeitura | string, { label: string; variant: 'info' | 'success' | 'warning' | 'default' }>> = {
                         camera: { label: 'Câmera', variant: 'info' },
                         leitor_externo: { label: 'Leitor', variant: 'success' },
                         manual: { label: 'Manual', variant: 'warning' },
+                        import_json_rotas: { label: 'JSON rotas', variant: 'info' },
+                        import_json_zona: { label: 'JSON zona', variant: 'success' },
                       };
-                      const oMeta = origemMap[p.origem];
+                      const oMeta = origemMap[p.origem] ?? { label: String(p.origem ?? 'Outro'), variant: 'default' };
                       const destaque = flashId === p.id;
                       const shaking = shakeId === p.id;
                       const d = new Date(p.created_at);
@@ -4108,7 +4110,7 @@ export default function ContagemPage() {
                               </span>
                             )}
                             <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-black ring-1 ${
-                              oMeta.variant === 'info'
+                              oMeta.variant === 'info' || oMeta.variant === 'default'
                                 ? 'bg-sky-50 text-sky-700 ring-sky-200'
                                 : oMeta.variant === 'success'
                                 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
