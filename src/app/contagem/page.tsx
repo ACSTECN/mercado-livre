@@ -2945,13 +2945,44 @@ export default function ContagemPage() {
     void fecharSacaAtiva();
   };
 
+  const pacotesDaSaca = React.useMemo(() => {
+    if (!sacaAtiva) return [];
+    return pacotes.filter((p) => p.saca_id === sacaAtiva.id);
+  }, [pacotes, sacaAtiva]);
+
+  const totalDaSaca = React.useMemo(() => pacotesDaSaca.length, [pacotesDaSaca]);
+  const unicosDaSaca = React.useMemo(() => new Set(pacotesDaSaca.map((p) => p.codigo_pacote)).size, [pacotesDaSaca]);
+
   const contagemEntregadores = React.useMemo(() => {
-    if (!contagensEntregadoresStore.length) return [];
-    return [...contagensEntregadoresStore].sort((a, b) => b.qtd - a.qtd);
-  }, [contagensEntregadoresStore]);
+    const mapaQtd = new Map<string, number>();
+    const mapaRetornos = new Map<string, number>();
+    const mapaEntregues = new Map<string, number>();
+    const mapaDevolucoes = new Map<string, number>();
+    const mapaLidos = new Map<string, number>();
+    for (const p of pacotesDaSaca) {
+      const k = p.entregador ?? 'Sem entregador';
+      mapaQtd.set(k, (mapaQtd.get(k) ?? 0) + 1);
+      if (p.status === 'retorno') mapaRetornos.set(k, (mapaRetornos.get(k) ?? 0) + 1);
+      if (p.status === 'entregue') mapaEntregues.set(k, (mapaEntregues.get(k) ?? 0) + 1);
+      if (p.status === 'devolucao') mapaDevolucoes.set(k, (mapaDevolucoes.get(k) ?? 0) + 1);
+      if (p.status === 'lido') mapaLidos.set(k, (mapaLidos.get(k) ?? 0) + 1);
+    }
+    const resultado: Array<{ nome: string; qtd: number; retornos: number; entregues: number; devolucoes: number; lidos: number }> = [];
+    for (const [nome, qtd] of mapaQtd.entries()) {
+      resultado.push({
+        nome,
+        qtd,
+        retornos: mapaRetornos.get(nome) ?? 0,
+        entregues: mapaEntregues.get(nome) ?? 0,
+        devolucoes: mapaDevolucoes.get(nome) ?? 0,
+        lidos: mapaLidos.get(nome) ?? 0,
+      });
+    }
+    return resultado.sort((a, b) => b.qtd - a.qtd);
+  }, [pacotesDaSaca]);
 
   const filtrados = React.useMemo(() => {
-    let lista = pacotes;
+    let lista = pacotesDaSaca;
     if (filtroEntregador !== '__todos__') {
       if (filtroEntregador === '__sem__') {
         lista = lista.filter((p) => !p.entregador);
@@ -2972,7 +3003,7 @@ export default function ContagemPage() {
           p.id.toLowerCase().includes(q) ||
           (p.entregador ?? '').toLowerCase().includes(q),
       );
-  }, [pacotes, filtro, filtroEntregador, filtroStatus]);
+  }, [pacotesDaSaca, filtro, filtroEntregador, filtroStatus]);
 
   const selecionarTodosFiltrados = React.useCallback(() => {
     setSelecionados(new Set(filtrados.map((p) => p.id)));
@@ -2985,7 +3016,7 @@ export default function ContagemPage() {
   const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
 
   const escopo = React.useMemo(() => {
-    let base = pacotes;
+    let base = pacotesDaSaca;
     if (filtroEntregador !== '__todos__') {
       if (filtroEntregador === '__sem__') base = base.filter((p) => !p.entregador);
       else base = base.filter((p) => p.entregador === filtroEntregador);
@@ -3006,7 +3037,7 @@ export default function ContagemPage() {
       retornos,
       entregadores: entregadores.size,
     };
-  }, [pacotes, filtroEntregador, filtroStatus]);
+  }, [pacotesDaSaca, filtroEntregador, filtroStatus]);
 
   const feedbackCor =
     feedback?.tipo === 'sucesso'
@@ -3884,9 +3915,9 @@ export default function ContagemPage() {
 
             {modo === 'dashboard' ? (
               <TelaDashboard
-                pacotes={pacotes}
-                total={total}
-                unicos={unicos}
+                pacotes={pacotesDaSaca}
+                total={totalDaSaca}
+                unicos={unicosDaSaca}
                 contagensEntregadores={contagemEntregadores}
                 entregadoresCadastrados={entregadores}
                 resumos={resumos}
@@ -3931,12 +3962,12 @@ export default function ContagemPage() {
                   </div>
                   <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg shrink-0 flex-wrap">
                     {[
-                      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: pacotes.length, icon: null },
-                      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: pacotes.filter((p) => !p.status).length, icon: null },
-                      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: pacotes.filter((p) => p.status === 'lido').length, icon: CheckCheck },
-                      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: pacotes.filter((p) => p.status === 'entregue').length, icon: Truck },
-                      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: pacotes.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
-                      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: pacotes.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
+                      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: pacotesDaSaca.length, icon: null },
+                      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: pacotesDaSaca.filter((p) => !p.status).length, icon: null },
+                      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: pacotesDaSaca.filter((p) => p.status === 'lido').length, icon: CheckCheck },
+                      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: pacotesDaSaca.filter((p) => p.status === 'entregue').length, icon: Truck },
+                      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: pacotesDaSaca.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
+                      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: pacotesDaSaca.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
                     ].map((b) => {
                       const Icon = b.icon;
                       const sel = filtroStatus === b.k;
