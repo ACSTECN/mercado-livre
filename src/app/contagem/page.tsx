@@ -1336,6 +1336,7 @@ function ModalImportarJson({
   onConfirmarRotas,
   onConfirmarZonas,
   fileInputRef,
+  entregadoresCadastrados,
 }: {
   aberto: boolean;
   aoFechar: () => void;
@@ -1354,10 +1355,12 @@ function ModalImportarJson({
   importandoStatus: null | { importados: number; duplicados: number; falhas: number; total: number };
   setImportandoStatus: (s: null | { importados: number; duplicados: number; falhas: number; total: number }) => void;
   onConfirmarRotas: (porEntregador: Record<string, string[]>) => Promise<void>;
-  onConfirmarZonas: (porZona: Record<string, string[]>) => Promise<void>;
+  onConfirmarZonas: (porZona: Record<string, string[]>, entregadorDestino?: string) => Promise<void>;
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
+  entregadoresCadastrados: string[];
 }) {
   const [copiado, setCopiado] = React.useState(false);
+  const [zonaEntregadorDestino, setZonaEntregadorDestino] = React.useState<string>('');
   const copiarEsqueleto = () => {
     const modelo = tipoImportacao === 'rotas'
       ? JSON.stringify({
@@ -1655,6 +1658,44 @@ function ModalImportarJson({
               )}
             </div>
 
+            {tipoImportacao === 'zonas' && parseResultadoZonas?.ok && (
+              <div className="rounded-xl bg-gradient-to-br from-rose-50 to-orange-50 ring-1 ring-rose-200/80 px-3.5 py-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="shrink-0 mt-0.5"><Truck className="h-4 w-4 text-rose-600" /></div>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-wider text-rose-800 mb-1">
+                        Entregador destino (evita ter que mover depois)
+                      </p>
+                      <p className="text-[11.5px] text-rose-700 leading-relaxed">
+                        Escolhendo abaixo, os pacotes <strong className="font-black">já importam DIRETO para o entregador selecionado</strong>,
+                        sem passar por zona temporária. Deixe vazio para usar o comportamento padrão (zone_name como entregador temporário, depois mover).
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="!text-[10.5px] !font-black uppercase tracking-wider text-rose-800 mb-1">
+                        Destino final
+                      </Label>
+                      <select
+                        value={zonaEntregadorDestino}
+                        onChange={(e) => setZonaEntregadorDestino(e.target.value)}
+                        disabled={importandoRodando}
+                        className="w-full h-10 rounded-xl border border-rose-200 bg-white px-3 text-[12.5px] text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition disabled:opacity-60"
+                      >
+                        <option value="">⏳ Criar zona temporária com zone_name (padrão)</option>
+                        {entregadoresCadastrados.length === 0 && (
+                          <option value="" disabled>Nenhum entregador cadastrado ainda</option>
+                        )}
+                        {entregadoresCadastrados.map((nomeEnt) => (
+                          <option key={nomeEnt} value={nomeEnt}>✅ {nomeEnt} (importa direto)</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <p className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mb-1.5">
                 {tipoImportacao === 'rotas' ? 'Por entregador' : 'Por zona (agrupa antes de atribuir entregador)'}
@@ -1775,7 +1816,7 @@ function ModalImportarJson({
             if (tipoImportacao === 'rotas' && parseResultadoRotas?.ok) {
               void onConfirmarRotas(parseResultadoRotas.porEntregador);
             } else if (tipoImportacao === 'zonas' && parseResultadoZonas?.ok) {
-              void onConfirmarZonas(parseResultadoZonas.porZona);
+              void onConfirmarZonas(parseResultadoZonas.porZona, zonaEntregadorDestino || undefined);
             }
           }}
           className={`!h-9 !px-3.5 ${
@@ -3186,13 +3227,13 @@ export default function ContagemPage() {
             setImportandoRodando(false);
           }
         }}
-        onConfirmarZonas={async (porZona) => {
+        onConfirmarZonas={async (porZona, entregadorDestino) => {
           if (importandoRodando) return;
           const total = Object.values(porZona).reduce((a, b) => a + b.length, 0);
           setImportandoRodando(true);
           setImportandoStatus({ importados: 0, duplicados: 0, falhas: 0, total });
           try {
-            const res = await importarLotePorZona(porZona);
+            const res = await importarLotePorZona(porZona, 'import_json_zona', entregadorDestino);
             setImportandoStatus({ importados: res.importados, duplicados: res.duplicados, falhas: res.falhas, total });
             setMenuAberto(false);
             setTimeout(() => { setImportandoRodando(false); }, 1500);
@@ -3202,6 +3243,7 @@ export default function ContagemPage() {
           }
         }}
         fileInputRef={fileInputJsonRef}
+        entregadoresCadastrados={entregadores}
       />
       <ModalAtribuirEntregadorLote
         aberto={modalAtribuirEntregadorAberto}

@@ -149,6 +149,7 @@ export type PacoteLido = {
   origem: OrigemLeitura;
   metadados?: Record<string, unknown> | null;
   created_at: string;
+  updated_at?: string | null;
   user_id?: string | null;
   saca_id?: string | null;
   entregador?: string | null;

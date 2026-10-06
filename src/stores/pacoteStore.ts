@@ -59,7 +59,7 @@ type PacoteState = {
     falhas: number;
     porEntregador: Record<string, { importados: number; duplicados: number }>;
   }>;
-  importarLotePorZona: (porZona: Record<string, string[]>, origem?: string) => Promise<{
+  importarLotePorZona: (porZona: Record<string, string[]>, origem?: string, entregadorDestino?: string | null) => Promise<{
     importados: number;
     duplicados: number;
     falhas: number;
@@ -132,8 +132,18 @@ function mesclarPreservandoNaoSincronizados(doBanco: PacoteLidoLocal[], atuaisLo
   const saida: PacoteLidoLocal[] = [];
   for (const p of doBanco) {
     const local = mapaLocal.get(p.id);
-    if (local && local.sincronizado === false) saida.push(local);
-    else saida.push(p);
+    if (local) {
+      if (local.sincronizado === false) {
+        saida.push(local);
+      } else {
+        const tLocal = local.updated_at ? new Date(local.updated_at).getTime() : 0;
+        const tBanco = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+        if (tLocal > 0 && tBanco > 0 && tLocal > tBanco) saida.push(local);
+        else saida.push(p);
+      }
+    } else {
+      saida.push(p);
+    }
   }
   for (const local of atuaisLocal) {
     if (!mapaBanco.has(local.id)) saida.push(local);
@@ -779,7 +789,7 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     return { atualizados, falhas };
   },
 
-  importarLotePorZona: async (porZona, origem = 'import_json_zona') => {
+  importarLotePorZona: async (porZona, origem = 'import_json_zona', entregadorDestino?: string | null) => {
     const origemLeitura = origem as OrigemLeitura;
     const resumoPorZona: Record<string, { importados: number; duplicados: number }> = {};
     let importados = 0;
@@ -797,11 +807,12 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     for (const nome of nomesZonas) {
       resumoPorZona[nome] = { importados: 0, duplicados: 0 };
       const ids = porZona[nome] ?? [];
+      const entregadorDoPacote = entregadorDestino != null && entregadorDestino !== '' ? entregadorDestino : nome;
       for (const cod of ids) {
         try {
           const resultado = await PacoteService.adicionar(cod, origemLeitura, {
             saca_id: sacaAtual?.id ?? undefined,
-            entregador: nome,
+            entregador: entregadorDoPacote,
             status: 'lido',
           });
           let pacoteParaLista: PacoteLidoLocal | null = null;
