@@ -607,9 +607,11 @@ export const PacoteService = {
       origem,
       metadados: extra.metadados ?? null,
       created_at: extra.created_at ?? new Date().toISOString(),
+      updated_at: extra.updated_at ?? null,
       user_id: extra.user_id ?? null,
       saca_id,
       entregador,
+      zona_ml: extra.zona_ml ?? null,
       status: extra.status ?? statusHerado,
       sincronizado: false,
     };
@@ -658,6 +660,7 @@ export const PacoteService = {
             created_at: novo.created_at,
             saca_id: novo.saca_id,
             entregador: novo.entregador ?? null,
+            zona_ml: novo.zona_ml ?? null,
             status: novo.status ?? null,
           };
           const { error } = await sb.from('pacotes_lidos').insert(payload);

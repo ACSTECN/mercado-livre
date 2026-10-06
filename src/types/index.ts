@@ -153,6 +153,7 @@ export type PacoteLido = {
   user_id?: string | null;
   saca_id?: string | null;
   entregador?: string | null;
+  zona_ml?: string | null;
   status?: StatusPacote | null;
 };
 

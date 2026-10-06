@@ -813,6 +813,7 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
           const resultado = await PacoteService.adicionar(cod, origemLeitura, {
             saca_id: sacaAtual?.id ?? undefined,
             entregador: entregadorDoPacote,
+            zona_ml: nome,
             status: 'lido',
           });
           let pacoteParaLista: PacoteLidoLocal | null = null;

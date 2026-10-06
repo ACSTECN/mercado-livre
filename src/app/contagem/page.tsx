@@ -1992,6 +1992,7 @@ function TelaDashboard({
   total,
   unicos,
   contagensEntregadores,
+  contagensZonas,
   entregadoresCadastrados,
   resumos,
   hojeFormatado,
@@ -2001,6 +2002,15 @@ function TelaDashboard({
   total: number;
   unicos: number;
   contagensEntregadores: ContagemEntregador[];
+  contagensZonas: Array<{
+    nome: string;
+    qtd: number;
+    retornos: number;
+    entregues: number;
+    devolucoes: number;
+    lidos: number;
+    entregadores: number;
+  }>;
   entregadoresCadastrados: string[];
   resumos: ResumoSacaDash[];
   hojeFormatado: string;
@@ -2529,6 +2539,200 @@ function TelaDashboard({
         )}
       </div>
 
+      {/* ===== GRÁFICO ZONAS ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="lg:col-span-2 rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
+          <div className="flex items-end justify-between gap-3 mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Por zona ML</h3>
+              </div>
+              <p className="text-[11.5px] font-semibold text-neutral-500 mt-0.5">
+                Pacotes por zona importada · apenas nesta saca
+              </p>
+            </div>
+            {contagensZonas.filter((z) => z.nome !== '— Sem zona —').length > 0 && (
+              <span className="shrink-0 text-[10.5px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-200/60">
+                {contagensZonas.filter((z) => z.nome !== '— Sem zona —').length} zona{contagensZonas.filter((z) => z.nome !== '— Sem zona —').length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {contagensZonas.filter((z) => z.nome !== '— Sem zona —').length === 0 ? (
+            <div className="py-14 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
+              <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
+                <MapPin className="h-6 w-6" />
+              </div>
+              <div className="text-[13px] font-bold text-neutral-700">Sem zonas importadas ainda</div>
+              <div className="text-[11.5px] text-neutral-500 mt-0.5">Use "Importar JSON zonas ML" para preencher aqui.</div>
+            </div>
+          ) : (
+            <>
+              <div className="h-[240px] sm:h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={(() => {
+                      const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
+                      return zs.map((z, idx) => ({
+                        nome: z.nome.length > 12 ? z.nome.slice(0, 11) + '…' : z.nome,
+                        nomeCompleto: z.nome,
+                        cor: PALETA_DASH[(idx + 3) % PALETA_DASH.length],
+                        normais: z.qtd - z.retornos,
+                        retornos: z.retornos,
+                        total: z.qtd,
+                      }));
+                    })()}
+                    margin={{ top: 8, right: 12, bottom: 8, left: -14 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="nome" tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} />
+                    <YAxis tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} width={40} />
+                    <Tooltip
+                      cursor={{ fill: '#f8fafc', opacity: 0.7 }}
+                      contentStyle={{
+                        borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                        fontSize: 12.5, fontWeight: 600, padding: '10px 12px',
+                      }}
+                      formatter={(value: any, name: any, _p: any, payload: any) => {
+                        const full = (payload as { payload?: { nomeCompleto?: string } })?.payload?.nomeCompleto;
+                        if (name === 'nome') return [String(value), full ?? 'Zona'];
+                        return [
+                          value.toLocaleString('pt-BR'),
+                          name === 'normais' ? 'Normais' : 'Retornos',
+                        ];
+                      }}
+                      labelFormatter={(label: any, payload: readonly any[]) => {
+                        const first = payload?.[0]?.payload as { nomeCompleto?: string } | undefined;
+                        return first?.nomeCompleto ?? String(label ?? 'Zona');
+                      }}
+                    />
+                    <Legend
+                      iconType="rect"
+                      wrapperStyle={{ fontSize: 11.5, fontWeight: 700, paddingTop: 8 }}
+                      formatter={(value) => <span className="text-neutral-600">{value === 'normais' ? 'Normais' : 'Retornos'}</span>}
+                    />
+                    <Bar dataKey="normais" stackId="a" fill="#f43f5e" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="retornos" stackId="a" fill="#f97316" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-3 space-y-1.5 max-h-[230px] overflow-auto pr-1">
+                {(() => {
+                  const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
+                  const maxQtd = Math.max(1, ...zs.map((z) => z.qtd));
+                  return zs.map((z, idx) => {
+                    const cor = PALETA_DASH[(idx + 3) % PALETA_DASH.length];
+                    return (
+                      <div key={z.nome} className="group">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <MapPin className="h-3 w-3 shrink-0 text-rose-500" />
+                            <span className="text-[12px] font-bold text-neutral-700 truncate">{z.nome}</span>
+                            {z.entregadores > 0 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo-50 ring-1 ring-indigo-200/60 text-[9.5px] font-black uppercase tracking-wider text-indigo-700">
+                                <Users className="h-2.5 w-2.5" />
+                                {z.entregadores}
+                              </span>
+                            )}
+                          </div>
+                          <div className="shrink-0 text-[11.5px] font-black tabular-nums text-neutral-600 flex items-center gap-1.5">
+                            <span>{z.qtd.toLocaleString('pt-BR')}</span>
+                            {z.retornos > 0 && (
+                              <span className="text-orange-600 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-orange-50 ring-1 ring-orange-200/60">
+                                <RefreshCw className="h-2.5 w-2.5" /> {z.retornos}
+                              </span>
+                            )}
+                            <span className="text-neutral-400 text-[10px]">
+                              {total > 0 ? ((z.qtd / total) * 100).toFixed(1) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden flex">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${(z.qtd / maxQtd) * 100}%`,
+                              background: `linear-gradient(90deg, ${cor}dd, ${cor}aa)`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* RESUMO ZONAS + ENTREGADORES */}
+        <div className="space-y-3 sm:space-y-4">
+          <div className="rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center">
+                <MapPin className="h-3.5 w-3.5" />
+              </div>
+              <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Resumo de zonas</h3>
+            </div>
+            {(() => {
+              const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
+              if (zs.length === 0) {
+                return (
+                  <div className="py-8 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
+                    <div className="text-[13px] font-bold text-neutral-700">Sem zonas</div>
+                  </div>
+                );
+              }
+              const totalZonas = zs.reduce((acc, z) => acc + z.qtd, 0);
+              return (
+                <div className="grid grid-cols-3 gap-1.5 mb-3">
+                  {[
+                    { k: 'Zonas', v: zs.length, grad: 'from-rose-500 to-pink-500' },
+                    { k: 'Pacotes', v: totalZonas, grad: 'from-orange-500 to-amber-500' },
+                    {
+                      k: 'Entr. únicos',
+                      v: zs.reduce((acc, z) => acc + z.entregadores, 0),
+                      grad: 'from-violet-500 to-indigo-500',
+                    },
+                  ].map((kv, i) => (
+                    <div key={i} className={`rounded-xl bg-gradient-to-br ${kv.grad} p-[1px]`}>
+                      <div className="rounded-[10px] bg-white px-2 py-2 text-center">
+                        <div className="text-[15px] font-black tabular-nums leading-none text-neutral-900">{kv.v}</div>
+                        <div className="text-[8.5px] font-black uppercase tracking-wider text-neutral-500 mt-1">{kv.k}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="space-y-1 max-h-[220px] overflow-auto pr-1">
+              {(() => {
+                const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
+                const tot = zs.reduce((acc, z) => acc + z.qtd, 0);
+                return zs.map((z) => {
+                  const pct = tot > 0 ? (z.qtd / tot) * 100 : 0;
+                  return (
+                    <div key={z.nome} className="flex items-center justify-between gap-2 py-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <MapPin className="h-3 w-3 shrink-0 text-rose-500" />
+                        <span className="text-[11px] font-bold text-neutral-700 truncate">{z.nome}</span>
+                      </div>
+                      <span className="text-[11px] font-black tabular-nums text-neutral-500 shrink-0">
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ===== RODAPÉ DASHBOARD ===== */}
       <div className="flex items-center justify-between px-1 pt-1">
         <div className="text-[10.5px] font-bold uppercase tracking-wider text-neutral-400">
@@ -3020,6 +3224,49 @@ export default function ContagemPage() {
         entregues: mapaEntregues.get(nome) ?? 0,
         devolucoes: mapaDevolucoes.get(nome) ?? 0,
         lidos: mapaLidos.get(nome) ?? 0,
+      });
+    }
+    return resultado.sort((a, b) => b.qtd - a.qtd);
+  }, [pacotesDaSaca]);
+
+  const contagemZonas = React.useMemo(() => {
+    const mapaQtd = new Map<string, number>();
+    const mapaRetornos = new Map<string, number>();
+    const mapaEntregues = new Map<string, number>();
+    const mapaDevolucoes = new Map<string, number>();
+    const mapaLidos = new Map<string, number>();
+    const mapaEntregadores = new Map<string, Set<string>>();
+    for (const p of pacotesDaSaca) {
+      const k = p.zona_ml ?? '— Sem zona —';
+      mapaQtd.set(k, (mapaQtd.get(k) ?? 0) + 1);
+      if (p.status === 'retorno') mapaRetornos.set(k, (mapaRetornos.get(k) ?? 0) + 1);
+      if (p.status === 'entregue') mapaEntregues.set(k, (mapaEntregues.get(k) ?? 0) + 1);
+      if (p.status === 'devolucao') mapaDevolucoes.set(k, (mapaDevolucoes.get(k) ?? 0) + 1);
+      if (p.status === 'lido') mapaLidos.set(k, (mapaLidos.get(k) ?? 0) + 1);
+      if (p.entregador) {
+        const s = mapaEntregadores.get(k) ?? new Set<string>();
+        s.add(p.entregador);
+        mapaEntregadores.set(k, s);
+      }
+    }
+    const resultado: Array<{
+      nome: string;
+      qtd: number;
+      retornos: number;
+      entregues: number;
+      devolucoes: number;
+      lidos: number;
+      entregadores: number;
+    }> = [];
+    for (const [nome, qtd] of mapaQtd.entries()) {
+      resultado.push({
+        nome,
+        qtd,
+        retornos: mapaRetornos.get(nome) ?? 0,
+        entregues: mapaEntregues.get(nome) ?? 0,
+        devolucoes: mapaDevolucoes.get(nome) ?? 0,
+        lidos: mapaLidos.get(nome) ?? 0,
+        entregadores: mapaEntregadores.get(nome)?.size ?? 0,
       });
     }
     return resultado.sort((a, b) => b.qtd - a.qtd);
@@ -3975,6 +4222,7 @@ export default function ContagemPage() {
                 total={totalDaSaca}
                 unicos={unicosDaSaca}
                 contagensEntregadores={contagemEntregadores}
+                contagensZonas={contagemZonas}
                 entregadoresCadastrados={entregadores}
                 resumos={resumos}
                 hojeFormatado={hojeFormatado}
