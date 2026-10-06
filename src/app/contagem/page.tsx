@@ -2726,9 +2726,14 @@ export default function ContagemPage() {
     };
     atualizarPausa();
     const idPausa = setInterval(atualizarPausa, 500);
+    const id2 = setInterval(() => {
+      if (pausarPolling.current) return;
+      void sincronizarAgoraAuto(false);
+    }, 30000);
     return () => {
       cancelado = true;
       clearInterval(idPausa);
+      clearInterval(id2);
     };
   }, [carregarSacas, carregar, carregarEntregadoresBanco, sincronizarAgoraAuto, criarSaca, definirSacaAtiva, modoRef]);
 
