@@ -2571,7 +2571,6 @@ export default function ContagemPage() {
   const [shakeId, setShakeId] = React.useState<string | null>(null);
   const [moverId, setMoverId] = React.useState<string | null>(null);
   const [sincronizando, setSincronizando] = React.useState(false);
-  const [primeiroSyncFeito, setPrimeiroSyncFeito] = React.useState(false);
   const [resultadoSync, setResultadoSync] = React.useState<{
     sacas: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
     pacotes: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
@@ -2716,11 +2715,8 @@ export default function ContagemPage() {
         try {
           await sincronizarAgoraAuto(true);
         } catch { /* noop */ }
-        if (!cancelado) {
-          setPrimeiroSyncFeito(true);
-        }
       } catch {
-        if (!cancelado) setPrimeiroSyncFeito(true);
+        /* noop */
       }
     };
     void rodarInicial();
@@ -2958,16 +2954,14 @@ export default function ContagemPage() {
   };
 
   const pacotesDaSaca = React.useMemo(() => {
-    if (!primeiroSyncFeito) return [];
     if (!sacaAtiva) return [];
     return pacotes.filter((p) => p.saca_id === sacaAtiva.id);
-  }, [pacotes, sacaAtiva, primeiroSyncFeito]);
+  }, [pacotes, sacaAtiva]);
 
   const totalDaSaca = React.useMemo(() => pacotesDaSaca.length, [pacotesDaSaca]);
   const unicosDaSaca = React.useMemo(() => new Set(pacotesDaSaca.map((p) => p.codigo_pacote)).size, [pacotesDaSaca]);
 
   const contagemEntregadores = React.useMemo(() => {
-    if (!primeiroSyncFeito) return [];
     const mapaQtd = new Map<string, number>();
     const mapaRetornos = new Map<string, number>();
     const mapaEntregues = new Map<string, number>();
@@ -2993,10 +2987,9 @@ export default function ContagemPage() {
       });
     }
     return resultado.sort((a, b) => b.qtd - a.qtd);
-  }, [pacotesDaSaca, primeiroSyncFeito]);
+  }, [pacotesDaSaca]);
 
   const filtrados = React.useMemo(() => {
-    if (!primeiroSyncFeito) return [];
     let lista = pacotesDaSaca;
     if (filtroEntregador !== '__todos__') {
       if (filtroEntregador === '__sem__') {
@@ -3018,7 +3011,7 @@ export default function ContagemPage() {
           p.id.toLowerCase().includes(q) ||
           (p.entregador ?? '').toLowerCase().includes(q),
       );
-  }, [pacotesDaSaca, filtro, filtroEntregador, filtroStatus, primeiroSyncFeito]);
+  }, [pacotesDaSaca, filtro, filtroEntregador, filtroStatus]);
 
   const selecionarTodosFiltrados = React.useCallback(() => {
     setSelecionados(new Set(filtrados.map((p) => p.id)));
@@ -3031,9 +3024,6 @@ export default function ContagemPage() {
   const resumoAtual = resumos.find((r) => r.saca.id === sacaAtiva?.id);
 
   const escopo = React.useMemo(() => {
-    if (!primeiroSyncFeito) {
-      return { lista: [], total: 0, unicos: 0, retornos: 0, entregadores: 0 };
-    }
     let base = pacotesDaSaca;
     if (filtroEntregador !== '__todos__') {
       if (filtroEntregador === '__sem__') base = base.filter((p) => !p.entregador);
@@ -3055,7 +3045,7 @@ export default function ContagemPage() {
       retornos,
       entregadores: entregadores.size,
     };
-  }, [pacotesDaSaca, filtroEntregador, filtroStatus, primeiroSyncFeito]);
+  }, [pacotesDaSaca, filtroEntregador, filtroStatus]);
 
   const feedbackCor =
     feedback?.tipo === 'sucesso'
@@ -3129,9 +3119,6 @@ export default function ContagemPage() {
   }, []);
 
   const chipSync = React.useMemo(() => {
-    if (!primeiroSyncFeito) {
-      return { bg: 'bg-amber-50', txt: 'text-amber-700', ring: 'ring-amber-200', label: 'Carregando banco', icon: RefreshCw, spin: true, pulse: true };
-    }
     const st = statusSincronia;
     if (st === 'sincronizando') {
       return { bg: 'bg-amber-50', txt: 'text-amber-700', ring: 'ring-amber-200', label: 'Sincronizando', icon: RefreshCw, spin: true, pulse: true };
@@ -3143,30 +3130,19 @@ export default function ContagemPage() {
       return { bg: 'bg-red-50', txt: 'text-red-700', ring: 'ring-red-200', label: 'Erro', icon: AlertTriangle, spin: false, pulse: true };
     }
     return { bg: 'bg-transparent', txt: 'text-emerald-600', ring: 'ring-transparent', label: 'OK', icon: CheckCircle2, spin: false, pulse: false };
-  }, [statusSincronia, primeiroSyncFeito]);
+  }, [statusSincronia]);
   const SyncIcon = chipSync.icon;
 
-  type BotaoStatus = { k: string; label: string; colorSel: string; colorHover: string; count: number; icon: React.ComponentType<{ className?: string }> | null };
-  const botoesStatus: BotaoStatus[] = React.useMemo(() => {
-    if (primeiroSyncFeito) {
-      return [
-        { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: pacotesDaSaca.length, icon: null },
-        { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: pacotesDaSaca.filter((p) => !p.status).length, icon: null },
-        { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: pacotesDaSaca.filter((p) => p.status === 'lido').length, icon: CheckCheck },
-        { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: pacotesDaSaca.filter((p) => p.status === 'entregue').length, icon: Truck },
-        { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: pacotesDaSaca.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
-        { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: pacotesDaSaca.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
-      ];
-    }
+  const botoesStatus: Array<{ k: string; label: string; colorSel: string; colorHover: string; count: number; icon: React.ComponentType<{ className?: string }> | null }> = React.useMemo(() => {
     return [
-      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: 0, icon: null },
-      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: 0, icon: null },
-      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: 0, icon: CheckCheck },
-      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: 0, icon: Truck },
-      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: 0, icon: RefreshCw },
-      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: 0, icon: Undo2 },
+      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: pacotesDaSaca.length, icon: null },
+      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: pacotesDaSaca.filter((p) => !p.status).length, icon: null },
+      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: pacotesDaSaca.filter((p) => p.status === 'lido').length, icon: CheckCheck },
+      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: pacotesDaSaca.filter((p) => p.status === 'entregue').length, icon: Truck },
+      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: pacotesDaSaca.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
+      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: pacotesDaSaca.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
     ];
-  }, [primeiroSyncFeito, pacotesDaSaca]);
+  }, [pacotesDaSaca]);
 
   const acaoMenu = (fn: () => void) => { fn(); setMenuAberto(false); };
 
@@ -3587,26 +3563,6 @@ export default function ContagemPage() {
           </div>
         </header>
 
-        {/* ===== PRIMEIRO LOAD: TELA CARREGANDO BANCO (sem flash 0s) ===== */}
-        {!primeiroSyncFeito && (
-          <div className="bg-white rounded-2xl border border-amber-200/60 shadow-sm px-4 sm:px-6 py-10 sm:py-14">
-            <div className="text-center max-w-md mx-auto">
-              <div className="mx-auto mb-4 inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
-                <RefreshCw className="h-7 w-7 animate-spin" />
-              </div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-600 mb-2">Sincronia banco</p>
-              <h2 className="text-[20px] sm:text-[22px] font-black tracking-tight text-neutral-900 mb-2">Sincronizando com o banco…</h2>
-              <p className="text-[13px] font-semibold text-neutral-500 leading-relaxed">
-                Buscando saca ativa, pacotes e entregadores no Supabase. Em segundos a tela aparece completa com os dados certos.
-              </p>
-              <div className="mt-5 h-1.5 w-full max-w-xs mx-auto bg-amber-100/70 rounded-full overflow-hidden">
-                <div className="h-full w-2/3 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full animate-pulse" />
-              </div>
-            </div>
-          </div>
-        )}
-        {primeiroSyncFeito && (<>
-
         {/* ===== SEM SACA: TELA BOAS-VINDAS MINIMALISTA ===== */}
         {!sacaAtiva && (
           <div className="bg-white rounded-2xl border border-neutral-200/70 shadow-sm px-4 sm:px-6 py-6 sm:py-10">
@@ -4013,7 +3969,7 @@ export default function ContagemPage() {
                   <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
                     <Search className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                     <Input
-                      placeholder={primeiroSyncFeito ? `Buscar ${filtrados.length} ${filtrados.length === 1 ? 'ID…' : 'IDs…'}` : 'Sincronizando banco…'}
+                      placeholder={`Buscar ${filtrados.length} ${filtrados.length === 1 ? 'ID…' : 'IDs…'}`}
                       value={filtro}
                       onChange={(e) => setFiltro(e.target.value)}
                       className="!h-8 !text-[13px] !px-2 !border-0 !ring-0 !p-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 !bg-transparent"
@@ -4046,7 +4002,7 @@ export default function ContagemPage() {
                     })}
                   </div>
                   <div className="text-[10.5px] font-semibold text-neutral-500 shrink-0">
-                    {primeiroSyncFeito ? `${filtrados.length}/${pacotesDaSaca.length}` : '—/—'}
+                    {filtrados.length}/{pacotesDaSaca.length}
                   </div>
                 </div>
 
@@ -4281,8 +4237,6 @@ export default function ContagemPage() {
             <p className="text-[11px] text-neutral-700 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
           </div>
         )}
-
-        </>)}
 
         {backupMsg && (
           <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[92vw] rounded-2xl px-4 py-3 shadow-2xl ring-1 whitespace-pre-line animate-slide-up ${backupMsg.ok ? 'bg-emerald-50 ring-emerald-200' : 'bg-red-50 ring-red-200'}`}>

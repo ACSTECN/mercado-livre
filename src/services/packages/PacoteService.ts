@@ -469,6 +469,24 @@ async function sincronizarComSupabase(): Promise<{ sincronizados: number; falhas
   return { sincronizados: ok, falhas: falha, total: locais.length, primeiroErro };
 }
 
+function mesclarPreservandoNaoSincronizadosLocal(
+  doBanco: PacoteLidoLocal[],
+  atuaisLocal: PacoteLidoLocal[],
+): PacoteLidoLocal[] {
+  const mapaLocal = new Map(atuaisLocal.map((p) => [p.id, p]));
+  const mapaBanco = new Map(doBanco.map((p) => [p.id, p]));
+  const saida: PacoteLidoLocal[] = [];
+  for (const p of doBanco) {
+    const local = mapaLocal.get(p.id);
+    if (local && local.sincronizado === false) saida.push(local);
+    else saida.push(p);
+  }
+  for (const local of atuaisLocal) {
+    if (!mapaBanco.has(local.id)) saida.push(local);
+  }
+  return saida;
+}
+
 export const PacoteService = {
   async listarTodasSacas(): Promise<PacoteLidoLocal[]> {
     if (!isSupabaseConfigurado) {
@@ -523,20 +541,23 @@ export const PacoteService = {
         if (temChaveDuplicadaNormalizada(item)) continue;
         idsVistos.add(item.id);
         registrarChaveNormalizada(item);
-        const local = mapaLocal.get(item.id);
         todos.push({ ...item, sincronizado: true });
       }
+
+      const todosDoBanco = [...todos];
+      const mesclados = mesclarPreservandoNaoSincronizadosLocal(todosDoBanco, locais);
 
       for (const local of locais) {
         if (idsVistos.has(local.id)) continue;
         if (temChaveDuplicadaNormalizada(local)) continue;
+        if (mesclados.some((m) => m.id === local.id)) continue;
         idsVistos.add(local.id);
         registrarChaveNormalizada(local);
-        todos.push(local);
+        mesclados.push(local);
       }
 
-      todos.sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return todos;
+      mesclados.sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return mesclados;
     } catch {
       return lerLocal();
     }

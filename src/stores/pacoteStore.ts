@@ -729,28 +729,52 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     });
     if (entregadorLimpo) adicionarEntregador(entregadorLimpo);
     void (async () => {
+      const agora = nova.map((p) => ({ ...p }));
       try {
         for (const id of ids) {
           try {
+            const idx = agora.findIndex((p) => p.id === id);
+            if (idx < 0) { falhas++; continue; }
             if (entregadorLimpo) {
-              await get().moverPacote(id, entregadorLimpo, 'manual');
+              const res = await PacoteService.mover(id, entregadorLimpo, 'manual');
+              if (res.sucesso) {
+                agora[idx] = { ...agora[idx], entregador: entregadorLimpo, sincronizado: true };
+              } else {
+                falhas++;
+              }
             } else if (isSupabaseConfigurado) {
               const sb = getSupabase();
               if (sb) {
                 const { error } = await sb.from('pacotes_lidos').update({ entregador: null }).eq('id', id);
                 if (!error) {
-                  const locais = carregarDoCache();
-                  const idx = locais.findIndex((p) => p.id === id);
-                  if (idx >= 0) {
-                    locais[idx] = { ...locais[idx], entregador: undefined, sincronizado: true };
-                    salvarCache(locais);
-                  }
+                  agora[idx] = { ...agora[idx], entregador: undefined, sincronizado: true };
+                } else {
+                  falhas++;
                 }
+              } else {
+                falhas++;
               }
             }
           } catch { falhas++; }
         }
-      } catch { /* noop */ }
+        salvarCache(agora);
+        const r2 = recalcular(agora);
+        set({
+          pacotes: agora,
+          entregadoresSaca: r2.entregadoresSaca,
+          contagensEntregadores: r2.contagens,
+        });
+      } catch {
+        try {
+          salvarCache(agora);
+          const rFallback = recalcular(agora);
+          set({
+            pacotes: agora,
+            entregadoresSaca: rFallback.entregadoresSaca,
+            contagensEntregadores: rFallback.contagens,
+          });
+        } catch { /* noop */ }
+      }
     })();
     return { atualizados, falhas };
   },
