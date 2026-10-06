@@ -469,24 +469,6 @@ async function sincronizarComSupabase(): Promise<{ sincronizados: number; falhas
   return { sincronizados: ok, falhas: falha, total: locais.length, primeiroErro };
 }
 
-function mesclarPreservandoNaoSincronizadosLocal(
-  doBanco: PacoteLidoLocal[],
-  atuaisLocal: PacoteLidoLocal[],
-): PacoteLidoLocal[] {
-  const mapaLocal = new Map(atuaisLocal.map((p) => [p.id, p]));
-  const mapaBanco = new Map(doBanco.map((p) => [p.id, p]));
-  const saida: PacoteLidoLocal[] = [];
-  for (const p of doBanco) {
-    const local = mapaLocal.get(p.id);
-    if (local && local.sincronizado === false) saida.push(local);
-    else saida.push(p);
-  }
-  for (const local of atuaisLocal) {
-    if (!mapaBanco.has(local.id)) saida.push(local);
-  }
-  return saida;
-}
-
 export const PacoteService = {
   async listarTodasSacas(): Promise<PacoteLidoLocal[]> {
     if (!isSupabaseConfigurado) {
@@ -544,20 +526,23 @@ export const PacoteService = {
         todos.push({ ...item, sincronizado: true });
       }
 
-      const todosDoBanco = [...todos];
-      const mesclados = mesclarPreservandoNaoSincronizadosLocal(todosDoBanco, locais);
+      const idsBanco = new Set<string>();
+      for (const d of data as PacoteLido[]) idsBanco.add(d.id);
 
       for (const local of locais) {
         if (idsVistos.has(local.id)) continue;
         if (temChaveDuplicadaNormalizada(local)) continue;
-        if (mesclados.some((m) => m.id === local.id)) continue;
+        if (!idsBanco.has(local.id) && local.sincronizado === true) continue;
         idsVistos.add(local.id);
         registrarChaveNormalizada(local);
-        mesclados.push(local);
+        todos.push(local);
       }
 
-      mesclados.sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return mesclados;
+      const locaisAlinhados = locais.filter((p) => idsBanco.has(p.id) || p.sincronizado === false);
+      if (locaisAlinhados.length !== locais.length) salvarLocal(locaisAlinhados);
+
+      todos.sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return todos;
     } catch {
       return lerLocal();
     }

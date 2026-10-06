@@ -144,14 +144,13 @@ export const SacaService = {
       const locais = lerSacasLocal();
       const mapaLocal = new Map(locais.map((s) => [s.id, s]));
       const todos: Saca[] = [];
-      const ids = new Set<string>();
+      const idsBanco = new Set<string>();
       for (const item of data as Saca[]) {
-        ids.add(item.id);
-        todos.push(mapaLocal.get(item.id) ?? item);
+        idsBanco.add(item.id);
+        todos.push(item);
       }
-      for (const local of locais) {
-        if (!ids.has(local.id)) todos.push(local);
-      }
+      const locaisAlinhados = locais.filter((s) => idsBanco.has(s.id));
+      if (locaisAlinhados.length !== locais.length) salvarSacasLocal(locaisAlinhados);
       todos.sort((a, b) => b.created_at.localeCompare(a.created_at));
       return todos;
     } catch {
