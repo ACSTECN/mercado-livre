@@ -459,7 +459,7 @@ export function TelaDashboard({
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   {escopoLabel ?? (sacaAtiva ? sacaAtiva.nome : 'Sem saca ativa')}
                 </span>
-                <span className="text-slate-600">•</span>
+                <span className="text-slate-500">•</span>
                 <span className="truncate">{hojeFormatado}</span>
               </div>
             </div>

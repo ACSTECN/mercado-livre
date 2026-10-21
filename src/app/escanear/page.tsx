@@ -222,28 +222,39 @@ export default function EscanearPage() {
   const multiplos = status === 'MULTIPLOS_ENCONTRADOS';
 
   return (
-    <div className="space-y-4 animate-slide-up">
-      <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
-            Escanear etiqueta
-          </h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            Câmera ou upload · OCR Português + Inglês · Score com pesos ponderados
-          </p>
+    <div className="space-y-5 animate-slide-up">
+      <section className="hero-shell">
+        <div className="relative p-6 sm:p-8 lg:p-9">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-3xl">
+              <Badge variant="primary" className="mb-4">
+                <Search className="h-3 w-3" /> OCR e busca inteligente
+              </Badge>
+              <h1 className="section-title">Escanear etiqueta</h1>
+              <p className="section-subtitle mt-2 max-w-2xl">
+                Câmera, galeria ou busca manual em uma interface mais ampla e limpa para operar sem ruído visual.
+              </p>
+            </div>
+            <div className="panel-dark p-4 sm:p-5 min-w-[260px]">
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Base ativa</div>
+              <div className="mt-2 text-2xl font-black tracking-tight text-white">
+                {planilhaValida ? registros.length.toLocaleString('pt-BR') : '0'}
+              </div>
+              <div className="mt-1 text-sm text-slate-400">
+                {planilhaValida ? 'endereços disponíveis para confronto' : 'sem planilha importada'}
+              </div>
+            </div>
+          </div>
         </div>
-        <Badge variant={planilhaValida ? 'success' : 'danger'}>
-          {planilhaValida ? `${registros.length} endereços ativos` : 'Sem planilha ativa'}
-        </Badge>
-      </header>
+      </section>
 
       {!planilhaValida && etapa === 'escolha' && (
-        <Card className="border-amber-200 bg-amber-50/40">
+        <Card className="border-amber-400/25 bg-amber-400/12">
           <CardContent className="!p-4 flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600 shrink-0" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-300 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-amber-900">Importe uma planilha primeiro</p>
-              <p className="text-sm text-amber-800">
+              <p className="font-semibold text-amber-300">Importe uma planilha primeiro</p>
+              <p className="text-sm text-amber-300">
                 O OCR vai funcionar, mas não há dados para comparar.{' '}
                 <Link href="/importar" className="font-semibold underline underline-offset-2">
                   Ir para importação →
@@ -256,18 +267,18 @@ export default function EscanearPage() {
 
       {etapa === 'escolha' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <Card>
-              <CardContent className="!p-5 flex flex-col gap-4 h-full">
+              <CardContent className="!p-6 flex flex-col gap-4 h-full">
                 <div className="flex items-center justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-ml-blue shadow-sm">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-sky-400/12 text-ml-blue shadow-[0_14px_30px_rgba(52,131,250,0.18)]">
                     <CamIcon className="h-6 w-6" />
                   </div>
                   <Badge variant="info">Recomendado</Badge>
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-neutral-900">Abrir câmera</h3>
-                  <p className="text-sm text-neutral-600 mt-1">
+                  <h3 className="text-lg font-bold text-white">Abrir câmera</h3>
+                  <p className="text-sm text-slate-400 mt-1">
                     Abre a câmera TRASEIRA do celular direto (sem instalar nada). Fotografa a etiqueta e já envia para leitura.
                   </p>
                 </div>
@@ -291,13 +302,13 @@ export default function EscanearPage() {
             </Card>
 
             <Card>
-              <CardContent className="!p-5 flex flex-col gap-4 h-full">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm">
+              <CardContent className="!p-6 flex flex-col gap-4 h-full">
+                <div className="flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-emerald-400/12 text-emerald-300 shadow-[0_14px_30px_rgba(16,185,129,0.18)]">
                   <Upload className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-neutral-900">Fazer upload</h3>
-                  <p className="text-sm text-neutral-600 mt-1">
+                  <h3 className="text-lg font-bold text-white">Fazer upload</h3>
+                  <p className="text-sm text-slate-400 mt-1">
                     Já tem a foto? Envie da galeria, downloads ou arquivos do computador.
                   </p>
                 </div>
@@ -308,13 +319,13 @@ export default function EscanearPage() {
             </Card>
 
             <Card className="sm:col-span-2 lg:col-span-1">
-              <CardContent className="!p-5 flex flex-col gap-4 h-full">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 shadow-sm">
+              <CardContent className="!p-6 flex flex-col gap-4 h-full">
+                <div className="flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-violet-400/12 text-violet-300 shadow-[0_14px_30px_rgba(139,92,246,0.18)]">
                   <Search className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-neutral-900">Busca manual</h3>
-                  <p className="text-sm text-neutral-600 mt-1">
+                  <h3 className="text-lg font-bold text-white">Busca manual</h3>
+                  <p className="text-sm text-slate-400 mt-1">
                     Digite ou cole o endereço direto (Rua, nº, Bairro, CEP, Cidade/UF). Sem câmera, sem OCR, bem rápido.
                   </p>
                 </div>
@@ -330,14 +341,14 @@ export default function EscanearPage() {
             </Card>
           </div>
 
-          <Card className="border-neutral-200 bg-white">
+          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))]">
             <CardContent className="!p-4 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-bold text-neutral-900 text-[14.5px] flex items-center gap-1.5">
-                  <ListChecks className="h-4 w-4 text-blue-600" />
+                <p className="font-bold text-white text-[14.5px] flex items-center gap-1.5">
+                  <ListChecks className="h-4 w-4 text-sky-300" />
                   Dicas para a foto / etiqueta
                 </p>
-                <ul className="mt-1.5 text-sm text-neutral-600 list-disc list-inside space-y-0.5 pl-0.5">
+                <ul className="mt-1.5 text-sm text-slate-400 list-disc list-inside space-y-0.5 pl-0.5">
                   <li>Boa iluminação (preferência luz natural)</li>
                   <li>Foco nítido na área do endereço / CEP</li>
                   <li>Procure enquadrar TODO o endereço (evite cortes)</li>
@@ -383,7 +394,7 @@ export default function EscanearPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {imagem && (
-              <div className="overflow-hidden rounded-xl border border-black/5 bg-neutral-100">
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.06]">
                 <img src={imagem} alt="etiqueta" className="h-56 w-full object-contain" />
               </div>
             )}
@@ -403,12 +414,12 @@ export default function EscanearPage() {
       )}
 
       {erro && (
-        <Card className="border-red-200 bg-red-50/40">
+        <Card className="border-rose-400/25 bg-rose-400/12">
           <CardContent className="!p-4 flex items-start gap-3">
-            <XCircle className="mt-0.5 h-5 w-5 text-red-600 shrink-0" />
+            <XCircle className="mt-0.5 h-5 w-5 text-rose-300 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-red-900">Erro</p>
-              <p className="text-sm text-red-800">{erro}</p>
+              <p className="font-semibold text-rose-300">Erro</p>
+              <p className="text-sm text-rose-300">{erro}</p>
             </div>
           </CardContent>
         </Card>
@@ -420,12 +431,12 @@ export default function EscanearPage() {
             <Card>
               <CardHeader className="!pb-2">
                 <CardTitle className="text-[16px] flex items-center gap-2">
-                  <FileText className="h-4.5 w-4.5 text-neutral-700" />
+                  <FileText className="h-4.5 w-4.5 text-slate-300" />
                   Texto extraído via OCR
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap rounded-xl bg-neutral-50 border border-neutral-200 p-3.5 text-[13px] leading-relaxed text-neutral-800 min-h-[72px] max-h-[200px] overflow-auto scrollbar-thin">
+                <p className="whitespace-pre-wrap rounded-xl bg-white/[0.06] border border-white/10 p-3.5 text-[13px] leading-relaxed text-slate-300 min-h-[72px] max-h-[200px] overflow-auto scrollbar-thin">
                   {ocrTexto || <span className="text-neutral-400">(sem texto)</span>}
                 </p>
                 {etapa === 'resultado' && (
@@ -446,14 +457,14 @@ export default function EscanearPage() {
           {etapa === 'corrigir' && (
             <>
               {origemBusca === 'manual' && (
-                <Card className="border-violet-200 bg-violet-50/40">
+                <Card className="border-violet-400/25 bg-violet-400/12">
                   <CardContent className="!p-4 flex items-start gap-3">
-                    <Search className="mt-0.5 h-5 w-5 text-violet-600 shrink-0" />
+                    <Search className="mt-0.5 h-5 w-5 text-violet-300 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-violet-900">
+                      <p className="font-semibold text-violet-300">
                         Busca manual · digite os dados do endereço
                       </p>
-                      <p className="text-sm text-violet-800 mt-0.5">
+                      <p className="text-sm text-violet-300 mt-0.5">
                         Quanto mais campos preencher (CEP + nº + rua), melhor a busca.
                       </p>
                     </div>
@@ -461,14 +472,14 @@ export default function EscanearPage() {
                 </Card>
               )}
               {!validParse.valido && (
-                <Card className="border-amber-200 bg-amber-50/40">
+                <Card className="border-amber-400/25 bg-amber-400/12">
                   <CardContent className="!p-4 flex items-start gap-3">
-                    <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600 shrink-0" />
+                    <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-300 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-amber-900">
+                      <p className="font-semibold text-amber-300">
                         Confira e corrija o endereço
                       </p>
-                      <p className="text-sm text-amber-800">
+                      <p className="text-sm text-amber-300">
                         Campos faltando ou fracos:{' '}
                         <span className="font-semibold">{validParse.camposFaltando.join(', ')}</span>
                       </p>
@@ -505,12 +516,12 @@ export default function EscanearPage() {
               {status === 'PLANILHA_NAO_IMPORTADA' && (
                 <Card>
                   <CardContent className="!p-5 flex flex-col items-center gap-3 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-400/12 text-amber-300">
                       <AlertTriangle className="h-8 w-8" />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold">Planilha não importada</h3>
-                      <p className="text-sm text-neutral-600 mt-1">
+                      <p className="text-sm text-slate-400 mt-1">
                         Importe um arquivo Excel para buscar os endereços.
                       </p>
                     </div>
@@ -524,7 +535,7 @@ export default function EscanearPage() {
               {status !== 'PLANILHA_NAO_IMPORTADA' && (
                 <>
                   {melhorResultado && status !== 'MULTIPLOS_ENCONTRADOS' && (
-                    <Card className="relative overflow-hidden gradient-card border-emerald-200">
+                    <Card className="relative overflow-hidden gradient-card border-emerald-400/25">
                       <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-400 via-ml-yellow to-ml-blue" />
                       <CardContent className="!p-0">
                         <div className="rounded-t-2xl bg-gradient-to-br from-ml-yellow via-[#fff48a] to-[#ffe600] px-4 py-5 sm:px-6 sm:py-7 border-b border-black/5">
@@ -584,7 +595,7 @@ export default function EscanearPage() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-[16px]">
-                          <ListChecks className="h-5 w-5 text-amber-600" />
+                          <ListChecks className="h-5 w-5 text-amber-300" />
                           Encontramos {resultados.length} possibilidades
                         </CardTitle>
                         <CardDescription>Selecione o endereço correto manualmente</CardDescription>
@@ -605,14 +616,14 @@ export default function EscanearPage() {
                   {status === 'ENDERECO_NAO_ENCONTRADO' && (
                     <Card>
                       <CardContent className="!p-6 flex flex-col items-center gap-3 text-center">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-400/12 text-rose-300">
                           <XCircle className="h-7 w-7" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-bold text-neutral-900">
+                          <h3 className="text-lg font-bold text-white">
                             Nenhum endereço correspondente
                           </h3>
-                          <p className="text-sm text-neutral-600 mt-1">
+                          <p className="text-sm text-slate-400 mt-1">
                             Verifique a planilha ou corrija os dados do endereço lido.
                           </p>
                         </div>

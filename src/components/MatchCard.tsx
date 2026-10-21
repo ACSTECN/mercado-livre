@@ -73,7 +73,7 @@ export function MatchCard({
                   'flex h-[74px] w-full items-center justify-center rounded-xl font-black text-[28px] leading-none',
                   destacado
                     ? 'bg-gradient-to-br from-ml-yellow to-[#fde640] text-neutral-900 shadow-premium'
-                    : 'bg-neutral-100 text-neutral-800',
+                    : 'bg-white/[0.06] text-slate-300',
                 )}
               >
                 <span className="truncate px-2 tabular-nums">{r.codigo}</span>
@@ -100,12 +100,12 @@ export function MatchCard({
             </div>
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-500">
+                <div className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-400">
                   <MapPin className="h-3.5 w-3.5" /> Endereço
                 </div>
                 <BadgeConfianca score={item.score} />
               </div>
-              <p className="text-[14.5px] leading-snug text-neutral-800 break-words">
+              <p className="text-[14.5px] leading-snug text-slate-300 break-words">
                 {endereco || r.enderecoCompleto || '(sem endereço)'}
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -135,7 +135,7 @@ export function MatchCard({
 
 function Chip({ label, value }: { label: string; value: number }) {
   const color =
-    value >= 85 ? 'bg-emerald-50 text-emerald-700' : value >= 60 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+    value >= 85 ? 'bg-emerald-400/12 text-emerald-300' : value >= 60 ? 'bg-amber-400/12 text-amber-300' : 'bg-rose-400/12 text-rose-300';
   return (
     <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold', color)}>
       {label} {value}%

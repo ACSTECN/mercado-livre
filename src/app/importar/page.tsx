@@ -101,28 +101,40 @@ export default function ImportarPage() {
   };
 
   return (
-    <div className="space-y-4 animate-slide-up">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
-          Importar planilha de endereços
-        </h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          Formatos suportados: <span className="font-semibold">.xlsx</span>, <span className="font-semibold">.xls</span>,{' '}
-          <span className="font-semibold">.csv</span>.
-        </p>
-      </div>
+    <div className="space-y-5 animate-slide-up">
+      <section className="hero-shell">
+        <div className="relative p-6 sm:p-8 lg:p-9">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <Badge variant="primary" className="mb-4">
+                <Upload className="h-3 w-3" /> Entrada de dados
+              </Badge>
+              <h1 className="section-title">Importar planilha de endereços</h1>
+              <p className="section-subtitle mt-2 max-w-2xl">
+                Faça upload da base, confira o mapeamento e deixe a operação pronta para OCR e
+                busca. Agora com um layout mais amplo e confortável para arquivos grandes.
+              </p>
+            </div>
+            <div className="panel-dark min-w-[240px] p-4 sm:p-5">
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Formatos</div>
+              <div className="mt-2 text-2xl font-black tracking-tight text-white">XLSX · XLS · CSV</div>
+              <div className="mt-1 text-sm text-slate-400">Mapeamento visual e substituição controlada</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {planilhaAtual && <SpreadsheetStatus />}
 
       {sucesso && (
-        <Card>
-          <CardContent className="!p-4 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+        <Card className="border-emerald-400/25 bg-emerald-400/12">
+          <CardContent className="!p-5 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/12 text-emerald-300 shadow-[0_12px_24px_rgba(16,185,129,0.18)]">
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-neutral-900">Importação concluída</p>
-              <p className="text-sm text-neutral-600">Redirecionando para escanear...</p>
+              <p className="font-black tracking-tight text-white">Importação concluída</p>
+              <p className="text-sm text-slate-400">Redirecionando para escanear...</p>
             </div>
             <Badge variant="success">Concluído</Badge>
           </CardContent>
@@ -130,14 +142,14 @@ export default function ImportarPage() {
       )}
 
       {erro && (
-        <Card className="border-red-200 bg-red-50/40">
-          <CardContent className="!p-4 flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+        <Card className="border-rose-400/25 bg-rose-400/12">
+          <CardContent className="!p-5 flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-400/12 text-rose-300 shadow-[0_12px_24px_rgba(239,68,68,0.14)]">
               <AlertTriangle className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-red-800">Erro na importação</p>
-              <p className="text-sm text-red-700">{erro}</p>
+              <p className="font-black tracking-tight text-rose-300">Erro na importação</p>
+              <p className="text-sm text-rose-300">{erro}</p>
             </div>
           </CardContent>
         </Card>
@@ -145,7 +157,7 @@ export default function ImportarPage() {
 
       {processando && (
         <Card>
-          <CardContent className="!p-5 space-y-2">
+          <CardContent className="!p-6 space-y-3">
             <BadgeLoading />
             <Progress value={progresso} label="Processando planilha..." />
           </CardContent>
@@ -161,7 +173,7 @@ export default function ImportarPage() {
       />
 
       {!preview ? (
-        <>
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -182,19 +194,19 @@ export default function ImportarPage() {
                 }}
               >
                 <ImageUploader onSelecionado={() => void 0} className="hidden" />
-                <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-300 bg-white/60 p-6 text-center transition hover:border-ml-blue hover:bg-blue-50/30">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ml-yellow/30 text-neutral-900">
-                    <Upload className="h-6 w-6" />
+                <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 rounded-[1.75rem] border-2 border-dashed border-white/15 bg-white/[0.04] p-8 text-center transition hover:border-ml-blue hover:bg-white/10">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-[linear-gradient(135deg,#fff159,#f5e100)] text-neutral-950 shadow-[0_14px_30px_rgba(255,241,89,0.22)]">
+                    <Upload className="h-7 w-7" />
                   </div>
-                  <div className="space-y-0.5">
-                    <p className="text-[15px] font-semibold text-neutral-900">
+                  <div className="space-y-1">
+                    <p className="text-[18px] font-black tracking-tight text-white">
                       Clique para selecionar ou arraste a planilha aqui
                     </p>
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-sm text-slate-400">
                       Necessário: coluna de código/número + coluna de endereço
                     </p>
                   </div>
-                  <Button size="sm" variant="primary">
+                  <Button size="lg" variant="primary">
                     Escolher arquivo Excel
                   </Button>
                 </div>
@@ -202,44 +214,70 @@ export default function ImportarPage() {
             </CardContent>
           </Card>
 
-          {planilhaAtual && (
-            <Card>
-              <CardContent className="!p-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <RefreshCw className="h-5 w-5 text-neutral-500" />
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-800">
-                      Já existe uma planilha ativa
-                    </p>
-                    <p className="text-xs text-neutral-500">
-                      A importação acima substituirá a anterior.
-                    </p>
+          <div className="space-y-4">
+            {planilhaAtual && (
+              <Card>
+                <CardContent className="!p-5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="h-5 w-5 text-slate-400" />
+                    <div>
+                      <p className="text-sm font-black tracking-tight text-white">
+                        Já existe uma planilha ativa
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        A importação acima substituirá a anterior.
+                      </p>
+                    </div>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      limparStore();
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remover
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="panel-dark !bg-[linear-gradient(180deg,rgba(9,17,31,0.94),rgba(10,18,30,0.88))] !text-white">
+              <CardContent className="!p-6 space-y-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Fluxo</p>
+                  <h3 className="mt-2 text-xl font-black tracking-tight text-white">Importação guiada</h3>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    limparStore();
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Remover
-                </Button>
+                <div className="space-y-3">
+                  {[
+                    'Upload da planilha',
+                    'Leitura dos cabeçalhos',
+                    'Mapeamento das colunas',
+                    'Confirmação e uso no OCR',
+                  ].map((item, index) => (
+                    <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-sky-300 font-black">
+                        {index + 1}
+                      </div>
+                      <span className="text-sm font-semibold text-slate-200">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          )}
-        </>
+          </div>
+        </div>
       ) : (
         <>
           <Card>
             <CardContent className="!p-4 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/12 text-emerald-300">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-neutral-900">{preview.arquivoNome}</p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="truncate font-semibold text-white">{preview.arquivoNome}</p>
+                  <p className="text-xs text-slate-400">
                     {preview.totalLinhas} linhas · {preview.cabecalhos.length} colunas
                   </p>
                 </div>

@@ -93,19 +93,19 @@ export default function DashboardPage() {
   const sacaParaCard = sacaSel ?? sacaAtiva;
 
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-[#05080f] via-[#0a1120] to-[#05080f] border border-white/10 shadow-2xl shadow-black/40 overflow-hidden">
+    <div className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(5,8,15,0.92),rgba(9,16,29,0.92))] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden">
       {/* barra superior da aba */}
-      <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-3 border-b border-white/10 bg-black/20">
+      <div className="flex flex-wrap items-center gap-3 px-4 sm:px-5 py-4 border-b border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))]">
         <Link
           href="/contagem"
-          className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl bg-white/5 ring-1 ring-white/10 text-slate-200 hover:bg-white/10 text-[12px] font-bold transition shrink-0"
+          className="inline-flex items-center gap-1.5 h-10 px-3 rounded-2xl bg-white/5 ring-1 ring-white/10 text-slate-200 hover:bg-white/10 text-[12px] font-bold transition shrink-0"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Contagem</span>
         </Link>
 
         <div className="flex items-center gap-2 min-w-0">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white flex items-center justify-center shrink-0">
+          <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white flex items-center justify-center shrink-0 shadow-[0_14px_28px_rgba(99,102,241,0.28)]">
             <Boxes className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -116,7 +116,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
           <label className="inline-flex items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-[10.5px] font-black uppercase tracking-wider text-slate-400 shrink-0">
               <Layers className="h-3.5 w-3.5" />
@@ -126,7 +126,7 @@ export default function DashboardPage() {
               <select
                 value={filtroSaca}
                 onChange={(e) => setFiltroSaca(e.target.value)}
-                className="appearance-none h-9 pl-2.5 pr-7 rounded-xl bg-slate-900/80 border border-white/10 text-slate-100 text-[12px] font-bold cursor-pointer outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20 transition"
+                className="appearance-none h-10 min-w-[220px] pl-3 pr-8 rounded-2xl bg-slate-900/80 border border-white/10 text-slate-100 text-[12px] font-bold cursor-pointer outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20 transition"
               >
                 <option value="__todas__">📋 Todas as sacas ({opcoesSacas.total})</option>
                 {opcoesSacas.lista.map((s) => (
@@ -144,7 +144,7 @@ export default function DashboardPage() {
             type="button"
             onClick={() => void recarregar(true)}
             disabled={atualizando}
-            className="inline-flex items-center gap-1 h-9 px-2.5 rounded-xl bg-white/5 ring-1 ring-white/10 text-slate-200 hover:bg-white/10 text-[12px] font-bold transition disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-1 h-10 px-3 rounded-2xl bg-white/5 ring-1 ring-white/10 text-slate-200 hover:bg-white/10 text-[12px] font-bold transition disabled:opacity-50 shrink-0"
             title="Atualizar dados do banco"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${atualizando ? 'animate-spin' : ''}`} />
@@ -153,7 +153,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="p-3 sm:p-4">
+      <div className="p-4 sm:p-5">
         <TelaDashboard
           pacotes={pacotesEscopo}
           resumos={resumos}

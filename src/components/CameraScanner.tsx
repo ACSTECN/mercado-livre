@@ -148,7 +148,7 @@ export function CameraScanner({ onFoto, onClose, className }: Props) {
   }, [parar]);
 
   return (
-    <div className={cn('w-full overflow-hidden rounded-2xl border border-black/5 bg-neutral-900', className)}>
+    <div className={cn('w-full overflow-hidden rounded-2xl border border-white/10 bg-neutral-900', className)}>
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-black">
         <video
           ref={videoRef}

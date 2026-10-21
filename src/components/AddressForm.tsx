@@ -47,7 +47,7 @@ export function AddressForm({ value, onChange, onCancelarEdicao, modoEdicao = tr
                 value={value[c.key]}
                 placeholder={c.placeholder}
                 disabled={!modoEdicao}
-                className={!modoEdicao ? '!bg-neutral-50 !text-neutral-700' : ''}
+                className={!modoEdicao ? '!bg-white/[0.03] !text-slate-400' : ''}
                 inputMode={c.inputmode}
                 onChange={(e) =>
                   update(c.key, c.uppercase ? e.target.value.toUpperCase() : e.target.value)

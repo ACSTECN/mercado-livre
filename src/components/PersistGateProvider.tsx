@@ -91,7 +91,7 @@ export function PersistGateProvider({ children }: { children: React.ReactNode })
     }
     return (
       <div className="flex min-h-[60vh] w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-center text-neutral-600">
+        <div className="flex flex-col items-center gap-3 text-center text-slate-400">
           <Loader2 className="h-9 w-9 animate-spin text-ml-blue" />
           <p className="text-sm font-medium">Carregando dados locais…</p>
         </div>

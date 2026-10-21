@@ -83,8 +83,8 @@ export function ColumnMapper({
           <FileSpreadsheet className="h-5 w-5 text-ml-blue" />
           Mapear colunas da planilha
         </CardTitle>
-        <p className="text-sm text-neutral-500">
-          <span className="font-semibold text-neutral-700">{nomeArquivo}</span> · {totalLinhas} linhas
+        <p className="text-sm text-slate-400">
+          <span className="font-semibold text-slate-300">{nomeArquivo}</span> · {totalLinhas} linhas
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -95,10 +95,10 @@ export function ColumnMapper({
                 <FileSpreadsheet className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-[13.5px] font-bold text-neutral-900 leading-snug">
+                <p className="text-[13.5px] font-bold text-white leading-snug">
                   Formato recomendado: A=Endereço · B=Posição · C=Quantidade (opcional)
                 </p>
-                <p className="text-[12px] text-neutral-700 mt-0.5 leading-relaxed">
+                <p className="text-[12px] text-slate-300 mt-0.5 leading-relaxed">
                   O sistema já detecta automaticamente colunas <b>Endereço</b> e <b>Posição</b>. Também suporta o formato antigo onde o número fica 1 linha ACIMA do endereço + linha "X unidades". Coluna Quantidade é ignorada.
                 </p>
               </div>
@@ -114,9 +114,9 @@ export function ColumnMapper({
             const sel = value[op.key] ?? '';
             return (
               <div key={op.key}>
-                <Label className={cn(op.obrigatorio && !sel && '!text-red-600')}>
+                <Label className={cn(op.obrigatorio && !sel && '!text-rose-300')}>
                   {op.label}
-                  {op.obrigatorio && <span className="text-red-500 ml-1">*</span>}
+                  {op.obrigatorio && <span className="text-rose-300 ml-1">*</span>}
                 </Label>
                 <Select
                   disabled={disabled}
@@ -129,20 +129,20 @@ export function ColumnMapper({
                     </option>
                   ))}
                 </Select>
-                {op.ajuda && <p className="mt-1 text-[11px] text-neutral-500">{op.ajuda}</p>}
+                {op.ajuda && <p className="mt-1 text-[11px] text-slate-400">{op.ajuda}</p>}
               </div>
             );
           })}
         </div>
 
-        <div className="rounded-xl border border-neutral-200 bg-neutral-50/60 p-3.5">
-          <div className="mb-2 flex items-center gap-2 text-[12.5px] font-semibold text-neutral-700">
+        <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3.5">
+          <div className="mb-2 flex items-center gap-2 text-[12.5px] font-semibold text-slate-300">
             <Database className="h-4 w-4" /> Amostra ({amostra.length} linhas
           </div>
           <div className="overflow-x-auto scrollbar-thin -mx-1">
             <table className="min-w-full text-left text-[12.5px]">
               <thead>
-                <tr className="border-b border-neutral-200 text-neutral-600">
+                <tr className="border-b border-white/10 text-slate-400">
                   <th className="px-2 py-1.5 font-medium">#</th>
                   {Object.keys(amostra[0] ?? {}).map((h) => (
                     <th
@@ -154,7 +154,7 @@ export function ColumnMapper({
                     >
                       {h}
                       {Object.values(value).includes(h) && (
-                        <Check className="ml-1 inline-block h-3 w-3 text-emerald-600" />
+                        <Check className="ml-1 inline-block h-3 w-3 text-emerald-300" />
                       )}
                     </th>
                   ))}
@@ -162,10 +162,10 @@ export function ColumnMapper({
               </thead>
               <tbody>
                 {amostra.map((linha, i) => (
-                  <tr key={i} className="border-b border-neutral-100 last:border-0">
-                    <td className="px-2 py-1.5 text-neutral-500">{i + 1}</td>
+                  <tr key={i} className="border-b border-white/10 last:border-0">
+                    <td className="px-2 py-1.5 text-slate-400">{i + 1}</td>
                     {Object.values(linha).map((v, j) => (
-                      <td key={j} className="px-2 py-1.5 max-w-[200px] truncate text-neutral-800">
+                      <td key={j} className="px-2 py-1.5 max-w-[200px] truncate text-slate-300">
                         {v || <span className="text-neutral-400">—</span>}
                       </td>
                     ))}
@@ -179,11 +179,11 @@ export function ColumnMapper({
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
           <div className="text-[12.5px]">
             {valido ? (
-              <p className="text-emerald-700 font-medium flex items-center gap-1.5">
+              <p className="text-emerald-300 font-medium flex items-center gap-1.5">
                 <Check className="h-4 w-4" /> Mapeamento válido. Pronto para importar.
               </p>
             ) : (
-              <p className="text-amber-700 font-medium">
+              <p className="text-amber-300 font-medium">
                 É obrigatório: Código + Endereço completo OU Logradouro + (Nº ou CEP).
               </p>
             )}

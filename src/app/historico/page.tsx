@@ -87,15 +87,35 @@ export default function HistoricoPage() {
   };
 
   return (
-    <div className="space-y-4 animate-slide-up">
-      <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">
-            Histórico de consultas
-          </h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            {itens.length} {itens.length === 1 ? 'consulta registrada' : 'consultas registradas'}
-          </p>
+    <div className="space-y-5 animate-slide-up">
+      <section className="hero-shell">
+        <div className="relative p-6 sm:p-8 lg:p-9">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-3xl">
+              <Badge variant="primary" className="mb-4">
+                <History className="h-3 w-3" /> Memória operacional
+              </Badge>
+              <h1 className="section-title">Histórico de consultas</h1>
+              <p className="section-subtitle mt-2">
+                Revise consultas, filtre por resultado e exporte com um visual mais limpo e coerente com o resto do sistema.
+              </p>
+            </div>
+            <div className="panel-dark p-4 sm:p-5 min-w-[250px]">
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Registros</div>
+              <div className="mt-2 text-2xl font-black tracking-tight text-white">
+                {itens.length.toLocaleString('pt-BR')}
+              </div>
+              <div className="mt-1 text-sm text-slate-400">
+                {itens.length === 1 ? 'consulta registrada' : 'consultas registradas'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="text-sm text-slate-300">
+          Use busca por código, rua, bairro e filtros de status.
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
@@ -110,12 +130,12 @@ export default function HistoricoPage() {
             <Trash2 className="h-4 w-4" /> Limpar
           </Button>
         </div>
-      </header>
+      </div>
 
       <Card>
         <CardContent className="!p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-neutral-500" />
+            <Search className="h-4 w-4 text-slate-400" />
             <Input
               placeholder="Buscar por código, rua, bairro..."
               value={busca}
@@ -133,12 +153,12 @@ export default function HistoricoPage() {
                   className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition border ${
                     ativo
                       ? 'bg-ml-blue text-white border-ml-blue shadow-sm'
-                      : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                      : 'bg-white/[0.06] text-slate-300 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <Filter className="inline h-3 w-3 mr-1 opacity-70" />
                   {f === 'TODOS' ? 'Todos' : STATUS_META[f as StatusConsulta]?.label ?? f}
-                  <span className={`ml-1.5 ${ativo ? 'text-white/80' : 'text-neutral-500'}`}>
+                  <span className={`ml-1.5 ${ativo ? 'text-white/80' : 'text-slate-400'}`}>
                     {count}
                   </span>
                 </button>
@@ -151,12 +171,12 @@ export default function HistoricoPage() {
       {!filtrados.length ? (
         <Card>
           <CardContent className="!p-10 flex flex-col items-center gap-3 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.06] text-slate-400">
               <History className="h-8 w-8" />
             </div>
             <div>
-              <h3 className="text-[16px] font-bold text-neutral-900">Nenhuma consulta</h3>
-              <p className="text-sm text-neutral-600 mt-1">
+              <h3 className="text-[16px] font-bold text-white">Nenhuma consulta</h3>
+              <p className="text-sm text-slate-400 mt-1">
                 {itens.length
                   ? 'Ajuste os filtros de busca.'
                   : 'Escanear uma etiqueta para começar.'}
@@ -190,12 +210,12 @@ export default function HistoricoPage() {
                       <div
                         className={`flex h-12 w-12 items-center justify-center rounded-xl ${
                           meta.variant === 'success'
-                            ? 'bg-emerald-50 text-emerald-600'
+                            ? 'bg-emerald-400/12 text-emerald-300'
                             : meta.variant === 'warning'
-                            ? 'bg-amber-50 text-amber-600'
+                            ? 'bg-amber-400/12 text-amber-300'
                             : meta.variant === 'danger'
-                            ? 'bg-red-50 text-red-600'
-                            : 'bg-blue-50 text-blue-600'
+                            ? 'bg-rose-400/12 text-rose-300'
+                            : 'bg-sky-400/12 text-sky-300'
                         }`}
                       >
                         <Icon className="h-5.5 w-5 h-5 w-5 h-5 w-5" />
@@ -207,23 +227,23 @@ export default function HistoricoPage() {
                         <div className="flex items-center gap-2">
                           <Badge variant={meta.variant}>{meta.label}</Badge>
                           {h.codigoEncontrado && (
-                            <span className="font-black text-[18px] tracking-tight text-neutral-900 tabular-nums">
+                            <span className="font-black text-[18px] tracking-tight text-white tabular-nums">
                               #{h.codigoEncontrado}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11.5px] text-neutral-500">
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-slate-400">
                           <Clock className="h-3.5 w-3.5" />
                           {formatarData(h.dataHora)}
                         </div>
                       </div>
                       {enderecoResumido && (
-                        <p className="text-[13.5px] leading-snug text-neutral-800 break-words">
+                        <p className="text-[13.5px] leading-snug text-slate-300 break-words">
                           {enderecoResumido}
                         </p>
                       )}
                       {h.textoOcr && (
-                        <p className="rounded-lg bg-neutral-50 border border-neutral-100 px-2.5 py-1.5 text-[11.5px] leading-snug text-neutral-600 line-clamp-2">
+                        <p className="rounded-lg bg-white/[0.06] border border-white/10 px-2.5 py-1.5 text-[11.5px] leading-snug text-slate-400 line-clamp-2">
                           {truncate(h.textoOcr, 180)}
                         </p>
                       )}
@@ -232,9 +252,9 @@ export default function HistoricoPage() {
                           {h.multiplosResultados.map((m, i) => (
                             <span
                               key={i}
-                              className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-neutral-700"
+                              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[10.5px] font-semibold text-slate-300"
                             >
-                              #{m.codigo} <span className="text-neutral-500">{m.score}%</span>
+                              #{m.codigo} <span className="text-slate-400">{m.score}%</span>
                             </span>
                           ))}
                         </div>

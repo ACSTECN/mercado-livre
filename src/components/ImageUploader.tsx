@@ -45,8 +45,8 @@ export function ImageUploader({ onSelecionado, className, compacto }: Props) {
       className={cn(
         'relative w-full rounded-2xl border-2 border-dashed p-6 text-center transition cursor-pointer',
         drag
-          ? 'border-ml-blue bg-blue-50/60'
-          : 'border-neutral-300 bg-white hover:border-neutral-400 hover:bg-neutral-50',
+          ? 'border-ml-blue bg-white/[0.08]'
+          : 'border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/10',
         className,
       )}
       onClick={() => inputRef.current?.click()}
@@ -69,14 +69,14 @@ export function ImageUploader({ onSelecionado, className, compacto }: Props) {
         onChange={(e) => aoSelecionar(e.target.files)}
       />
       <div className="flex flex-col items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ml-yellow/30 text-neutral-900">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ml-yellow/30 text-amber-200">
           <Upload className="h-6 w-6" />
         </div>
         <div className="space-y-0.5">
-          <p className="text-[14.5px] font-semibold text-neutral-800">
+          <p className="text-[14.5px] font-semibold text-slate-300">
             Solte uma imagem ou toque para selecionar
           </p>
-          <p className="text-xs text-neutral-500">PNG, JPG, WEBP — boa qualidade e foco</p>
+          <p className="text-xs text-slate-400">PNG, JPG, WEBP — boa qualidade e foco</p>
         </div>
         <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
           <ImgIcon className="h-4 w-4" /> Escolher imagem
@@ -98,8 +98,8 @@ export function ImagemPreview({
   className?: string;
 }) {
   return (
-    <div className={cn('relative w-full overflow-hidden rounded-2xl border border-black/5', className)}>
-      <img src={src} alt="Etiqueta" className="h-full max-h-[420px] w-full object-contain bg-neutral-100" />
+    <div className={cn('relative w-full overflow-hidden rounded-2xl border border-white/10', className)}>
+      <img src={src} alt="Etiqueta" className="h-full max-h-[420px] w-full object-contain bg-white/[0.06]" />
       {(onRemover || onRefazer) && (
         <div className="absolute top-3 right-3 flex gap-2">
           {onRemover && (

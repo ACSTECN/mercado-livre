@@ -13,15 +13,15 @@ export function SpreadsheetStatus({ compact = false }: { compact?: boolean }) {
 
   if (!planilha) {
     return (
-      <Card className={compact ? '!rounded-xl' : ''}>
-        <CardContent className={compact ? '!p-3.5' : '!p-4'}>
+      <Card className={compact ? '!rounded-2xl' : ''}>
+        <CardContent className={compact ? '!p-4' : '!p-5'}>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/12 text-amber-300 shadow-[0_10px_24px_rgba(245,158,11,0.18)]">
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-semibold text-neutral-800">Nenhuma planilha importada</p>
-              {!compact && <p className="text-xs text-neutral-500">Importe um arquivo XLSX para começar</p>}
+              <p className="text-[14px] font-black tracking-tight text-white">Nenhuma planilha importada</p>
+              {!compact && <p className="text-xs text-slate-400">Importe um arquivo XLSX para começar</p>}
             </div>
             <Badge variant="danger">Pendente</Badge>
           </div>
@@ -31,23 +31,23 @@ export function SpreadsheetStatus({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <Card className={compact ? '!rounded-xl' : ''}>
-      <CardContent className={compact ? '!p-3.5' : '!p-4'}>
+    <Card className={compact ? '!rounded-2xl' : ''}>
+      <CardContent className={compact ? '!p-4' : '!p-5'}>
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/12 text-emerald-300 shadow-[0_10px_24px_rgba(16,185,129,0.18)]">
           <CheckCircle2 className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-semibold text-neutral-900">
+          <p className="truncate text-[14px] font-black tracking-tight text-white">
             <FileSpreadsheet className="mr-1 inline h-4 w-4 -translate-y-0.5 text-ml-blue" />
             {planilha.nomeArquivo}
           </p>
           {!compact && (
-            <p className="mt-0.5 text-xs text-neutral-500">
+            <p className="mt-0.5 text-xs text-slate-400">
               {formatarData(planilha.importadaEm)}
             </p>
           )}
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-neutral-600">
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
             <Database className="h-3.5 w-3.5" />
             <span className="font-semibold">{total}</span> endereços carregados
           </p>

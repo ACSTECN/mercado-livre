@@ -144,7 +144,7 @@ function ModalBase({
         onClick={aoFechar}
       />
       <div
-        className={`relative w-full ${maxW} bg-white rounded-3xl shadow-2xl animate-slide-up max-h-[92vh] overflow-hidden flex flex-col`}
+        className={`relative w-full ${maxW} bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-3xl shadow-2xl animate-slide-up max-h-[92vh] overflow-hidden flex flex-col`}
       >
         {children}
       </div>
@@ -199,10 +199,10 @@ function ModalNovaSaca() {
               <Boxes className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-black tracking-tight text-neutral-900">
+              <h2 className="text-xl font-black tracking-tight text-white">
                 Iniciar nova saca
               </h2>
-              <p className="text-sm text-neutral-500 mt-0.5">
+              <p className="text-sm text-slate-400 mt-0.5">
                 Cada dia/lote é uma saca separada
               </p>
             </div>
@@ -225,7 +225,7 @@ function ModalNovaSaca() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="saca-desc" className="text-[13px] font-bold text-neutral-600">
+            <Label htmlFor="saca-desc" className="text-[13px] font-bold text-slate-400">
               Descrição (opcional)
             </Label>
             <Input
@@ -238,9 +238,9 @@ function ModalNovaSaca() {
           </div>
 
           {erro && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
-              <span className="text-[12.5px] font-semibold text-red-800">{erro}</span>
+            <div className="rounded-xl border border-red-400/30 bg-red-400/12 px-3 py-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-300 shrink-0" />
+              <span className="text-[12.5px] font-semibold text-red-200">{erro}</span>
             </div>
           )}
 
@@ -310,13 +310,13 @@ function ModalHistoricoSacas() {
       aoFechar={store.fecharHistoricoSacas}
       maxW="max-w-xl"
     >
-      <div className="p-6 sm:p-7 border-b border-neutral-100 flex items-start justify-between gap-3">
+      <div className="p-6 sm:p-7 border-b border-white/10 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black tracking-tight text-neutral-900 flex items-center gap-2">
+          <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
             <FolderOpen className="h-5 w-5 text-ml-blue" />
             Sacas
           </h2>
-          <p className="text-sm text-neutral-500 mt-0.5">
+          <p className="text-sm text-slate-400 mt-0.5">
             Total de {store.sacas.length} saca(s) · clique para abrir
           </p>
         </div>
@@ -334,7 +334,7 @@ function ModalHistoricoSacas() {
           </Button>
           <button
             onClick={store.fecharHistoricoSacas}
-            className="h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/[0.06] hover:text-slate-300"
           >
             <X className="h-4 w-4" />
           </button>
@@ -343,7 +343,7 @@ function ModalHistoricoSacas() {
 
       <div className="px-6 sm:px-7 pt-4">
         <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-neutral-400" />
+          <Search className="h-4 w-4 text-slate-400" />
           <Input
             placeholder="Buscar saca..."
             value={filtro}
@@ -357,7 +357,7 @@ function ModalHistoricoSacas() {
         {!filtradas.length ? (
           <div className="py-10 text-center">
             <FolderClosed className="h-12 w-12 text-neutral-300 mx-auto" />
-            <p className="text-sm text-neutral-500 mt-2">Nenhuma saca encontrada</p>
+            <p className="text-sm text-slate-400 mt-2">Nenhuma saca encontrada</p>
           </div>
         ) : (
           filtradas.map((s) => {
@@ -369,7 +369,7 @@ function ModalHistoricoSacas() {
                 key={s.id}
                 className={`cursor-pointer transition-all duration-200 group ${
                   ativa
-                    ? 'ring-2 ring-ml-blue border-blue-200 bg-blue-50/40'
+                    ? 'ring-2 ring-ml-blue border-blue-400/30 bg-blue-400/12'
                     : 'hover:shadow-md hover:-translate-y-0.5'
                 }`}
                 onClick={() => {
@@ -380,8 +380,8 @@ function ModalHistoricoSacas() {
                   <div
                     className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${
                       aberta
-                        ? 'bg-emerald-50 text-emerald-600'
-                        : 'bg-neutral-100 text-neutral-400'
+                        ? 'bg-emerald-400/12 text-emerald-300'
+                        : 'bg-white/[0.06] text-slate-400'
                     }`}
                   >
                     {aberta ? (
@@ -392,7 +392,7 @@ function ModalHistoricoSacas() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-[16px] font-black tracking-tight text-neutral-900 truncate">
+                      <h3 className="text-[16px] font-black tracking-tight text-white truncate">
                         {s.nome}
                       </h3>
                       <Badge variant={aberta ? 'success' : 'info'} className="!text-[10.5px] !py-0.5">
@@ -405,9 +405,9 @@ function ModalHistoricoSacas() {
                       )}
                     </div>
                     {s.descricao && (
-                      <p className="text-[12px] text-neutral-500 truncate mt-0.5">{s.descricao}</p>
+                      <p className="text-[12px] text-slate-400 truncate mt-0.5">{s.descricao}</p>
                     )}
-                    <div className="flex items-center gap-2 text-[11.5px] text-neutral-500 mt-1">
+                    <div className="flex items-center gap-2 text-[11.5px] text-slate-400 mt-1">
                       <Calendar className="h-3 w-3" />
                       {formatarData(new Date(s.created_at).getTime())}
                       <span className="text-neutral-300">·</span>
@@ -419,7 +419,7 @@ function ModalHistoricoSacas() {
                     <p className="text-[22px] font-black tabular-nums text-ml-blue leading-none">
                       {resumo.unicos}
                     </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       únicos
                     </p>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -451,7 +451,7 @@ function ModalHistoricoSacas() {
                           void store.removerSaca(s.id).finally(() => setRemovendo(null));
                         }}
                       >
-                        <Trash2 className="h-3 w-3 text-red-500" />
+                        <Trash2 className="h-3 w-3 text-red-400" />
                       </Button>
                     </div>
                   </div>
@@ -557,26 +557,26 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
         }}
         className={`w-full sm:w-auto inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 transition ${
           ativo
-            ? 'bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-200/70 hover:shadow-sm'
-            : 'bg-amber-50 border-amber-200 hover:shadow-sm'
+            ? 'bg-gradient-to-r from-indigo-400/12 to-violet-400/12 border-indigo-400/30 hover:shadow-sm'
+            : 'bg-amber-400/12 border-amber-400/30 hover:shadow-sm'
         }`}
       >
         <div
           className={`h-7 w-7 rounded-lg flex items-center justify-center ${
-            ativo ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'
+            ativo ? 'bg-indigo-400/15 text-indigo-300' : 'bg-amber-400/15 text-amber-300'
           }`}
         >
           {ativo ? <Truck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
         </div>
         <div className="text-left min-w-0">
           <div className={`text-[9.5px] font-bold uppercase tracking-wider leading-none mb-0.5 ${
-            ativo ? 'text-indigo-500' : 'text-amber-600'
+            ativo ? 'text-indigo-400' : 'text-amber-300'
           }`}>
             {ativo ? 'Entregador' : 'Selecionar'}
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             <div className={`text-[12.5px] font-black tracking-tight truncate max-w-[140px] leading-tight ${
-              ativo ? 'text-neutral-900' : 'text-amber-800'
+              ativo ? 'text-white' : 'text-amber-200'
             }`}>
               {ativo ?? 'Toque aqui'}
             </div>
@@ -584,21 +584,21 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
               const c = mapaContagem.get(ativo);
               if (!c || c.qtd === 0) return null;
               return (
-                <span className="text-[10px] font-black tabular-nums bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded shrink-0">
+                <span className="text-[10px] font-black tabular-nums bg-violet-400/15 text-violet-300 px-1.5 py-0.5 rounded shrink-0">
                   {c.qtd}
                 </span>
               );
             })()}
           </div>
         </div>
-        <ChevronDown className={`h-3.5 w-3.5 shrink-0 ${ativo ? 'text-indigo-400' : 'text-amber-500'} ${aberto ? 'rotate-180' : ''} transition`} />
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 ${ativo ? 'text-indigo-400' : 'text-amber-400'} ${aberto ? 'rotate-180' : ''} transition`} />
       </button>
 
       {aberto && (
-        <div className="absolute z-50 top-full mt-2 left-0 right-0 sm:w-[340px] bg-white rounded-2xl shadow-2xl border border-neutral-100 p-3 animate-slide-up">
+        <div className="absolute z-50 top-full mt-2 left-0 right-0 sm:w-[340px] bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl shadow-2xl border border-white/10 p-3 animate-slide-up">
           <div className="space-y-2.5">
             <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-neutral-400 shrink-0" />
+              <Search className="h-4 w-4 text-slate-400 shrink-0" />
               <Input
                 autoFocus
                 placeholder="Buscar entregador..."
@@ -615,13 +615,13 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
             </div>
 
             {q && !matchExato && filtrados.length === 0 && (
-              <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="rounded-xl border border-amber-400/25 bg-amber-400/12 p-3 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-300 shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-black text-amber-800 leading-tight">
+                  <div className="text-[12px] font-black text-amber-200 leading-tight">
                     Nenhum entregador encontrado
                   </div>
-                  <div className="text-[11px] text-amber-700 mt-0.5">
+                  <div className="text-[11px] text-amber-300 mt-0.5">
                     Toque em "Gerenciar entregadores" abaixo para cadastrar.
                   </div>
                 </div>
@@ -631,11 +631,11 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
             <div className="max-h-64 overflow-auto space-y-1 pr-1 pt-1">
               {todos.length === 0 && !q ? (
                 <div className="py-6 text-center">
-                  <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
+                  <div className="h-12 w-12 mx-auto rounded-xl bg-white/[0.06] text-slate-400 flex items-center justify-center mb-2.5">
                     <Users className="h-6 w-6" />
                   </div>
-                  <div className="text-[13px] font-bold text-neutral-700">Sem entregadores</div>
-                  <div className="text-[11.5px] text-neutral-500 mt-0.5">
+                  <div className="text-[13px] font-bold text-slate-300">Sem entregadores</div>
+                  <div className="text-[11.5px] text-slate-400 mt-0.5">
                     Toque em Gerenciar abaixo para cadastrar.
                   </div>
                 </div>
@@ -646,7 +646,7 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                       key={matchExato}
                       type="button"
                       onClick={() => escolher(matchExato)}
-                      className="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
+                      className="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition bg-indigo-400/12 text-indigo-300 ring-1 ring-indigo-400/30"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-[13.5px] font-black truncate">{matchExato}</span>
@@ -655,12 +655,12 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                         {(() => {
                           const counts = mapaContagem.get(matchExato);
                           return counts && counts.qtd > 0 ? (
-                            <span className="text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700">
+                            <span className="text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md bg-indigo-400/15 text-indigo-300">
                               {counts.qtd}
                             </span>
                           ) : null;
                         })()}
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-300" />
                       </div>
                     </button>
                   )}
@@ -674,8 +674,8 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                         onClick={() => escolher(nome)}
                         className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
                           selecionado
-                            ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
-                            : 'hover:bg-neutral-50 text-neutral-800'
+                            ? 'bg-indigo-400/12 text-indigo-300 ring-1 ring-indigo-400/30'
+                            : 'hover:bg-white/[0.06] text-slate-300'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -686,8 +686,8 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                             <span
                               className={`text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
                                 selecionado
-                                  ? 'bg-indigo-100 text-indigo-700'
-                                  : 'bg-violet-50 text-violet-700'
+                                  ? 'bg-indigo-400/15 text-indigo-300'
+                                  : 'bg-violet-400/12 text-violet-300'
                               }`}
                             >
                               {counts.qtd}
@@ -697,8 +697,8 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                             <span
                               className={`inline-flex items-center gap-0.5 text-[10.5px] font-black tabular-nums px-1.5 py-0.5 rounded-md ${
                                 selecionado
-                                  ? 'bg-orange-100 text-orange-700'
-                                  : 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/60'
+                                  ? 'bg-orange-400/15 text-orange-300'
+                                  : 'bg-orange-400/12 text-orange-300 ring-1 ring-orange-400/30'
                               }`}
                               title={`${counts.retornos} retorno(s)`}
                             >
@@ -706,7 +706,7 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                               {counts.retornos}
                             </span>
                           )}
-                          {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />}
+                          {selecionado && <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-300" />}
                         </div>
                       </button>
                     );
@@ -715,12 +715,12 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
               )}
             </div>
 
-            <div className="pt-1 border-t border-neutral-100 space-y-1.5">
+            <div className="pt-1 border-t border-white/10 space-y-1.5">
               {aoGerenciar && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full !h-9 justify-start gap-2 !text-indigo-700 hover:!bg-indigo-50"
+                  className="w-full !h-9 justify-start gap-2 !text-indigo-300 hover:!bg-indigo-400/12"
                   onClick={() => {
                     aoGerenciar();
                     fechar();
@@ -735,7 +735,7 @@ function SeletorEntregador({ aoGerenciar }: { aoGerenciar?: () => void }) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full !h-8 !text-neutral-500"
+                  className="w-full !h-8 !text-slate-400"
                   onClick={() => {
                     store.definirEntregador(null);
                     fechar();
@@ -815,34 +815,34 @@ function ModalMoverPacote({
               <ArrowRightLeft className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-black tracking-tight text-neutral-900">
+              <h2 className="text-xl font-black tracking-tight text-white">
                 Alterar rota
               </h2>
-              <p className="text-sm text-neutral-500 mt-0.5">
+              <p className="text-sm text-slate-400 mt-0.5">
                 Mover pacote para outro entregador
               </p>
             </div>
           </div>
           <button
             onClick={aoFechar}
-            className="h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/[0.06] hover:text-slate-300"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {pacote && (
-          <div className="mb-5 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center text-neutral-600">
+          <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-400">
               <Package className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[18px] font-black tabular-nums tracking-tight text-neutral-900 break-all">
+              <div className="text-[18px] font-black tabular-nums tracking-tight text-white break-all">
                 {pacote.codigo_pacote}
               </div>
-              <div className="text-[11.5px] text-neutral-500 mt-0.5">
+              <div className="text-[11.5px] text-slate-400 mt-0.5">
                 Entregador atual:{' '}
-                <span className="font-bold text-neutral-700">
+                <span className="font-bold text-slate-300">
                   {pacote.entregador ?? 'Sem entregador'}
                 </span>
               </div>
@@ -866,7 +866,7 @@ function ModalMoverPacote({
                         className={`px-3 py-1.5 rounded-xl text-[12.5px] font-bold transition ${
                           selecionado
                             ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-white border border-neutral-200 text-neutral-700 hover:border-indigo-300 hover:text-indigo-700'
+                            : 'bg-white/[0.06] border border-white/10 text-slate-300 hover:border-indigo-300 hover:text-indigo-300'
                         }`}
                       >
                         {selecionado && <CheckCircle2 className="h-3.5 w-3.5 inline mr-1" />}
@@ -879,7 +879,7 @@ function ModalMoverPacote({
 
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">
-                  <UserRound className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <UserRound className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     id="modal-mover-input"
                     value={query}
@@ -1041,20 +1041,20 @@ function ModalGerenciarEntregadores({
 
   return (
     <ModalBase aberto={aberto} aoFechar={aoFechar} maxW="max-w-lg">
-      <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 flex items-center justify-between gap-3">
+      <div className="px-5 sm:px-6 py-4 border-b border-white/10 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-10 w-10 shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center shadow-sm">
             <Users className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-[17px] font-black tracking-tight text-neutral-900 leading-tight">Entregadores</h2>
-            <p className="text-[11.5px] text-neutral-500 font-semibold mt-0.5">Gerencie a lista de entregadores cadastrados</p>
+            <h2 className="text-[17px] font-black tracking-tight text-white leading-tight">Entregadores</h2>
+            <p className="text-[11.5px] text-slate-400 font-semibold mt-0.5">Gerencie a lista de entregadores cadastrados</p>
           </div>
         </div>
         <button
           type="button"
           onClick={aoFechar}
-          className="h-9 w-9 shrink-0 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition"
+          className="h-9 w-9 shrink-0 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/[0.06] hover:text-slate-300 transition"
           aria-label="Fechar"
         >
           <X className="h-4.5 w-4.5" />
@@ -1063,8 +1063,8 @@ function ModalGerenciarEntregadores({
 
       <div className="p-4 sm:p-5 space-y-4 overflow-auto">
         {/* NOVO ENTREGADOR */}
-        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-violet-50/40 p-3.5">
-          <div className="text-[10.5px] font-black uppercase tracking-[0.12em] text-indigo-600 mb-2">Novo entregador</div>
+        <div className="rounded-2xl border border-indigo-400/25 bg-gradient-to-br from-indigo-400/12 to-violet-400/12 p-3.5">
+          <div className="text-[10.5px] font-black uppercase tracking-[0.12em] text-indigo-300 mb-2">Novo entregador</div>
           <div className="flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
               <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 pointer-events-none" />
@@ -1078,7 +1078,7 @@ function ModalGerenciarEntregadores({
                   }
                 }}
                 placeholder="Nome completo (ex: João Silva)"
-                className="!h-11 !pl-9 !text-[14px] !bg-white"
+                className="!h-11 !pl-9 !text-[14px] !bg-white/[0.06]"
               />
             </div>
             <Button
@@ -1101,43 +1101,43 @@ function ModalGerenciarEntregadores({
         {/* BUSCAR */}
         <div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar entregador..."
-              className="!h-10 !pl-9 !text-[13.5px] !bg-neutral-50/60"
+              className="!h-10 !pl-9 !text-[13.5px] !bg-white/[0.06]"
             />
           </div>
         </div>
 
         {/* LISTA */}
-        <div className="rounded-2xl border border-neutral-200/70 bg-white overflow-hidden">
-          <div className="px-4 py-2.5 bg-neutral-50/70 border-b border-neutral-200/60 flex items-center justify-between">
-            <span className="text-[10.5px] font-black uppercase tracking-[0.12em] text-neutral-500">
+        <div className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] overflow-hidden">
+          <div className="px-4 py-2.5 bg-white/[0.06] border-b border-white/10 flex items-center justify-between">
+            <span className="text-[10.5px] font-black uppercase tracking-[0.12em] text-slate-400">
               {filtrados.length} entregador{filtrados.length !== 1 ? 'es' : ''}
             </span>
             {q && (
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                className="text-[11px] font-bold text-neutral-500 hover:text-neutral-700 transition"
+                className="text-[11px] font-bold text-slate-400 hover:text-slate-300 transition"
               >
                 Limpar busca
               </button>
             )}
           </div>
 
-          <div className="divide-y divide-neutral-100 max-h-[48vh] overflow-auto">
+          <div className="divide-y divide-white/10 max-h-[48vh] overflow-auto">
             {filtrados.length === 0 ? (
               <div className="py-12 text-center">
-                <div className="h-14 w-14 mx-auto rounded-2xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-3">
+                <div className="h-14 w-14 mx-auto rounded-2xl bg-white/[0.06] text-slate-400 flex items-center justify-center mb-3">
                   {entregadores.length === 0 ? <UserRound className="h-7 w-7" /> : <Search className="h-7 w-7" />}
                 </div>
-                <div className="text-[13.5px] font-bold text-neutral-700">
+                <div className="text-[13.5px] font-bold text-slate-300">
                   {entregadores.length === 0 ? 'Nenhum entregador cadastrado' : 'Nenhum resultado encontrado'}
                 </div>
-                <div className="text-[11.5px] text-neutral-500 mt-1">
+                <div className="text-[11.5px] text-slate-400 mt-1">
                   {entregadores.length === 0 ? 'Cadastre o primeiro acima.' : 'Tente buscar por outro nome.'}
                 </div>
               </div>
@@ -1153,12 +1153,12 @@ function ModalGerenciarEntregadores({
                   <div
                     key={nome}
                     className={`px-4 py-3 flex items-center gap-3 transition ${
-                      eAtivo ? 'bg-gradient-to-r from-indigo-50/60 to-violet-50/40' : 'hover:bg-neutral-50/60'
+                      eAtivo ? 'bg-gradient-to-r from-indigo-400/12 to-violet-400/12' : 'hover:bg-white/[0.06]'
                     }`}
                   >
                     <div
                       className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center ${
-                        eAtivo ? 'bg-indigo-100 text-indigo-600' : 'bg-neutral-100 text-neutral-500'
+                        eAtivo ? 'bg-indigo-400/15 text-indigo-300' : 'bg-white/[0.06] text-slate-400'
                       }`}
                     >
                       <Truck className="h-4 w-4" />
@@ -1184,7 +1184,7 @@ function ModalGerenciarEntregadores({
                         <button
                           type="button"
                           onClick={cancelarEditar}
-                          className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition"
+                          className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white/[0.06] hover:text-slate-300 transition"
                           title="Cancelar"
                         >
                           <X className="h-4 w-4" />
@@ -1193,7 +1193,7 @@ function ModalGerenciarEntregadores({
                           type="button"
                           onClick={() => void confirmarEditar()}
                           disabled={procEdit || !editando!.valor.trim()}
-                          className="h-9 px-3 shrink-0 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition inline-flex items-center gap-1.5"
+                          className="h-9 px-3 shrink-0 rounded-lg bg-emerald-400/12 text-emerald-300 hover:bg-emerald-400/15 disabled:opacity-50 transition inline-flex items-center gap-1.5"
                           title="Salvar"
                         >
                           {procEdit ? (
@@ -1209,24 +1209,24 @@ function ModalGerenciarEntregadores({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className={`text-[14px] font-black truncate ${
-                              eAtivo ? 'text-indigo-900' : 'text-neutral-800'
+                              eAtivo ? 'text-indigo-200' : 'text-slate-300'
                             }`}>
                               {nome}
                             </span>
                             {eAtivo && (
-                              <span className="shrink-0 text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200/60">
+                              <span className="shrink-0 text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-400/15 text-indigo-300 ring-1 ring-indigo-400/30">
                                 Ativo
                               </span>
                             )}
                           </div>
                           {contagem && contagem.qtd > 0 && (
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[11px] font-bold tabular-nums text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded">
+                              <span className="text-[11px] font-bold tabular-nums text-slate-400 bg-white/[0.06] px-1.5 py-0.5 rounded">
                                 {contagem.qtd} nesta saca
                               </span>
                               {contagem.retornos > 0 && (
                                 <span
-                                  className="text-[11px] font-bold tabular-nums bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5"
+                                  className="text-[11px] font-bold tabular-nums bg-orange-400/15 text-orange-300 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5"
                                   title="Retornos"
                                 >
                                   <RefreshCw className="h-3 w-3" />
@@ -1244,7 +1244,7 @@ function ModalGerenciarEntregadores({
                               onClick={() => {
                                 void store.definirEntregador(nome);
                               }}
-                              className="h-8 px-2 rounded-lg text-[11px] font-black text-indigo-600 hover:bg-indigo-50 transition inline-flex items-center gap-1"
+                              className="h-8 px-2 rounded-lg text-[11px] font-black text-indigo-300 hover:bg-indigo-400/12 transition inline-flex items-center gap-1"
                               title="Definir como ativo"
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1254,7 +1254,7 @@ function ModalGerenciarEntregadores({
                           <button
                             type="button"
                             onClick={() => iniciarEditar(nome)}
-                            className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-amber-50 hover:text-amber-600 transition"
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-amber-400/12 hover:text-amber-300 transition"
                             title="Renomear"
                           >
                             <PencilLine className="h-3.5 w-3.5" />
@@ -1263,7 +1263,7 @@ function ModalGerenciarEntregadores({
                             type="button"
                             onClick={() => void excluir(nome)}
                             disabled={procDel}
-                            className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition"
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-400/12 hover:text-red-300 disabled:opacity-50 transition"
                             title="Excluir"
                           >
                             {procDel ? (
@@ -1283,7 +1283,7 @@ function ModalGerenciarEntregadores({
         </div>
       </div>
 
-      <div className="px-5 sm:px-6 py-3.5 border-t border-neutral-100 flex items-center justify-end gap-2 bg-neutral-50/40">
+      <div className="px-5 sm:px-6 py-3.5 border-t border-white/10 flex items-center justify-end gap-2 bg-white/[0.04]">
         <Button
           size="sm"
           variant="ghost"
@@ -1434,16 +1434,16 @@ function ModalImportarJson({
   const total = Math.max(...(tipoImportacao === 'rotas' ? porEntregadorEntries : porZonaEntries).map(([, arr]) => arr.length), 1);
   return (
     <ModalBase aberto={aberto} aoFechar={importandoRodando ? () => {} : aoFechar} maxW="max-w-3xl">
-      <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 flex items-start justify-between gap-3">
+      <div className="px-5 sm:px-6 py-4 border-b border-white/10 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <span className={`shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ${tipoImportacao === 'rotas' ? 'from-violet-500 to-fuchsia-500' : 'from-rose-500 to-orange-500'}`}>
             {tipoImportacao === 'rotas' ? <Route className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
           </span>
           <div className="min-w-0">
-            <h3 className="text-[17px] font-black tracking-tight text-neutral-900">
+            <h3 className="text-[17px] font-black tracking-tight text-white">
               {tipoImportacao === 'rotas' ? 'Importar rotas Mercado Livre' : 'Importar zonas Mercado Livre'}
             </h3>
-            <p className="text-[12.5px] text-neutral-500 mt-0.5 leading-relaxed">
+            <p className="text-[12.5px] text-slate-400 mt-0.5 leading-relaxed">
               {tipoImportacao === 'rotas'
                 ? 'Cole o JSON da API de monitoring do ML. Extrai entregador (driver) e os IDs (address.id de cada stop).'
                 : 'Cole o JSON de zona do monitoring ML. Extrai zone_name como agrupador e markers[].shipment_id como IDs dos pacotes; depois atribua para entregadores.'}
@@ -1454,22 +1454,22 @@ function ModalImportarJson({
           type="button"
           onClick={importandoRodando ? undefined : aoFechar}
           disabled={importandoRodando}
-          className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100 transition disabled:opacity-50"
+          className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-300 hover:bg-white/[0.06] transition disabled:opacity-50"
           title="Fechar"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="px-5 sm:px-6 py-3 border-b border-neutral-100 flex flex-wrap items-center gap-1.5 bg-neutral-50/70">
-        <div className="inline-flex rounded-xl bg-neutral-100/80 p-1 ring-1 ring-neutral-200/70 gap-0.5 mr-2">
+      <div className="px-5 sm:px-6 py-3 border-b border-white/10 flex flex-wrap items-center gap-1.5 bg-white/[0.06]">
+        <div className="inline-flex rounded-xl bg-white/[0.06] p-1 ring-1 ring-white/10 gap-0.5 mr-2">
           <button
             type="button"
             onClick={() => { setTipoImportacao('rotas'); }}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-black transition ${
               tipoImportacao === 'rotas'
-                ? 'bg-white text-violet-700 shadow-sm ring-1 ring-violet-200'
-                : 'text-neutral-500 hover:text-neutral-800'
+                ? 'bg-white/10 text-violet-300 shadow-sm ring-1 ring-violet-400/30'
+                : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Route className="h-3.5 w-3.5" /> Rotas (por entregador)
@@ -1479,21 +1479,21 @@ function ModalImportarJson({
             onClick={() => { setTipoImportacao('zonas'); }}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-black transition ${
               tipoImportacao === 'zonas'
-                ? 'bg-white text-rose-700 shadow-sm ring-1 ring-rose-200'
-                : 'text-neutral-500 hover:text-neutral-800'
+                ? 'bg-white/10 text-rose-300 shadow-sm ring-1 ring-rose-400/30'
+                : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <MapPin className="h-3.5 w-3.5" /> Zonas (shipment_id → entregador depois)
           </button>
         </div>
-        <div className="h-5 w-px bg-neutral-200 mx-0.5" />
+        <div className="h-5 w-px bg-white/10 mx-0.5" />
         <button
           type="button"
           onClick={() => setAbaImport('colar')}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-black transition ${
             abaImport === 'colar'
-              ? 'bg-white shadow-sm text-violet-700 ring-1 ring-violet-200'
-              : 'text-neutral-500 hover:text-neutral-800'
+              ? 'bg-white/10 shadow-sm text-violet-300 ring-1 ring-violet-400/30'
+              : 'text-slate-400 hover:text-slate-300'
           }`}
         >
           <Copy className="h-3.5 w-3.5" /> Colar JSON
@@ -1503,8 +1503,8 @@ function ModalImportarJson({
           onClick={() => setAbaImport('upload')}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-black transition ${
             abaImport === 'upload'
-              ? 'bg-white shadow-sm text-violet-700 ring-1 ring-violet-200'
-              : 'text-neutral-500 hover:text-neutral-800'
+              ? 'bg-white/10 shadow-sm text-violet-300 ring-1 ring-violet-400/30'
+              : 'text-slate-400 hover:text-slate-300'
           }`}
         >
           <Upload className="h-3.5 w-3.5" /> Subir arquivo .json
@@ -1513,10 +1513,10 @@ function ModalImportarJson({
           <button
             type="button"
             onClick={copiarEsqueleto}
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-[10.5px] font-black text-neutral-700 transition"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 text-[10.5px] font-black text-slate-300 transition"
             title="Copia um JSON exemplo (esqueleto do formato da API ML)"
           >
-            {copiado ? <Check className="h-3 w-3 text-emerald-600" /> : <FileText className="h-3 w-3" />}
+            {copiado ? <Check className="h-3 w-3 text-emerald-300" /> : <FileText className="h-3 w-3" />}
             {copiado ? 'Copiado!' : 'Copiar modelo (esqueleto)'}
           </button>
         </div>
@@ -1526,7 +1526,7 @@ function ModalImportarJson({
         {abaImport === 'colar' ? (
           <>
             <div>
-              <Label className="!text-[11px] !font-black uppercase tracking-wider text-neutral-500 mb-1.5">
+              <Label className="!text-[11px] !font-black uppercase tracking-wider text-slate-400 mb-1.5">
                 Cole o JSON aqui
               </Label>
               <Textarea
@@ -1563,14 +1563,14 @@ function ModalImportarJson({
             </div>
           </>
         ) : (
-          <div className="rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50/40 p-6 sm:p-8 text-center hover:bg-violet-50/30 hover:border-violet-300 transition cursor-pointer"
+          <div className="rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.04] p-6 sm:p-8 text-center hover:bg-violet-400/12 hover:border-violet-400/40 transition cursor-pointer"
                onClick={() => fileInputRef.current?.click()}
           >
-            <div className="h-14 w-14 rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200 inline-flex items-center justify-center mx-auto mb-3">
-              <Upload className="h-6 w-6 text-violet-600" />
+            <div className="h-14 w-14 rounded-2xl bg-white/[0.06] shadow-sm ring-1 ring-white/10 inline-flex items-center justify-center mx-auto mb-3">
+              <Upload className="h-6 w-6 text-violet-300" />
             </div>
-            <h4 className="text-[14px] font-black text-neutral-900 mb-1">Selecione ou arraste o arquivo .json</h4>
-            <p className="text-[12px] text-neutral-500 mb-3">
+            <h4 className="text-[14px] font-black text-white mb-1">Selecione ou arraste o arquivo .json</h4>
+            <p className="text-[12px] text-slate-400 mb-3">
               {tipoImportacao === 'rotas'
                 ? 'Formatos aceitos: .json da API de rotas Mercado Livre (monitoring/routes/...)'
                 : 'Formatos aceitos: .json com zone_name + markers[].shipment_id (API zonas ML)'}
@@ -1589,11 +1589,11 @@ function ModalImportarJson({
         )}
 
         {parseAtual && !parseAtual.ok && (
-          <div className="rounded-xl bg-red-50 ring-1 ring-red-200 px-3.5 py-2.5 flex items-start gap-2">
-            <XCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+          <div className="rounded-xl bg-red-400/12 ring-1 ring-red-400/30 px-3.5 py-2.5 flex items-start gap-2">
+            <XCircle className="h-4 w-4 text-red-300 shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <p className="text-[11.5px] font-black text-red-800">Não consegui importar</p>
-              <p className="text-[11.5px] text-red-700 mt-0.5 leading-relaxed">{parseAtual.erro}</p>
+              <p className="text-[11.5px] font-black text-red-200">Não consegui importar</p>
+              <p className="text-[11.5px] text-red-300 mt-0.5 leading-relaxed">{parseAtual.erro}</p>
             </div>
           </div>
         )}
@@ -1601,67 +1601,67 @@ function ModalImportarJson({
         {parseAtual?.ok && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div className="rounded-xl bg-emerald-50 ring-1 ring-emerald-200 px-3 py-2">
-                <div className="text-[9.5px] font-black uppercase tracking-wider text-emerald-700">Shipments / IDs</div>
-                <div className="text-[18px] font-black tabular-nums text-emerald-800 leading-tight">{parseAtual.totalIds}</div>
+              <div className="rounded-xl bg-emerald-400/12 ring-1 ring-emerald-400/30 px-3 py-2">
+                <div className="text-[9.5px] font-black uppercase tracking-wider text-emerald-300">Shipments / IDs</div>
+                <div className="text-[18px] font-black tabular-nums text-emerald-200 leading-tight">{parseAtual.totalIds}</div>
               </div>
               {tipoImportacao === 'rotas' && parseResultadoRotas && (
                 <>
-                  <div className="rounded-xl bg-violet-50 ring-1 ring-violet-200 px-3 py-2">
-                    <div className="text-[9.5px] font-black uppercase tracking-wider text-violet-700">Entregadores</div>
-                    <div className="text-[18px] font-black tabular-nums text-violet-800 leading-tight">{parseResultadoRotas.totalEntregadoresUnicos}</div>
+                  <div className="rounded-xl bg-violet-400/12 ring-1 ring-violet-400/30 px-3 py-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-violet-300">Entregadores</div>
+                    <div className="text-[18px] font-black tabular-nums text-violet-200 leading-tight">{parseResultadoRotas.totalEntregadoresUnicos}</div>
                   </div>
-                  <div className="rounded-xl bg-amber-50 ring-1 ring-amber-200 px-3 py-2">
-                    <div className="text-[9.5px] font-black uppercase tracking-wider text-amber-700">Duplicados</div>
-                    <div className="text-[18px] font-black tabular-nums text-amber-800 leading-tight">{parseResultadoRotas.duplicadosInternos}</div>
+                  <div className="rounded-xl bg-amber-400/12 ring-1 ring-amber-400/30 px-3 py-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-amber-300">Duplicados</div>
+                    <div className="text-[18px] font-black tabular-nums text-amber-200 leading-tight">{parseResultadoRotas.duplicadosInternos}</div>
                   </div>
-                  <div className="rounded-xl bg-sky-50 ring-1 ring-sky-200 px-3 py-2">
-                    <div className="text-[9.5px] font-black uppercase tracking-wider text-sky-700">Rotas</div>
-                    <div className="text-[18px] font-black tabular-nums text-sky-800 leading-tight">{parseResultadoRotas.rotas.length}</div>
+                  <div className="rounded-xl bg-sky-400/12 ring-1 ring-sky-400/30 px-3 py-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-sky-300">Rotas</div>
+                    <div className="text-[18px] font-black tabular-nums text-sky-200 leading-tight">{parseResultadoRotas.rotas.length}</div>
                   </div>
                 </>
               )}
               {tipoImportacao === 'zonas' && parseResultadoZonas && (
                 <>
-                  <div className="rounded-xl bg-rose-50 ring-1 ring-rose-200 px-3 py-2">
-                    <div className="text-[9.5px] font-black uppercase tracking-wider text-rose-700">Zonas</div>
-                    <div className="text-[18px] font-black tabular-nums text-rose-800 leading-tight">{parseResultadoZonas.totalZonasUnicas}</div>
+                  <div className="rounded-xl bg-rose-400/12 ring-1 ring-rose-400/30 px-3 py-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-rose-300">Zonas</div>
+                    <div className="text-[18px] font-black tabular-nums text-rose-200 leading-tight">{parseResultadoZonas.totalZonasUnicas}</div>
                   </div>
-                  <div className="rounded-xl bg-amber-50 ring-1 ring-amber-200 px-3 py-2">
-                    <div className="text-[9.5px] font-black uppercase tracking-wider text-amber-700">Duplicados</div>
-                    <div className="text-[18px] font-black tabular-nums text-amber-800 leading-tight">{parseResultadoZonas.duplicadosInternos}</div>
+                  <div className="rounded-xl bg-amber-400/12 ring-1 ring-amber-400/30 px-3 py-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-amber-300">Duplicados</div>
+                    <div className="text-[18px] font-black tabular-nums text-amber-200 leading-tight">{parseResultadoZonas.duplicadosInternos}</div>
                   </div>
-                  <div className="rounded-xl bg-sky-50 ring-1 ring-sky-200 px-3 py-2">
-                    <div className="text-[9.5px] font-black uppercase tracking-wider text-sky-700">Objetos zona</div>
-                    <div className="text-[18px] font-black tabular-nums text-sky-800 leading-tight">{parseResultadoZonas.zonas.length}</div>
+                  <div className="rounded-xl bg-sky-400/12 ring-1 ring-sky-400/30 px-3 py-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-sky-300">Objetos zona</div>
+                    <div className="text-[18px] font-black tabular-nums text-sky-200 leading-tight">{parseResultadoZonas.zonas.length}</div>
                   </div>
                 </>
               )}
             </div>
 
             {tipoImportacao === 'zonas' && parseResultadoZonas?.ok && (
-              <div className="rounded-xl bg-gradient-to-br from-rose-50 to-orange-50 ring-1 ring-rose-200/80 px-3.5 py-3">
+              <div className="rounded-xl bg-gradient-to-br from-rose-400/12 to-orange-400/12 ring-1 ring-rose-400/30 px-3.5 py-3">
                 <div className="flex items-start gap-2.5">
-                  <div className="shrink-0 mt-0.5"><Truck className="h-4 w-4 text-rose-600" /></div>
+                  <div className="shrink-0 mt-0.5"><Truck className="h-4 w-4 text-rose-300" /></div>
                   <div className="flex-1 min-w-0 space-y-2">
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-wider text-rose-800 mb-1">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-rose-200 mb-1">
                         Entregador destino (evita ter que mover depois)
                       </p>
-                      <p className="text-[11.5px] text-rose-700 leading-relaxed">
+                      <p className="text-[11.5px] text-rose-300 leading-relaxed">
                         Escolhendo abaixo, os pacotes <strong className="font-black">já importam DIRETO para o entregador selecionado</strong>,
                         sem passar por zona temporária. Deixe vazio para usar o comportamento padrão (zone_name como entregador temporário, depois mover).
                       </p>
                     </div>
                     <div>
-                      <Label className="!text-[10.5px] !font-black uppercase tracking-wider text-rose-800 mb-1">
+                      <Label className="!text-[10.5px] !font-black uppercase tracking-wider text-rose-200 mb-1">
                         Destino final
                       </Label>
                       <select
                         value={zonaEntregadorDestino}
                         onChange={(e) => setZonaEntregadorDestino(e.target.value)}
                         disabled={importandoRodando}
-                        className="w-full h-10 rounded-xl border border-rose-200 bg-white px-3 text-[12.5px] text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition disabled:opacity-60"
+                        className="w-full h-10 rounded-xl border border-rose-400/30 bg-white/[0.06] px-3 text-[12.5px] text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition disabled:opacity-60"
                       >
                         <option value="">⏳ Criar zona temporária com zone_name (padrão)</option>
                         {entregadoresCadastrados.length === 0 && (
@@ -1678,12 +1678,12 @@ function ModalImportarJson({
             )}
 
             <div>
-              <p className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mb-1.5">
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
                 {tipoImportacao === 'rotas' ? 'Por entregador' : 'Por zona (agrupa antes de atribuir entregador)'}
               </p>
-              <div className="rounded-xl bg-white ring-1 ring-neutral-200 divide-y divide-neutral-100 overflow-hidden">
+              <div className="rounded-xl bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-1 ring-white/10 divide-y divide-white/10 overflow-hidden">
                 {(tipoImportacao === 'rotas' ? porEntregadorEntries : porZonaEntries).length === 0 && (
-                  <div className="px-3 py-3 text-[12px] text-neutral-400 text-center">Nenhum ID encontrado</div>
+                  <div className="px-3 py-3 text-[12px] text-slate-400 text-center">Nenhum ID encontrado</div>
                 )}
                 {(tipoImportacao === 'rotas' ? porEntregadorEntries : porZonaEntries).map(([nome, ids], idx) => {
                   const maxQtd = Math.max(...(tipoImportacao === 'rotas' ? porEntregadorEntries : porZonaEntries).map(([, x]) => x.length), 1);
@@ -1692,20 +1692,20 @@ function ModalImportarJson({
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="inline-flex items-center gap-1.5 min-w-0">
                           {tipoImportacao === 'rotas' ? (
-                            <Truck className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                            <Truck className="h-3.5 w-3.5 text-violet-300 shrink-0" />
                           ) : (
-                            <MapPin className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                            <MapPin className="h-3.5 w-3.5 text-rose-300 shrink-0" />
                           )}
-                          <span className="text-[12.5px] font-black text-neutral-900 truncate">{nome}</span>
+                          <span className="text-[12.5px] font-black text-white truncate">{nome}</span>
                           <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ring-1 text-[10px] font-black tabular-nums ${
                             tipoImportacao === 'rotas'
-                              ? 'bg-violet-50 text-violet-700 ring-violet-200'
-                              : 'bg-rose-50 text-rose-700 ring-rose-200'
+                              ? 'bg-violet-400/12 text-violet-300 ring-violet-400/30'
+                              : 'bg-rose-400/12 text-rose-300 ring-rose-400/30'
                           }`}>
                             {ids.length}
                           </span>
                         </div>
-                        <span className="text-[10px] font-bold text-neutral-500 tabular-nums">
+                        <span className="text-[10px] font-bold text-slate-400 tabular-nums">
                           {totalPrevisto > 0 ? ((ids.length / totalPrevisto) * 100).toFixed(0) : 0}%
                         </span>
                       </div>
@@ -1722,12 +1722,12 @@ function ModalImportarJson({
                       {idx === 0 && ids.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1 max-h-[60px] overflow-auto">
                           {ids.slice(0, 12).map((id) => (
-                            <span key={id} className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 ring-1 ring-neutral-200 text-[10px] font-bold tabular-nums text-neutral-700">
+                            <span key={id} className="inline-flex items-center px-1.5 py-0.5 rounded bg-white/[0.06] ring-1 ring-white/10 text-[10px] font-bold tabular-nums text-slate-300">
                               {truncate(id, 14)}
                             </span>
                           ))}
                           {ids.length > 12 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-50 text-neutral-500 text-[10px] font-bold tabular-nums">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-400 text-[10px] font-bold tabular-nums">
                               +{ids.length - 12} mais
                             </span>
                           )}
@@ -1742,32 +1742,32 @@ function ModalImportarJson({
             {importandoStatus && (
               <div className={`rounded-xl ring-1 px-3.5 py-3 ${
                 importandoRodando
-                  ? 'bg-sky-50 ring-sky-200'
-                  : 'bg-emerald-50 ring-emerald-200'
+                  ? 'bg-sky-400/12 ring-sky-400/30'
+                  : 'bg-emerald-400/12 ring-emerald-400/30'
               }`}>
                 <div className="flex items-center gap-2">
                   {importandoRodando ? (
                     <div className="h-4 w-4 border-2 border-sky-500/30 border-t-sky-600 rounded-full animate-spin shrink-0" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-300 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-black text-neutral-900">
+                    <p className="text-[12px] font-black text-white">
                       {importandoRodando
                         ? `Importando ${importandoStatus.importados} de ${importandoStatus.total}...`
                         : 'Importação concluída! 🎉'}
                     </p>
-                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/60 ring-1 ring-neutral-200/60 overflow-hidden">
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/10 ring-1 ring-white/10 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${importandoRodando ? 'bg-sky-500' : 'bg-emerald-500'}`}
                         style={{ width: `${importandoStatus.total ? ((importandoStatus.importados + importandoStatus.duplicados + importandoStatus.falhas) / importandoStatus.total) * 100 : 0}%` }}
                       />
                     </div>
-                    <p className="text-[10.5px] font-bold text-neutral-600 mt-1.5 inline-flex items-center gap-2 flex-wrap">
-                      <span className="text-emerald-700">✅ {importandoStatus.importados} novos</span>
-                      <span className="text-amber-700">🔄 {importandoStatus.duplicados} duplicados</span>
+                    <p className="text-[10.5px] font-bold text-slate-400 mt-1.5 inline-flex items-center gap-2 flex-wrap">
+                      <span className="text-emerald-300">✅ {importandoStatus.importados} novos</span>
+                      <span className="text-amber-300">🔄 {importandoStatus.duplicados} duplicados</span>
                       {importandoStatus.falhas > 0 && (
-                        <span className="text-red-700">❌ {importandoStatus.falhas} falhas</span>
+                        <span className="text-red-300">❌ {importandoStatus.falhas} falhas</span>
                       )}
                     </p>
                   </div>
@@ -1778,7 +1778,7 @@ function ModalImportarJson({
         )}
       </div>
 
-      <div className="px-5 sm:px-6 py-3.5 border-t border-neutral-100 flex items-center justify-end gap-2 bg-neutral-50/40">
+      <div className="px-5 sm:px-6 py-3.5 border-t border-white/10 flex items-center justify-end gap-2 bg-white/[0.04]">
         <Button
           size="sm"
           variant="ghost"
@@ -1845,16 +1845,16 @@ function ModalAtribuirEntregadorLote({
   }, [aberto]);
   return (
     <ModalBase aberto={aberto} aoFechar={aplicando ? () => {} : aoFechar} maxW="max-w-md">
-      <div className="px-5 py-4 border-b border-neutral-100 flex items-start justify-between gap-3">
+      <div className="px-5 py-4 border-b border-white/10 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <span className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-md">
             <UserPlus className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <h3 className="text-[17px] font-black tracking-tight text-neutral-900">
+            <h3 className="text-[17px] font-black tracking-tight text-white">
               Atribuir entregador
             </h3>
-            <p className="text-[12.5px] text-neutral-500 mt-0.5 leading-relaxed">
+            <p className="text-[12.5px] text-slate-400 mt-0.5 leading-relaxed">
               {idsSelecionados.length} pacote{idsSelecionados.length !== 1 ? 's' : ''} selecionado{idsSelecionados.length !== 1 ? 's' : ''}. Escolha o entregador destino:
             </p>
           </div>
@@ -1863,7 +1863,7 @@ function ModalAtribuirEntregadorLote({
           type="button"
           onClick={aplicando ? undefined : aoFechar}
           disabled={aplicando}
-          className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100 transition disabled:opacity-50"
+          className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-300 hover:bg-white/[0.06] transition disabled:opacity-50"
         >
           <X className="h-4 w-4" />
         </button>
@@ -1874,23 +1874,23 @@ function ModalAtribuirEntregadorLote({
           onClick={() => setEntregadorEscolhido(null)}
           className={`w-full text-left rounded-xl px-3 py-2.5 transition border ${
             entregadorEscolhido === null
-              ? 'bg-neutral-50 ring-2 ring-neutral-300 border-neutral-300'
-              : 'border-neutral-200 hover:bg-neutral-50'
+              ? 'bg-white/[0.06] ring-2 ring-white/15 border-white/15'
+              : 'border-white/10 hover:bg-white/[0.06]'
           }`}
         >
           <div className="flex items-center justify-between gap-2">
             <div className="inline-flex items-center gap-2">
-              <Ban className="h-4 w-4 text-neutral-400 shrink-0" />
-              <span className="text-[13px] font-bold text-neutral-700">Sem entregador (limpar)</span>
+              <Ban className="h-4 w-4 text-slate-400 shrink-0" />
+              <span className="text-[13px] font-bold text-slate-300">Sem entregador (limpar)</span>
             </div>
-            {entregadorEscolhido === null && <Check className="h-4 w-4 text-violet-600" />}
+            {entregadorEscolhido === null && <Check className="h-4 w-4 text-violet-300" />}
           </div>
         </button>
         <div>
-          <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500 mb-1.5">Entregadores cadastrados</p>
+          <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Entregadores cadastrados</p>
           <div className="space-y-1.5">
             {entregadoresCadastrados.length === 0 && (
-              <div className="text-[12px] text-neutral-400 text-center py-4">
+              <div className="text-[12px] text-slate-400 text-center py-4">
                 Nenhum entregador cadastrado. Use o menu &quot;Gerenciar entregadores&quot; primeiro.
               </div>
             )}
@@ -1903,16 +1903,16 @@ function ModalAtribuirEntregadorLote({
                   onClick={() => setEntregadorEscolhido(nome)}
                   className={`w-full text-left rounded-xl px-3 py-2.5 transition border ${
                     selecionado
-                      ? 'bg-violet-50 ring-2 ring-violet-300 border-violet-300'
-                      : 'border-neutral-200 hover:bg-violet-50/30'
+                      ? 'bg-violet-400/12 ring-2 ring-violet-400/40 border-violet-400/40'
+                      : 'border-white/10 hover:bg-violet-400/12'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="inline-flex items-center gap-2 min-w-0">
-                      <Truck className="h-4 w-4 text-violet-600 shrink-0" />
-                      <span className="text-[13px] font-bold text-neutral-900 truncate">{nome}</span>
+                      <Truck className="h-4 w-4 text-violet-300 shrink-0" />
+                      <span className="text-[13px] font-bold text-white truncate">{nome}</span>
                     </div>
-                    {selecionado && <Check className="h-4 w-4 text-violet-600 shrink-0" />}
+                    {selecionado && <Check className="h-4 w-4 text-violet-300 shrink-0" />}
                   </div>
                 </button>
               );
@@ -1920,7 +1920,7 @@ function ModalAtribuirEntregadorLote({
           </div>
         </div>
       </div>
-      <div className="px-5 py-3.5 border-t border-neutral-100 flex items-center justify-end gap-2 bg-neutral-50/40">
+      <div className="px-5 py-3.5 border-t border-white/10 flex items-center justify-end gap-2 bg-white/[0.04]">
         <Button
           size="sm"
           variant="ghost"
@@ -2587,33 +2587,33 @@ export default function ContagemPage() {
   const chipSync = React.useMemo(() => {
     const st = statusSincronia;
     if (st === 'sincronizando') {
-      return { bg: 'bg-amber-50', txt: 'text-amber-700', ring: 'ring-amber-200', label: 'Sincronizando', icon: RefreshCw, spin: true, pulse: true };
+      return { bg: 'bg-amber-400/12', txt: 'text-amber-300', ring: 'ring-amber-400/30', label: 'Sincronizando', icon: RefreshCw, spin: true, pulse: true };
     }
     if (st === 'offline') {
-      return { bg: 'bg-orange-50', txt: 'text-orange-700', ring: 'ring-orange-200', label: 'Fora do ar', icon: WifiOff, spin: false, pulse: false };
+      return { bg: 'bg-orange-400/12', txt: 'text-orange-300', ring: 'ring-orange-400/30', label: 'Fora do ar', icon: WifiOff, spin: false, pulse: false };
     }
     if (st === 'erro') {
-      return { bg: 'bg-red-50', txt: 'text-red-700', ring: 'ring-red-200', label: 'Erro', icon: AlertTriangle, spin: false, pulse: true };
+      return { bg: 'bg-red-400/12', txt: 'text-red-300', ring: 'ring-red-400/30', label: 'Erro', icon: AlertTriangle, spin: false, pulse: true };
     }
-    return { bg: 'bg-transparent', txt: 'text-emerald-600', ring: 'ring-transparent', label: 'OK', icon: CheckCircle2, spin: false, pulse: false };
+    return { bg: 'bg-transparent', txt: 'text-emerald-300', ring: 'ring-transparent', label: 'OK', icon: CheckCircle2, spin: false, pulse: false };
   }, [statusSincronia]);
   const SyncIcon = chipSync.icon;
 
   const botoesStatus: Array<{ k: string; label: string; colorSel: string; colorHover: string; count: number; icon: React.ComponentType<{ className?: string }> | null }> = React.useMemo(() => {
     return [
-      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-neutral-800', count: pacotesDaSaca.length, icon: null },
-      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-neutral-700', count: pacotesDaSaca.filter((p) => !p.status).length, icon: null },
-      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-700', count: pacotesDaSaca.filter((p) => p.status === 'lido').length, icon: CheckCheck },
-      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-700', count: pacotesDaSaca.filter((p) => p.status === 'entregue').length, icon: Truck },
-      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-700', count: pacotesDaSaca.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
-      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-700', count: pacotesDaSaca.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
+      { k: '__todos__', label: 'Todos', colorSel: 'bg-neutral-900 text-white', colorHover: 'hover:text-slate-300', count: pacotesDaSaca.length, icon: null },
+      { k: '__sem_status__', label: 'Sem status', colorSel: 'bg-neutral-500 text-white', colorHover: 'hover:text-slate-300', count: pacotesDaSaca.filter((p) => !p.status).length, icon: null },
+      { k: 'lido', label: 'Lido', colorSel: 'bg-sky-500 text-white', colorHover: 'hover:text-sky-300', count: pacotesDaSaca.filter((p) => p.status === 'lido').length, icon: CheckCheck },
+      { k: 'entregue', label: 'Entregue', colorSel: 'bg-emerald-500 text-white', colorHover: 'hover:text-emerald-300', count: pacotesDaSaca.filter((p) => p.status === 'entregue').length, icon: Truck },
+      { k: 'retorno', label: 'Retorno', colorSel: 'bg-orange-500 text-white', colorHover: 'hover:text-orange-300', count: pacotesDaSaca.filter((p) => p.status === 'retorno').length, icon: RefreshCw },
+      { k: 'devolucao', label: 'Devolução', colorSel: 'bg-rose-500 text-white', colorHover: 'hover:text-rose-300', count: pacotesDaSaca.filter((p) => p.status === 'devolucao').length, icon: Undo2 },
     ];
   }, [pacotesDaSaca]);
 
   const acaoMenu = (fn: () => void) => { fn(); setMenuAberto(false); };
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]">
+    <div className="min-h-screen bg-transparent">
       <ModalNovaSaca />
       <ModalHistoricoSacas />
       <ModalMoverPacote
@@ -2723,13 +2723,14 @@ export default function ContagemPage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4 animate-fade-in">
+      <div className="max-w-[1580px] mx-auto px-2 sm:px-3 lg:px-4 py-3 sm:py-5 space-y-4 sm:space-y-5 animate-fade-in">
         {/* ===== HEADER COMPACTO ===== */}
-        <header className="relative overflow-hidden flex items-center gap-2 sm:gap-3 bg-white rounded-2xl px-3 sm:px-4 py-2.5 border border-neutral-200/70 shadow-sm">
-          <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-ml-blue via-violet-500 to-emerald-400" />
+        <header className="relative overflow-hidden flex items-center gap-3 sm:gap-4 bg-[linear-gradient(135deg,rgba(19,29,50,0.94),rgba(11,19,34,0.9))] rounded-[1.9rem] px-4 sm:px-5 py-3.5 border border-white/10 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r from-ml-blue via-violet-500 to-emerald-400" />
+          <span aria-hidden className="absolute -top-20 right-0 h-48 w-48 rounded-full bg-blue-400/120/10 blur-3xl" />
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-sm">
-              <Boxes className="h-4 w-4" />
+            <div className="h-11 w-11 shrink-0 rounded-2xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-[0_14px_28px_rgba(52,131,250,0.22)]">
+              <Boxes className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
               <button
@@ -2737,14 +2738,14 @@ export default function ContagemPage() {
                 onClick={abrirHistoricoSacas}
                 className="text-left w-full group"
               >
-                <h1 className="text-[15px] sm:text-[16px] font-black tracking-tight text-neutral-900 truncate leading-tight">
+                <h1 className="text-[17px] sm:text-[18px] font-black tracking-tight text-white truncate leading-tight">
                   {sacaAtiva ? sacaAtiva.nome : (!sacas.length ? 'Contagem' : 'Escolher saca')}
                 </h1>
-                <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px] sm:text-[11px] text-neutral-500 font-semibold">
+                <div className="flex items-center gap-1.5 mt-1 text-[10.5px] sm:text-[11px] text-slate-400 font-semibold">
                   {sacaAtiva ? (
                     <>
                       <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ring-1 ${
-                        sacaAtiva.status === 'aberta' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-neutral-100 text-neutral-600 ring-neutral-200'
+                        sacaAtiva.status === 'aberta' ? 'bg-emerald-400/12 text-emerald-300 ring-emerald-400/30' : 'bg-white/[0.06] text-slate-400 ring-white/10'
                       }`}>
                         {sacaAtiva.status === 'aberta' ? <Unlock className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
                         {sacaAtiva.status === 'aberta' ? 'Aberta' : 'Fechada'}
@@ -2754,7 +2755,7 @@ export default function ContagemPage() {
                       </span>
                     </>
                   ) : (
-                    <span className="text-amber-700">Sem saca ativa · clique para escolher</span>
+                    <span className="text-amber-300">Sem saca ativa · clique para escolher</span>
                   )}
                 </div>
               </button>
@@ -2794,7 +2795,7 @@ export default function ContagemPage() {
                 type="button"
                 onClick={() => setMenuAberto((v) => !v)}
                 className={`h-9 w-9 rounded-xl flex items-center justify-center transition ${
-                  menuAberto ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+                  menuAberto ? 'bg-white/[0.06] text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-300'
                 }`}
                 aria-label="Menu"
                 title="Ações"
@@ -2807,9 +2808,9 @@ export default function ContagemPage() {
               </button>
 
               {menuAberto && (
-                <div className="absolute right-0 top-full mt-1.5 w-[260px] sm:w-[280px] bg-white rounded-2xl shadow-2xl border border-neutral-200 p-1.5 z-[80] animate-slide-up">
-                  <div className="px-2.5 py-1.5 border-b border-neutral-100 mb-1">
-                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Sincronia</p>
+                <div className="absolute right-0 top-full mt-1.5 w-[260px] sm:w-[280px] bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl shadow-2xl border border-white/10 p-1.5 z-[80] animate-slide-up">
+                  <div className="px-2.5 py-1.5 border-b border-white/10 mb-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">Sincronia</p>
                   </div>
                   <button
                     type="button"
@@ -2826,9 +2827,9 @@ export default function ContagemPage() {
                       }
                     })}
                     disabled={sincronizando}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition disabled:opacity-60"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition disabled:opacity-60"
                   >
-                    <RefreshCw className={`h-4 w-4 text-emerald-600 shrink-0 ${sincronizando ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`h-4 w-4 text-emerald-300 shrink-0 ${sincronizando ? 'animate-spin' : ''}`} />
                     Sincronizar agora
                   </button>
                   <button
@@ -2858,26 +2859,26 @@ export default function ContagemPage() {
                         setDiagnostico({ etapa: '❌ Exceção', ok: false, detalhe: msg });
                       }
                     })}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
-                    <Database className="h-4 w-4 text-sky-600 shrink-0" />
+                    <Database className="h-4 w-4 text-sky-300 shrink-0" />
                     Diagnóstico banco
                   </button>
 
-                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
-                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Entregadores</p>
+                  <div className="px-2.5 py-1.5 border-b border-t border-white/10 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">Entregadores</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => acaoMenu(() => setGerenciarEntregadoresAberto(true))}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
-                    <Users className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <Users className="h-4 w-4 text-indigo-300 shrink-0" />
                     Gerenciar entregadores
                   </button>
 
-                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
-                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Importação de rotas e zonas ML</p>
+                  <div className="px-2.5 py-1.5 border-b border-t border-white/10 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">Importação de rotas e zonas ML</p>
                   </div>
                   <button
                     type="button"
@@ -2889,35 +2890,35 @@ export default function ContagemPage() {
                       setImportandoStatus(null);
                       setModalImportJsonAberto(true);
                     })}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
                     <div className="flex items-center -space-x-1">
-                      <Route className="h-4 w-4 text-violet-600 shrink-0" />
-                      <MapPin className="h-4 w-4 text-orange-600 shrink-0" />
+                      <Route className="h-4 w-4 text-violet-300 shrink-0" />
+                      <MapPin className="h-4 w-4 text-orange-300 shrink-0" />
                     </div>
                     Importar JSON rotas ou zonas
-                    <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-violet-50 to-orange-50 text-neutral-700 ring-1 ring-violet-200 text-[9.5px] font-black uppercase">
+                    <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-violet-400/12 to-orange-400/12 text-slate-300 ring-1 ring-violet-400/30 text-[9.5px] font-black uppercase">
                       NEW
                     </span>
                   </button>
 
-                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
-                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Backup</p>
+                  <div className="px-2.5 py-1.5 border-b border-t border-white/10 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">Backup</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => acaoMenu(() => { PacoteService.baixarArquivoBackup(); setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo.' }); setTimeout(() => setBackupMsg(null), 5000); })}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
-                    <FileJson className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <FileJson className="h-4 w-4 text-emerald-300 shrink-0" />
                     Exportar JSON backup
                   </button>
                   <button
                     type="button"
                     onClick={() => acaoMenu(() => { inputArquivoRef.current?.click(); })}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
-                    <Upload className="h-4 w-4 text-neutral-700 shrink-0" />
+                    <Upload className="h-4 w-4 text-slate-300 shrink-0" />
                     Restaurar backup…
                   </button>
                   <input
@@ -2965,27 +2966,27 @@ export default function ContagemPage() {
                         setBackupMsg({ ok: false, texto: `❌ ${msg}` });
                       }
                     })}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
-                    <HardDrive className="h-4 w-4 text-neutral-600 shrink-0" />
+                    <HardDrive className="h-4 w-4 text-slate-400 shrink-0" />
                     Ver dados locais
                   </button>
 
-                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
-                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Saca</p>
+                  <div className="px-2.5 py-1.5 border-b border-t border-white/10 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">Saca</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => acaoMenu(() => abrirHistoricoSacas())}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
-                    <FolderOpen className="h-4 w-4 text-neutral-600 shrink-0" />
+                    <FolderOpen className="h-4 w-4 text-slate-400 shrink-0" />
                     Histórico de sacas
                   </button>
                   <button
                     type="button"
                     onClick={() => acaoMenu(() => abrirModalSaca())}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
                     <FolderPlus className="h-4 w-4 text-ml-blue shrink-0" />
                     Criar nova saca
@@ -2998,7 +2999,7 @@ export default function ContagemPage() {
                         if (confirm(`Remover TODOS os ${pacotes.length} pacotes da saca "${sacaAtiva.nome}"?`)) void limpar();
                       }}
                       disabled={!pacotes.length}
-                      className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-red-700 hover:bg-red-50 transition disabled:opacity-60"
+                      className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-red-300 hover:bg-red-400/12 transition disabled:opacity-60"
                     >
                       <Trash2 className="h-4 w-4 shrink-0" />
                       Limpar saca atual
@@ -3011,26 +3012,26 @@ export default function ContagemPage() {
                         setMenuAberto(false);
                         confirmarFecharSaca();
                       }}
-                      className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                      className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                     >
-                      <Lock className="h-4 w-4 text-neutral-600 shrink-0" />
+                      <Lock className="h-4 w-4 text-slate-400 shrink-0" />
                       Fechar saca atual
                     </button>
                   )}
 
-                  <div className="px-2.5 py-1.5 border-b border-t border-neutral-100 my-1">
-                    <p className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500">Preferências</p>
+                  <div className="px-2.5 py-1.5 border-b border-t border-white/10 my-1">
+                    <p className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">Preferências</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSom((s) => !s)}
-                    className="w-full text-left flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-neutral-800 hover:bg-neutral-50 transition"
+                    className="w-full text-left flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
                     <span className="flex items-center gap-2">
-                      {som ? <Volume2 className="h-4 w-4 text-emerald-600 shrink-0" /> : <VolumeX className="h-4 w-4 text-neutral-500 shrink-0" />}
+                      {som ? <Volume2 className="h-4 w-4 text-emerald-300 shrink-0" /> : <VolumeX className="h-4 w-4 text-slate-400 shrink-0" />}
                       {som ? 'Som ativado' : 'Som desativado'}
                     </span>
-                    <div className={`h-5 w-9 rounded-full relative transition ${som ? 'bg-emerald-500' : 'bg-neutral-300'}`}>
+                    <div className={`h-5 w-9 rounded-full relative transition ${som ? 'bg-emerald-500' : 'bg-white/15'}`}>
                       <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${som ? 'left-[18px]' : 'left-0.5'}`} />
                     </div>
                   </button>
@@ -3042,7 +3043,7 @@ export default function ContagemPage() {
 
         {/* ===== SEM SACA: TELA BOAS-VINDAS MINIMALISTA ===== */}
         {!sacaAtiva && (
-          <div className="bg-white rounded-2xl border border-neutral-200/70 shadow-sm px-4 sm:px-6 py-6 sm:py-10">
+          <div className="bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl border border-white/10 shadow-sm px-4 sm:px-6 py-6 sm:py-10">
             <div className="text-center max-w-lg mx-auto">
               <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-lg mx-auto mb-4">
                 <Package className="h-7 w-7" />
@@ -3050,10 +3051,10 @@ export default function ContagemPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-ml-blue mb-2">
                 {hojeFormatado}
               </p>
-              <h2 className="text-[22px] sm:text-[26px] font-black tracking-tight text-neutral-900 leading-tight">
+              <h2 className="text-[22px] sm:text-[26px] font-black tracking-tight text-white leading-tight">
                 {sacaHoje ? 'Continue a contagem de hoje' : 'Vamos começar a contagem'}
               </h2>
-              <p className="text-[13px] text-neutral-500 mt-2 leading-relaxed">
+              <p className="text-[13px] text-slate-400 mt-2 leading-relaxed">
                 {sacaHoje
                   ? 'Selecione uma saca existente abaixo ou crie uma nova para separar lotes.'
                   : 'Cada lote/dia é uma "saca" separada. Crie a saca de hoje para começar a escanear.'}
@@ -3094,7 +3095,7 @@ export default function ContagemPage() {
             </div>
 
             {sacas.length > 0 && (
-              <div className="mt-6 sm:mt-8 pt-6 border-t border-neutral-100">
+              <div className="mt-6 sm:mt-8 pt-6 border-t border-white/10">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {sacas.slice(0, 9).map((s) => {
                     const r = resumos.find((x) => x.saca.id === s.id);
@@ -3108,19 +3109,19 @@ export default function ContagemPage() {
                         onClick={() => void definirSacaAtiva(s.id)}
                         className={`text-left rounded-xl p-3 border transition hover:shadow-sm ${
                           ehHoje
-                            ? 'bg-sky-50/50 border-sky-200/60'
-                            : 'bg-white border-neutral-200 hover:border-neutral-300'
+                            ? 'bg-sky-400/12 border-sky-400/30'
+                            : 'bg-white/[0.06] border-white/10 hover:border-white/15'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {ehHoje && (
-                              <span className="text-[9.5px] font-black uppercase tracking-wider text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded-md shrink-0">
+                              <span className="text-[9.5px] font-black uppercase tracking-wider text-sky-300 bg-sky-400/15 px-1.5 py-0.5 rounded-md shrink-0">
                                 HOJE
                               </span>
                             )}
                             <span
-                              className={`font-black tracking-tight truncate ${ehHoje ? 'text-[14px] text-neutral-900' : 'text-[13px] text-neutral-800'}`}
+                              className={`font-black tracking-tight truncate ${ehHoje ? 'text-[14px] text-white' : 'text-[13px] text-slate-300'}`}
                             >
                               {s.nome}
                             </span>
@@ -3128,8 +3129,8 @@ export default function ContagemPage() {
                           <span
                             className={`text-[9.5px] font-black uppercase px-1.5 py-0.5 rounded-md shrink-0 ring-1 ${
                               s.status === 'aberta'
-                                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                                : 'bg-neutral-100 text-neutral-600 ring-neutral-200'
+                                ? 'bg-emerald-400/12 text-emerald-300 ring-emerald-400/30'
+                                : 'bg-white/[0.06] text-slate-400 ring-white/10'
                             }`}
                           >
                             {s.status === 'aberta' ? 'Aberta' : 'Fechada'}
@@ -3137,12 +3138,12 @@ export default function ContagemPage() {
                         </div>
                         <div className="mt-2.5 flex items-end justify-between gap-2">
                           <div>
-                            <div className="text-[20px] font-black tabular-nums leading-none text-neutral-900">
+                            <div className="text-[20px] font-black tabular-nums leading-none text-white">
                               {r ? r.unicos : 0}
                             </div>
-                            <div className="text-[10px] font-bold text-neutral-500 mt-0.5">IDs</div>
+                            <div className="text-[10px] font-bold text-slate-400 mt-0.5">IDs</div>
                           </div>
-                          <div className="text-right text-[10px] text-neutral-500 font-semibold">
+                          <div className="text-right text-[10px] text-slate-400 font-semibold">
                             {dia}
                           </div>
                         </div>
@@ -3163,41 +3164,41 @@ export default function ContagemPage() {
                 {
                   n: escopo.unicos,
                   lab: filtroEntregador === '__todos__' && filtroStatus === '__todos__' ? 'IDs únicos' : 'Filtrado únicos',
-                  cor: 'text-neutral-900',
-                  corLab: 'text-neutral-500',
-                  badge: ultimoLido ? { txt: 'Último: #' + ultimoLido.codigo_pacote, cor: 'bg-emerald-50 text-emerald-700 ring-emerald-200' } : null,
+                  cor: 'text-white',
+                  corLab: 'text-slate-400',
+                  badge: ultimoLido ? { txt: 'Último: #' + ultimoLido.codigo_pacote, cor: 'bg-emerald-400/12 text-emerald-300 ring-emerald-400/30' } : null,
                 },
                 {
                   n: escopo.total,
                   lab: 'Leituras totais',
                   cor: 'text-ml-blue',
-                  corLab: 'text-neutral-500',
+                  corLab: 'text-slate-400',
                   badge: escopo.unicos !== escopo.total
-                    ? { txt: `${escopo.total - escopo.unicos} dup. bloqueadas`, cor: 'bg-amber-50 text-amber-700 ring-amber-200' }
+                    ? { txt: `${escopo.total - escopo.unicos} dup. bloqueadas`, cor: 'bg-amber-400/12 text-amber-300 ring-amber-400/30' }
                     : escopo.total > 0
-                    ? { txt: '100% únicos', cor: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
+                    ? { txt: '100% únicos', cor: 'bg-emerald-400/12 text-emerald-300 ring-emerald-400/30' }
                     : null,
                 },
                 {
                   n: filtroEntregador !== '__todos__' ? (escopo.total > 0 ? 1 : 0) : escopo.entregadores,
                   lab: 'Entregadores',
-                  cor: 'text-violet-600',
-                  corLab: 'text-neutral-500',
-                  badge: entregadorAtivo ? { txt: 'Ativo: ' + entregadorAtivo, cor: 'bg-violet-50 text-violet-700 ring-violet-200' } : null,
+                  cor: 'text-violet-300',
+                  corLab: 'text-slate-400',
+                  badge: entregadorAtivo ? { txt: 'Ativo: ' + entregadorAtivo, cor: 'bg-violet-400/12 text-violet-300 ring-violet-400/30' } : null,
                 },
                 {
                   n: escopo.retornos,
                   lab: 'Retornos',
-                  cor: 'text-orange-600',
-                  corLab: 'text-neutral-500',
+                  cor: 'text-orange-300',
+                  corLab: 'text-slate-400',
                   badge: escopo.retornos > 0 && escopo.total > 0
-                    ? { txt: `${Math.round((escopo.retornos / escopo.total) * 100)}% do total`, cor: 'bg-orange-50 text-orange-700 ring-orange-200' }
+                    ? { txt: `${Math.round((escopo.retornos / escopo.total) * 100)}% do total`, cor: 'bg-orange-400/12 text-orange-300 ring-orange-400/30' }
                     : null,
                 },
               ].map((card, i) => (
                 <div
                   key={i}
-                  className="relative overflow-hidden bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
+                  className="relative overflow-hidden bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl border border-white/10 px-3 sm:px-4 py-3 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
                 >
                   <span
                     aria-hidden
@@ -3222,10 +3223,10 @@ export default function ContagemPage() {
 
             {/* ===== POR ENTREGADOR: SÓ CHIPS ===== */}
             {contagemEntregadores.length > 0 && (
-              <div className="bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm">
+              <div className="bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl border border-white/10 px-3 sm:px-4 py-3 shadow-sm">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Truck className="h-3.5 w-3.5 text-violet-500 shrink-0" />
-                  <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mr-0.5">
+                  <Truck className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-0.5">
                     Entregadores
                   </span>
                   <button
@@ -3234,20 +3235,20 @@ export default function ContagemPage() {
                     title={autoFiltraEntregadorAtivo ? 'Desligar: selecionar entregador no header NÃO filtra mais a lista' : 'Ligar: selecionar entregador no header automaticamente filtra a lista'}
                     className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-black transition ring-1 ${
                       autoFiltraEntregadorAtivo
-                        ? 'bg-violet-100 text-violet-800 ring-violet-300'
-                        : 'bg-neutral-100 text-neutral-500 ring-neutral-200 hover:bg-neutral-200'
+                        ? 'bg-violet-400/15 text-violet-200 ring-violet-400/40'
+                        : 'bg-white/[0.06] text-slate-400 ring-white/10 hover:bg-white/10'
                     }`}
                   >
                     {autoFiltraEntregadorAtivo ? '🔗 AUTO' : '⛓️ OFF'}
                   </button>
-                  <div className="w-px h-4 bg-neutral-200 mx-0.5" />
+                  <div className="w-px h-4 bg-white/10 mx-0.5" />
                   <button
                     type="button"
                     onClick={() => setFiltroEntregador('__todos__')}
                     className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
                       filtroEntregador === '__todos__'
                         ? 'bg-neutral-900 text-white'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        : 'bg-white/[0.06] text-slate-400 hover:bg-white/10'
                     }`}
                   >
                     Todos
@@ -3263,14 +3264,14 @@ export default function ContagemPage() {
                           selecionado
                             ? 'bg-violet-600 text-white shadow-sm'
                             : nome === 'Sem entregador'
-                            ? 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                            : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                            ? 'bg-white/[0.06] text-slate-400 hover:bg-white/10'
+                            : 'bg-violet-400/12 text-violet-300 hover:bg-violet-400/15'
                         }`}
                       >
                         <span className="truncate max-w-[140px]">{nome}</span>
                         <span
                           className={`tabular-nums font-black text-[10.5px] px-1 py-0.5 rounded ${
-                            selecionado ? 'bg-white/20' : 'bg-white/70'
+                            selecionado ? 'bg-white/20' : 'bg-white/10'
                           }`}
                         >
                           {qtd}
@@ -3278,7 +3279,7 @@ export default function ContagemPage() {
                         {retornos > 0 && (
                           <span
                             className={`inline-flex items-center gap-0.5 tabular-nums font-black text-[10.5px] px-1 py-0.5 rounded ${
-                              selecionado ? 'bg-orange-400/30 text-white' : 'bg-orange-100 text-orange-700'
+                              selecionado ? 'bg-orange-400/30 text-white' : 'bg-orange-400/15 text-orange-300'
                             }`}
                           >
                             <RefreshCw className="h-2 w-2" />
@@ -3293,8 +3294,8 @@ export default function ContagemPage() {
             )}
 
             {/* ===== MODO LEITURA ===== */}
-            <div className={`bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm ${bloqueado ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-neutral-100 mb-3">
+            <div className={`bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl border border-white/10 px-3 sm:px-4 py-3 shadow-sm ${bloqueado ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-white/[0.06] mb-3">
                 {(Object.keys(MODO_META) as Modo[]).map((m) => {
                   const meta = MODO_META[m];
                   const Icon = meta.icon;
@@ -3306,7 +3307,7 @@ export default function ContagemPage() {
                       className={`rounded-lg py-2.5 px-2 flex items-center justify-center gap-1.5 font-bold text-[12px] transition ${
                         ativo
                           ? 'bg-gradient-to-r from-ml-blue to-violet-500 text-white shadow-sm shadow-indigo-500/30'
-                          : 'text-neutral-500 hover:text-neutral-700'
+                          : 'text-slate-400 hover:text-slate-300'
                       }`}
                     >
                       <Icon className={`h-4 w-4 ${ativo ? 'text-white' : ''}`} />
@@ -3345,7 +3346,7 @@ export default function ContagemPage() {
                     </Button>
                   </div>
                   {entregadorAtivo && (
-                    <p className="text-[10.5px] font-bold text-violet-700 inline-flex items-center gap-1">
+                    <p className="text-[10.5px] font-bold text-violet-300 inline-flex items-center gap-1">
                       <Truck className="h-3 w-3" /> Lançando em: {entregadorAtivo}
                     </p>
                   )}
@@ -3377,7 +3378,7 @@ export default function ContagemPage() {
                         spellCheck={false}
                       />
                       {codigoManual.trim() && (
-                        <p className="text-[10.5px] font-bold text-neutral-600">
+                        <p className="text-[10.5px] font-bold text-slate-400">
                           {(() => {
                             const qtd = Array.from(
                               new Set(
@@ -3388,7 +3389,7 @@ export default function ContagemPage() {
                               ),
                             ).length;
                             return (
-                              <span className={qtd > 1 ? 'text-indigo-600' : ''}>
+                              <span className={qtd > 1 ? 'text-indigo-300' : ''}>
                                 {qtd} ID{qtd !== 1 ? 's' : ''} pronto{qtd !== 1 ? 's' : ''}
                               </span>
                             );
@@ -3407,7 +3408,7 @@ export default function ContagemPage() {
                     </Button>
                   </div>
                   {entregadorAtivo && (
-                    <p className="text-[10.5px] font-bold text-violet-700 inline-flex items-center gap-1">
+                    <p className="text-[10.5px] font-bold text-violet-300 inline-flex items-center gap-1">
                       <Truck className="h-3 w-3" /> Lançando em: {entregadorAtivo}
                     </p>
                   )}
@@ -3417,7 +3418,7 @@ export default function ContagemPage() {
 
             <>
                 {/* ===== FILTROS COMPACTOS ===== */}
-                <div className="flex items-center gap-2 flex-wrap bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-2.5 shadow-sm">
+                <div className="flex items-center gap-2 flex-wrap bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl border border-white/10 px-3 sm:px-4 py-2.5 shadow-sm">
                   <label className="inline-flex items-center gap-1.5 cursor-pointer select-none shrink-0">
                     <input
                       type="checkbox"
@@ -3430,15 +3431,15 @@ export default function ContagemPage() {
                         if (e.target.checked) selecionarTodosFiltrados();
                         else limparSelecao();
                       }}
-                      className="h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      className="h-4 w-4 rounded border-white/15 text-indigo-300 focus:ring-indigo-500 cursor-pointer"
                     />
-                    <span className="text-[11px] font-black text-neutral-700 hidden sm:inline">
+                    <span className="text-[11px] font-black text-slate-300 hidden sm:inline">
                       {selecionados.size > 0 ? `${selecionados.size} selec.` : 'Selecionar'}
                     </span>
                   </label>
-                  <div className="w-px h-5 bg-neutral-200 mx-0.5 shrink-0" />
+                  <div className="w-px h-5 bg-white/10 mx-0.5 shrink-0" />
                   <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
-                    <Search className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                    <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     <Input
                       placeholder={`Buscar ${filtrados.length} ${filtrados.length === 1 ? 'ID…' : 'IDs…'}`}
                       value={filtro}
@@ -3446,11 +3447,11 @@ export default function ContagemPage() {
                       className="!h-8 !text-[13px] !px-2 !border-0 !ring-0 !p-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 !bg-transparent"
                     />
                   </div>
-                  <div className="w-px h-5 bg-neutral-200 mx-0.5 shrink-0" />
+                  <div className="w-px h-5 bg-white/10 mx-0.5 shrink-0" />
                   <div className={`sm:hidden inline-flex items-center gap-1 px-1.5 py-1 rounded-lg ring-1 ${chipSync.bg} ${chipSync.txt} ${chipSync.ring} ${chipSync.pulse ? 'animate-pulse' : ''}`}>
                     <SyncIcon className={`h-2.5 w-2.5 ${chipSync.spin ? 'animate-spin' : ''}`} />
                   </div>
-                  <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg shrink-0 flex-wrap">
+                  <div className="flex items-center gap-1 bg-white/[0.06] p-0.5 rounded-lg shrink-0 flex-wrap">
                     {botoesStatus.map((b) => {
                       const Icon = b.icon;
                       const sel = filtroStatus === b.k;
@@ -3460,26 +3461,26 @@ export default function ContagemPage() {
                           type="button"
                           onClick={() => setFiltroStatus(b.k as typeof filtroStatus)}
                           className={`px-2 py-1 rounded-md text-[11px] font-bold transition inline-flex items-center gap-1 ${
-                            sel ? b.colorSel : `text-neutral-500 ${b.colorHover}`
+                            sel ? b.colorSel : `text-slate-400 ${b.colorHover}`
                           }`}
                         >
                           {Icon && <Icon className="h-2.5 w-2.5" />}
                           {b.label}
-                          <span className={`tabular-nums opacity-80 ${sel ? 'text-white/90' : 'text-neutral-400'}`}>
+                          <span className={`tabular-nums opacity-80 ${sel ? 'text-white/90' : 'text-slate-400'}`}>
                             {b.count}
                           </span>
                         </button>
                       );
                     })}
                   </div>
-                  <div className="text-[10.5px] font-semibold text-neutral-500 shrink-0">
+                  <div className="text-[10.5px] font-semibold text-slate-400 shrink-0">
                     {filtrados.length}/{pacotesDaSaca.length}
                   </div>
                   <button
                     type="button"
                     onClick={removerTodosDaSaca}
                     disabled={!pacotesDaSaca.length}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black uppercase tracking-wider text-red-600 ring-1 ring-red-200 bg-red-50 hover:bg-red-100 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black uppercase tracking-wider text-red-300 ring-1 ring-red-400/30 bg-red-400/12 hover:bg-red-400/15 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     title="Remover todos os pacotes desta saca (definitivo)"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -3488,21 +3489,21 @@ export default function ContagemPage() {
                 </div>
 
                 {selecionados.size > 0 && (
-                  <div className="sticky top-0 z-20 bg-gradient-to-r from-indigo-50 via-violet-50 to-fuchsia-50 rounded-2xl border border-indigo-200 px-3 sm:px-4 py-2.5 shadow-sm flex items-center gap-2 sm:gap-3 flex-wrap animate-fade-in">
+                  <div className="sticky top-0 z-20 bg-gradient-to-r from-indigo-400/12 via-violet-400/12 to-fuchsia-400/12 rounded-2xl border border-indigo-400/30 px-3 sm:px-4 py-2.5 shadow-sm flex items-center gap-2 sm:gap-3 flex-wrap animate-fade-in">
                     <div className="inline-flex items-center gap-1.5 shrink-0">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
                         <CheckSquare className="h-3.5 w-3.5" />
                       </span>
                       <div className="leading-tight">
-                        <div className="text-[12px] font-black text-indigo-900">
+                        <div className="text-[12px] font-black text-indigo-200">
                           {selecionados.size} pacote{selecionados.size !== 1 ? 's' : ''} selecionado{selecionados.size !== 1 ? 's' : ''}
                         </div>
-                        <div className="text-[10px] font-bold text-indigo-600/80">
+                        <div className="text-[10px] font-bold text-indigo-300/80">
                           Clique num status abaixo para marcar todos de uma vez
                         </div>
                       </div>
                     </div>
-                    <div className="h-5 w-px bg-indigo-200/80 shrink-0 hidden sm:block" />
+                    <div className="h-5 w-px bg-indigo-400/30 shrink-0 hidden sm:block" />
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap flex-1 min-w-0">
                       {([
                         { st: 'lido' as const,      Icon: CheckCheck, bg: 'bg-sky-600 hover:bg-sky-700', label: 'Marcar lidos' },
@@ -3558,7 +3559,7 @@ export default function ContagemPage() {
                     <button
                       type="button"
                       onClick={limparSelecao}
-                      className="ml-auto inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white ring-1 ring-indigo-200 text-indigo-700 hover:bg-indigo-50 text-[11px] font-black shadow-sm transition shrink-0"
+                      className="ml-auto inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/[0.06] ring-1 ring-indigo-400/30 text-indigo-300 hover:bg-indigo-400/12 text-[11px] font-black shadow-sm transition shrink-0"
                     >
                       <X className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Limpar</span>
@@ -3568,16 +3569,16 @@ export default function ContagemPage() {
 
                 {/* ===== LISTA PACOTES COMPACTA ===== */}
                 {!filtrados.length ? (
-                  <div className="bg-white rounded-2xl border border-neutral-200/70 px-4 py-10 text-center shadow-sm">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 mx-auto mb-3">
+                  <div className="bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] rounded-2xl border border-white/10 px-4 py-10 text-center shadow-sm">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-slate-400 mx-auto mb-3">
                       <Package className="h-6 w-6" />
                     </div>
-                    <h3 className="text-[14px] font-bold text-neutral-900">
+                    <h3 className="text-[14px] font-bold text-white">
                       {pacotes.length
                         ? 'Nenhum resultado nos filtros'
                         : 'Nenhum pacote escaneado ainda'}
                     </h3>
-                    <p className="text-[12px] text-neutral-500 mt-1">
+                    <p className="text-[12px] text-slate-400 mt-1">
                       {pacotes.length
                         ? 'Ajuste a busca ou os filtros.'
                         : 'Use câmera, leitor ou digite acima.'}
@@ -3602,33 +3603,33 @@ export default function ContagemPage() {
                       return (
                         <div
                           key={p.id}
-                          className={`bg-white rounded-xl border transition-all duration-300 flex items-center gap-2 sm:gap-2.5 px-2 sm:px-2.5 py-2 ${
+                          className={`bg-white/[0.06] rounded-xl border transition-all duration-300 flex items-center gap-2 sm:gap-2.5 px-2 sm:px-2.5 py-2 ${
                             sel
-                              ? 'ring-2 ring-indigo-400/80 border-indigo-200 bg-indigo-50/40 shadow-sm'
+                              ? 'ring-2 ring-indigo-400/80 border-indigo-400/30 bg-indigo-400/12 shadow-sm'
                               : destaque
-                              ? 'ring-2 ring-emerald-400 shadow-md bg-emerald-50/40 border-emerald-200'
+                              ? 'ring-2 ring-emerald-400 shadow-md bg-emerald-400/12 border-emerald-400/30'
                               : shaking
-                              ? 'ring-2 ring-red-400 animate-shake border-red-200 bg-red-50/40'
-                              : 'border-neutral-200/70 hover:border-neutral-300 hover:shadow-sm'
+                              ? 'ring-2 ring-red-400 animate-shake border-red-400/30 bg-red-400/12'
+                              : 'border-white/10 hover:border-white/15 hover:shadow-sm'
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={sel}
                             onChange={(e) => toggleSelecionado(p.id)}
-                            className="h-4 w-4 shrink-0 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            className="h-4 w-4 shrink-0 rounded border-white/15 text-indigo-300 focus:ring-indigo-500 cursor-pointer"
                             title={sel ? 'Desmarcar' : 'Marcar para lote'}
                           />
-                          <div className="shrink-0 text-[10px] font-black tabular-nums text-neutral-400 w-5 sm:w-7 text-center">
+                          <div className="shrink-0 text-[10px] font-black tabular-nums text-slate-400 w-5 sm:w-7 text-center">
                             {pacotes.length - idx}
                           </div>
 
                           <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-                            <span className="text-[15px] sm:text-[16px] font-black tracking-tight tabular-nums text-neutral-900 break-all leading-tight">
+                            <span className="text-[15px] sm:text-[16px] font-black tracking-tight tabular-nums text-white break-all leading-tight">
                               {p.codigo_pacote}
                             </span>
                             {p.entregador && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-[10.5px] font-black truncate max-w-[160px]">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-400/12 text-violet-300 ring-1 ring-violet-400/30 text-[10.5px] font-black truncate max-w-[160px]">
                                 <Truck className="h-2.5 w-2.5 shrink-0" />
                                 <span className="truncate">{p.entregador}</span>
                               </span>
@@ -3644,32 +3645,32 @@ export default function ContagemPage() {
                             )}
                             <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-black ring-1 ${
                               oMeta.variant === 'info' || oMeta.variant === 'default'
-                                ? 'bg-sky-50 text-sky-700 ring-sky-200'
+                                ? 'bg-sky-400/12 text-sky-300 ring-sky-400/30'
                                 : oMeta.variant === 'success'
-                                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                                : 'bg-amber-50 text-amber-700 ring-amber-200'
+                                ? 'bg-emerald-400/12 text-emerald-300 ring-emerald-400/30'
+                                : 'bg-amber-400/12 text-amber-300 ring-amber-400/30'
                             }`}>
                               {oMeta.label}
                             </span>
                             <span
                               className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-black ring-1 ${
                                 p.sincronizado
-                                  ? 'bg-emerald-50/60 text-emerald-700 ring-emerald-200/60'
-                                  : 'bg-amber-50 text-amber-700 ring-amber-200'
+                                  ? 'bg-emerald-400/12 text-emerald-300 ring-emerald-400/30'
+                                  : 'bg-amber-400/12 text-amber-300 ring-amber-400/30'
                               }`}
                             >
                               {p.sincronizado ? 'BD' : 'Local'}
                             </span>
                           </div>
 
-                          <div className="shrink-0 flex items-center gap-0.5 text-[10.5px] text-neutral-500">
+                          <div className="shrink-0 flex items-center gap-0.5 text-[10.5px] text-slate-400">
                             <Clock className="h-2.5 w-2.5 hidden sm:inline" />
                             <span className="tabular-nums hidden sm:inline">{hora}</span>
                             {([
-                              { st: 'lido',      Icon: CheckCheck, bgOn: 'bg-sky-100 text-sky-700 ring-sky-200',      bgOff: 'hover:bg-sky-50 hover:text-sky-600',       title: 'Marcar como lido' },
-                              { st: 'entregue',  Icon: Truck,     bgOn: 'bg-emerald-100 text-emerald-700 ring-emerald-200', bgOff: 'hover:bg-emerald-50 hover:text-emerald-600', title: 'Marcar entregue' },
-                              { st: 'retorno',   Icon: RefreshCw, bgOn: 'bg-orange-100 text-orange-700 ring-orange-200',  bgOff: 'hover:bg-orange-50 hover:text-orange-600',  title: 'Marcar retorno' },
-                              { st: 'devolucao', Icon: Undo2,     bgOn: 'bg-rose-100 text-rose-700 ring-rose-200',        bgOff: 'hover:bg-rose-50 hover:text-rose-600',      title: 'Marcar devolução' },
+                              { st: 'lido',      Icon: CheckCheck, bgOn: 'bg-sky-400/15 text-sky-300 ring-sky-400/30',      bgOff: 'hover:bg-sky-400/12 hover:text-sky-300',       title: 'Marcar como lido' },
+                              { st: 'entregue',  Icon: Truck,     bgOn: 'bg-emerald-400/15 text-emerald-300 ring-emerald-400/30', bgOff: 'hover:bg-emerald-400/12 hover:text-emerald-300', title: 'Marcar entregue' },
+                              { st: 'retorno',   Icon: RefreshCw, bgOn: 'bg-orange-400/15 text-orange-300 ring-orange-400/30',  bgOff: 'hover:bg-orange-400/12 hover:text-orange-300',  title: 'Marcar retorno' },
+                              { st: 'devolucao', Icon: Undo2,     bgOn: 'bg-rose-400/15 text-rose-300 ring-rose-400/30',        bgOff: 'hover:bg-rose-400/12 hover:text-rose-300',      title: 'Marcar devolução' },
                             ] as const).map(({ st, Icon, bgOn, bgOff, title }) => {
                               const ativo = p.status === st;
                               return (
@@ -3678,7 +3679,7 @@ export default function ContagemPage() {
                                   type="button"
                                   onClick={() => void definirStatus(p.id, ativo ? null : st)}
                                   className={`ml-0.5 flex h-7 w-7 items-center justify-center rounded-lg transition ring-1 ${
-                                    ativo ? `${bgOn}` : `text-neutral-400 ring-transparent ${bgOff}`
+                                    ativo ? `${bgOn}` : `text-slate-400 ring-transparent ${bgOff}`
                                   }`}
                                   title={ativo ? `Desmarcar ${STATUS_PACOTE_META[st].label}` : title}
                                 >
@@ -3689,7 +3690,7 @@ export default function ContagemPage() {
                             <button
                               type="button"
                               onClick={() => setMoverId(p.id)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-amber-50 hover:text-amber-600 transition"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-amber-400/12 hover:text-amber-300 transition"
                               title="Mover entregador"
                             >
                               <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -3697,7 +3698,7 @@ export default function ContagemPage() {
                             <button
                               type="button"
                               onClick={() => void remover(p.id)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 transition"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-red-400/12 hover:text-red-300 transition"
                               title="Remover"
                             >
                               <XCircle className="h-3.5 w-3.5" />
@@ -3714,52 +3715,52 @@ export default function ContagemPage() {
 
         {/* ===== POPUPS MENORES ===== */}
         {diagnostico && (
-          <div className={`fixed bottom-4 right-4 z-[90] w-[280px] sm:w-[380px] rounded-2xl p-3.5 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-white ring-sky-200' : 'bg-white ring-red-200'}`}>
+          <div className={`fixed bottom-4 right-4 z-[90] w-[280px] sm:w-[380px] rounded-2xl p-3.5 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-sky-400/30' : 'bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-red-400/30'}`}>
             <div className="flex items-center gap-2">
               {diagnostico.ok ? (
-                <Database className="h-4 w-4 text-sky-600 shrink-0" />
+                <Database className="h-4 w-4 text-sky-300 shrink-0" />
               ) : (
-                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+                <AlertTriangle className="h-4 w-4 text-red-300 shrink-0" />
               )}
-              <p className="text-[12px] font-black text-neutral-900">{diagnostico.etapa}</p>
+              <p className="text-[12px] font-black text-white">{diagnostico.etapa}</p>
             </div>
-            <p className="text-[11px] text-neutral-700 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
+            <p className="text-[11px] text-slate-300 mt-1 break-all leading-snug">{diagnostico.detalhe}</p>
           </div>
         )}
 
         {backupMsg && (
-          <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[92vw] rounded-2xl px-4 py-3 shadow-2xl ring-1 whitespace-pre-line animate-slide-up ${backupMsg.ok ? 'bg-emerald-50 ring-emerald-200' : 'bg-red-50 ring-red-200'}`}>
-            <p className={`text-[12px] font-bold leading-snug ${backupMsg.ok ? 'text-emerald-900' : 'text-red-900'}`}>
+          <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[92vw] rounded-2xl px-4 py-3 shadow-2xl ring-1 whitespace-pre-line animate-slide-up ${backupMsg.ok ? 'bg-emerald-400/12 ring-emerald-400/30' : 'bg-red-400/12 ring-red-400/30'}`}>
+            <p className={`text-[12px] font-bold leading-snug ${backupMsg.ok ? 'text-emerald-200' : 'text-red-200'}`}>
               {backupMsg.texto}
             </p>
           </div>
         )}
 
         {resultadoSync && !sincronizando && (
-          <div className="fixed bottom-4 right-4 z-[90] w-[270px] sm:w-[330px] rounded-2xl bg-white ring-1 ring-neutral-200 shadow-2xl p-3.5 animate-slide-up">
+          <div className="fixed bottom-4 right-4 z-[90] w-[270px] sm:w-[330px] rounded-2xl bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-1 ring-white/10 shadow-2xl p-3.5 animate-slide-up">
             <div className="flex items-center gap-2 mb-2">
               {resultadoSync.sacas.falhas === 0 && resultadoSync.pacotes.falhas === 0 ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <p className="text-[12px] font-black text-neutral-900">Sincronização OK</p>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                  <p className="text-[12px] font-black text-white">Sincronização OK</p>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <p className="text-[12px] font-black text-neutral-900">Sincronização com falhas</p>
+                  <AlertTriangle className="h-4 w-4 text-amber-300" />
+                  <p className="text-[12px] font-black text-white">Sincronização com falhas</p>
                 </>
               )}
             </div>
             <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-              <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
-                <p className="text-neutral-500 font-black uppercase tracking-wider text-[9.5px]">Sacas</p>
-                <p className="text-neutral-900 font-black tabular-nums mt-0.5">
+              <div className="rounded-xl bg-white/[0.06] p-2 ring-1 ring-white/10">
+                <p className="text-slate-400 font-black uppercase tracking-wider text-[9.5px]">Sacas</p>
+                <p className="text-white font-black tabular-nums mt-0.5">
                   {resultadoSync.sacas.sincronizados}/{resultadoSync.sacas.total}
                 </p>
               </div>
-              <div className="rounded-xl bg-neutral-50 p-2 ring-1 ring-neutral-100">
-                <p className="text-neutral-500 font-black uppercase tracking-wider text-[9.5px]">Pacotes</p>
-                <p className="text-neutral-900 font-black tabular-nums mt-0.5">
+              <div className="rounded-xl bg-white/[0.06] p-2 ring-1 ring-white/10">
+                <p className="text-slate-400 font-black uppercase tracking-wider text-[9.5px]">Pacotes</p>
+                <p className="text-white font-black tabular-nums mt-0.5">
                   {resultadoSync.pacotes.sincronizados}/{resultadoSync.pacotes.total}
                 </p>
               </div>

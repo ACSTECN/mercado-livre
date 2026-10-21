@@ -4,16 +4,16 @@ import { Check, AlertTriangle, X, Info, Loader2 } from 'lucide-react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap',
+  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold whitespace-nowrap backdrop-blur-md',
   {
     variants: {
       variant: {
-        default: 'border-neutral-200 bg-neutral-100 text-neutral-800',
-        success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        warning: 'border-amber-200 bg-amber-50 text-amber-700',
-        danger: 'border-red-200 bg-red-50 text-red-700',
-        info: 'border-blue-200 bg-blue-50 text-blue-700',
-        primary: 'border-ml-yellow/60 bg-ml-yellow/70 text-neutral-900',
+        default: 'border-white/12 bg-white/[0.07] text-slate-200',
+        success: 'border-emerald-400/30 bg-emerald-400/12 text-emerald-300',
+        warning: 'border-amber-400/30 bg-amber-400/12 text-amber-300',
+        danger: 'border-red-400/30 bg-red-400/12 text-red-300',
+        info: 'border-sky-400/30 bg-sky-400/12 text-sky-300',
+        primary: 'border-ml-yellow/40 bg-ml-yellow/90 text-neutral-950 shadow-[0_10px_24px_rgba(255,241,89,0.22)]',
       },
     },
     defaultVariants: { variant: 'default' },
