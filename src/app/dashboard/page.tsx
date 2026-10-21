@@ -4,54 +4,79 @@ export const dynamic = 'force-dynamic';
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Layers, RefreshCw, Boxes } from 'lucide-react';
+import { ArrowLeft, Layers, RefreshCw, Boxes, ChevronDown } from 'lucide-react';
 import { usePacoteStore } from '@/stores/pacoteStore';
 import { TelaDashboard } from '@/components/dashboard/TelaDashboard';
-
-type Escopo = 'saca' | 'todas';
 
 export default function DashboardPage() {
   const pacotes = usePacoteStore((s) => s.pacotes);
   const sacas = usePacoteStore((s) => s.sacas);
   const sacaAtiva = usePacoteStore((s) => s.sacaAtiva);
   const resumos = usePacoteStore((s) => s.resumos);
-  const carregar = usePacoteStore((s) => s.carregar);
   const carregarSacas = usePacoteStore((s) => s.carregarSacas);
   const carregarTodasSacas = usePacoteStore((s) => s.carregarTodasSacas);
 
-  const [escopo, setEscopo] = React.useState<Escopo>('saca');
+  const [filtroSaca, setFiltroSaca] = React.useState<string>('__todas__');
+  const [definido, setDefinido] = React.useState(false);
   const [atualizando, setAtualizando] = React.useState(false);
+  const jaDefiniuRef = React.useRef(false);
 
   const recarregar = React.useCallback(
-    async (modo: Escopo, comSpinner = false) => {
+    async (comSpinner = false) => {
       if (comSpinner) setAtualizando(true);
       try {
         await carregarSacas();
-        if (modo === 'todas') await carregarTodasSacas();
-        else await carregar();
+        await carregarTodasSacas();
       } catch {
         /* noop */
       } finally {
         if (comSpinner) setAtualizando(false);
       }
     },
-    [carregar, carregarSacas, carregarTodasSacas],
+    [carregarSacas, carregarTodasSacas],
   );
 
   React.useEffect(() => {
-    void recarregar(escopo, false);
+    void (async () => {
+      await recarregar(false);
+      setDefinido(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // define a saca padrão (a ativa) após o primeiro carregamento
   React.useEffect(() => {
-    void recarregar(escopo, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [escopo]);
+    if (!definido || jaDefiniuRef.current) return;
+    jaDefiniuRef.current = true;
+    setFiltroSaca(sacaAtiva?.id ?? '__todas__');
+  }, [definido, sacaAtiva]);
+
+  const opcoesSacas = React.useMemo(() => {
+    const porSaca = new Map<string, number>();
+    for (const p of pacotes) {
+      if (!p.saca_id) continue;
+      porSaca.set(p.saca_id, (porSaca.get(p.saca_id) ?? 0) + 1);
+    }
+    return {
+      total: pacotes.length,
+      lista: sacas.map((s) => ({
+        id: s.id,
+        nome: s.nome,
+        qtd: porSaca.get(s.id) ?? 0,
+        aberta: s.status === 'aberta',
+      })),
+    };
+  }, [pacotes, sacas]);
 
   const pacotesEscopo = React.useMemo(() => {
-    if (escopo === 'saca' && sacaAtiva) return pacotes.filter((p) => p.saca_id === sacaAtiva.id);
-    return pacotes;
-  }, [escopo, pacotes, sacaAtiva]);
+    if (filtroSaca === '__todas__') return pacotes;
+    return pacotes.filter((p) => p.saca_id === filtroSaca);
+  }, [pacotes, filtroSaca]);
+
+  const sacaSel = React.useMemo(
+    () => (filtroSaca === '__todas__' ? null : sacas.find((s) => s.id === filtroSaca) ?? null),
+    [filtroSaca, sacas],
+  );
 
   const hojeFormatado = new Date()
     .toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -59,16 +84,18 @@ export default function DashboardPage() {
     .replace(/^\w/, (c) => c.toUpperCase());
 
   const escopoLabel =
-    escopo === 'todas'
+    filtroSaca === '__todas__'
       ? `Todas as sacas · ${sacas.length} saca${sacas.length !== 1 ? 's' : ''}`
-      : sacaAtiva
-        ? sacaAtiva.nome
-        : 'Sem saca ativa · mostrando tudo';
+      : sacaSel
+        ? sacaSel.nome
+        : 'Saca';
+
+  const sacaParaCard = sacaSel ?? sacaAtiva;
 
   return (
     <div className="rounded-3xl bg-gradient-to-br from-[#05080f] via-[#0a1120] to-[#05080f] border border-white/10 shadow-2xl shadow-black/40 overflow-hidden">
       {/* barra superior da aba */}
-      <div className="flex items-center gap-2 px-3 sm:px-4 py-3 border-b border-white/10 bg-black/20">
+      <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-3 border-b border-white/10 bg-black/20">
         <Link
           href="/contagem"
           className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl bg-white/5 ring-1 ring-white/10 text-slate-200 hover:bg-white/10 text-[12px] font-bold transition shrink-0"
@@ -83,37 +110,39 @@ export default function DashboardPage() {
           </div>
           <div className="min-w-0">
             <div className="text-[13.5px] font-black tracking-tight text-white leading-tight">Dashboard</div>
-            <div className="text-[10.5px] font-semibold text-slate-400 truncate">{pacotesEscopo.length} pacotes no escopo</div>
+            <div className="text-[10.5px] font-semibold text-slate-400 truncate">
+              {pacotesEscopo.length} pacote{pacotesEscopo.length !== 1 ? 's' : ''} no escopo
+            </div>
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <div className="flex items-center gap-1 bg-black/30 p-0.5 rounded-xl">
-            {([
-              { k: 'saca' as const, label: 'Saca atual', icon: Layers },
-              { k: 'todas' as const, label: 'Todas', icon: Boxes },
-            ]).map((o) => {
-              const Icon = o.icon;
-              const sel = escopo === o.k;
-              return (
-                <button
-                  key={o.k}
-                  type="button"
-                  onClick={() => setEscopo(o.k)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11.5px] font-black transition ${
-                    sel ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md shadow-indigo-900/40' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{o.label}</span>
-                </button>
-              );
-            })}
-          </div>
+        <div className="ml-auto flex items-center gap-2">
+          <label className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[10.5px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+              <Layers className="h-3.5 w-3.5" />
+              Saca
+            </span>
+            <div className="relative">
+              <select
+                value={filtroSaca}
+                onChange={(e) => setFiltroSaca(e.target.value)}
+                className="appearance-none h-9 pl-2.5 pr-7 rounded-xl bg-slate-900/80 border border-white/10 text-slate-100 text-[12px] font-bold cursor-pointer outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20 transition"
+              >
+                <option value="__todas__">📋 Todas as sacas ({opcoesSacas.total})</option>
+                {opcoesSacas.lista.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.aberta ? '🟢 ' : '⚪ '}
+                    {s.nome} ({s.qtd})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="h-3.5 w-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          </label>
 
           <button
             type="button"
-            onClick={() => void recarregar(escopo, true)}
+            onClick={() => void recarregar(true)}
             disabled={atualizando}
             className="inline-flex items-center gap-1 h-9 px-2.5 rounded-xl bg-white/5 ring-1 ring-white/10 text-slate-200 hover:bg-white/10 text-[12px] font-bold transition disabled:opacity-50 shrink-0"
             title="Atualizar dados do banco"
@@ -128,7 +157,7 @@ export default function DashboardPage() {
         <TelaDashboard
           pacotes={pacotesEscopo}
           resumos={resumos}
-          sacaAtiva={sacaAtiva ? { id: sacaAtiva.id, nome: sacaAtiva.nome, status: sacaAtiva.status } : null}
+          sacaAtiva={sacaParaCard ? { id: sacaParaCard.id, nome: sacaParaCard.nome, status: sacaParaCard.status } : null}
           hojeFormatado={hojeFormatado}
           escopoLabel={escopoLabel}
         />
