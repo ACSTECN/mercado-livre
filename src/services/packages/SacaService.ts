@@ -1,25 +1,18 @@
 import type { Saca, StatusSaca, ResumoSaca } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId } from '@/lib/utils';
-import { PacoteService, corrigirSacaIdsNosPacotes } from './PacoteService';
+import { PacoteService } from './PacoteService';
 
-const CHAVE_LOCAL_SACAS = 'ml_sacas_v1';
+/**
+ * Camada de acesso a sacas.
+ *
+ * FONTE ÚNICA DA VERDADE = Supabase. Toda leitura vem do banco e toda escrita
+ * é confirmada pelo banco antes de retornar. Apenas a "saca ativa" (preferência
+ * de interface do aparelho) permanece local.
+ */
+
 const CHAVE_SACA_ATIVA = 'ml_saca_ativa_id_v1';
-
-function lerSacasLocal(): Saca[] {
-  try {
-    const raw = localStorage.getItem(CHAVE_LOCAL_SACAS);
-    if (!raw) return [];
-    const arr = JSON.parse(raw) as Saca[];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-function salvarSacasLocal(lista: Saca[]) {
-  localStorage.setItem(CHAVE_LOCAL_SACAS, JSON.stringify(lista));
-}
+const LIMITE_SACAS = 500;
 
 export function pegarIdSacaAtiva(): string | null {
   try {
@@ -38,129 +31,25 @@ export function salvarIdSacaAtiva(id: string | null) {
   }
 }
 
-const SACA_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export async function sincronizarSacasAgora(): Promise<{
-  sincronizados: number;
-  falhas: number;
-  total: number;
-  primeiroErro: string | null;
-  idsRemapeados: Record<string, string>;
-}> {
-  if (!isSupabaseConfigurado) return { sincronizados: 0, falhas: 0, total: 0, primeiroErro: null, idsRemapeados: {} };
-  const sb = getSupabase();
-  if (!sb) return { sincronizados: 0, falhas: 0, total: 0, primeiroErro: null, idsRemapeados: {} };
-
-  const locais = lerSacasLocal();
-  let ok = 0;
-  let falha = 0;
-  let primeiroErro: string | null = null;
-  const idsRemapeados: Record<string, string> = {};
-
-  console.log('[sincronia-sacas] processando', locais.length, 'sacas locais');
-
-  for (let i = 0; i < locais.length; i++) {
-    const s = locais[i];
-    const idAntigo = s.id;
-    try {
-      const basePayload = {
-        nome: s.nome,
-        descricao: s.descricao ?? null,
-        status: s.status ?? 'aberta',
-        created_at: s.created_at,
-        updated_at: s.updated_at ?? new Date().toISOString(),
-      };
-      const idValido = SACA_UUID_RE.test(s.id ?? '');
-
-      if (idValido) {
-        const { error } = await sb
-          .from('sacas')
-          .upsert({ id: s.id, ...basePayload }, { onConflict: 'id' });
-        if (!error) {
-          ok += 1;
-          continue;
-        }
-        console.warn('[sincronia-sacas] upsert por id falhou, tentando insert sem id:', s.id, error);
-        if (!primeiroErro) primeiroErro = `upsert saca: ${(error as { message?: string })?.message ?? String(error)}`;
-      }
-
-      const { data, error: insertErr } = await sb
-        .from('sacas')
-        .insert(basePayload)
-        .select('id')
-        .maybeSingle();
-      if (!insertErr && data) {
-        const novoId = (data as { id: string }).id;
-        locais[i] = { ...s, id: novoId };
-        if (idAntigo !== novoId) idsRemapeados[idAntigo] = novoId;
-        ok += 1;
-      } else {
-        if (insertErr && /duplicate|unique|23505/i.test((insertErr as { message?: string; code?: string }).message ?? (insertErr as { code?: string }).code ?? '')) {
-          ok += 1;
-        } else {
-          const msg = (insertErr as { message?: string; code?: string })?.message
-            ?? (insertErr as { code?: string })?.code
-            ?? 'erro desconhecido';
-          console.error('[sincronia-sacas] falha definitiva saca:', s.nome, insertErr);
-          if (!primeiroErro) primeiroErro = `saca ${s.nome}: ${msg}`;
-          falha += 1;
-        }
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('[sincronia-sacas] catch:', s?.nome, e);
-      if (!primeiroErro) primeiroErro = `catch saca: ${msg}`;
-      falha += 1;
-    }
-  }
-  salvarSacasLocal(locais);
-
-  if (Object.keys(idsRemapeados).length) {
-    console.log('[sincronia-sacas] ids remapeados:', idsRemapeados);
-    await corrigirSacaIdsNosPacotes(idsRemapeados);
-    const ativaLocal = pegarIdSacaAtiva();
-    if (ativaLocal && idsRemapeados[ativaLocal]) salvarIdSacaAtiva(idsRemapeados[ativaLocal]);
-  }
-
-  console.log('[sincronia-sacas] resultado sacas:', { sincronizados: ok, falhas: falha, total: locais.length });
-  return { sincronizados: ok, falhas: falha, total: locais.length, primeiroErro, idsRemapeados };
-}
-
 export const SacaService = {
   async listar(): Promise<Saca[]> {
-    if (!isSupabaseConfigurado) {
-      return lerSacasLocal().sort((a, b) => b.created_at.localeCompare(a.created_at));
-    }
-    try {
-      await sincronizarSacasAgora();
-      const sb = getSupabase();
-      if (!sb) return lerSacasLocal();
-      const { data, error } = await sb
-        .from('sacas')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
-      if (error || !data) return lerSacasLocal();
-      const locais = lerSacasLocal();
-      const mapaLocal = new Map(locais.map((s) => [s.id, s]));
-      const todos: Saca[] = [];
-      const idsBanco = new Set<string>();
-      for (const item of data as Saca[]) {
-        idsBanco.add(item.id);
-        todos.push(item);
-      }
-      const locaisAlinhados = locais.filter((s) => idsBanco.has(s.id));
-      if (locaisAlinhados.length !== locais.length) salvarSacasLocal(locaisAlinhados);
-      todos.sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return todos;
-    } catch {
-      return lerSacasLocal();
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) return [];
+    const { data, error } = await sb
+      .from('sacas')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(LIMITE_SACAS);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Saca[];
   },
 
   async criar(nome: string, extra: Partial<Saca> = {}): Promise<Saca> {
     const nomeTratado = nome.trim();
     if (!nomeTratado) throw new Error('Nome da saca é obrigatório');
+
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
 
     const agora = new Date().toISOString();
     const nova: Saca = {
@@ -173,62 +62,33 @@ export const SacaService = {
       updated_at: agora,
     };
 
-    const locais = lerSacasLocal();
-    locais.unshift(nova);
-    salvarSacasLocal(locais);
-    salvarIdSacaAtiva(nova.id);
+    const { data, error } = await sb
+      .from('sacas')
+      .insert({
+        id: nova.id,
+        nome: nova.nome,
+        descricao: nova.descricao ?? null,
+        status: nova.status,
+        created_at: nova.created_at,
+        updated_at: nova.updated_at,
+      })
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(error.message);
 
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          const payload = {
-            id: nova.id,
-            nome: nova.nome,
-            descricao: nova.descricao ?? null,
-            status: nova.status,
-            created_at: nova.created_at,
-            updated_at: nova.updated_at,
-          };
-          const { error } = await sb.from('sacas').insert(payload);
-          if (!error) {
-            const atualizados = lerSacasLocal();
-            const idx = atualizados.findIndex((s) => s.id === nova.id);
-            if (idx >= 0) {
-              atualizados[idx] = nova;
-              salvarSacasLocal(atualizados);
-            }
-          } else {
-            console.error('[sacas] criar insert erro:', error);
-          }
-        }
-      } catch (e) {
-        console.error('[sacas] criar insert catch:', e);
-      }
-    }
-    return nova;
+    const criada = ((data as Saca) ?? nova);
+    salvarIdSacaAtiva(criada.id);
+    return criada;
   },
 
   async atualizar(id: string, patch: Partial<Saca>): Promise<void> {
-    const locais = lerSacasLocal();
-    const idx = locais.findIndex((s) => s.id === id);
-    if (idx < 0) return;
-    locais[idx] = { ...locais[idx], ...patch, updated_at: new Date().toISOString() };
-    salvarSacasLocal(locais);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          await sb
-            .from('sacas')
-            .update({ ...patch, updated_at: new Date().toISOString() })
-            .eq('id', id);
-        }
-      } catch {
-        /* noop */
-      }
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
+    const { error } = await sb
+      .from('sacas')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
   },
 
   async fechar(id: string): Promise<void> {
@@ -240,22 +100,13 @@ export const SacaService = {
   },
 
   async remover(id: string): Promise<void> {
-    const locais = lerSacasLocal().filter((s) => s.id !== id);
-    salvarSacasLocal(locais);
-    const ativa = pegarIdSacaAtiva();
-    if (ativa === id) salvarIdSacaAtiva(null);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          await sb.from('pacotes_lidos').delete().eq('saca_id', id);
-          await sb.from('sacas').delete().eq('id', id);
-        }
-      } catch {
-        /* noop */
-      }
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
+    const { error: errPacotes } = await sb.from('pacotes_lidos').delete().eq('saca_id', id);
+    if (errPacotes) throw new Error(errPacotes.message);
+    const { error } = await sb.from('sacas').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    if (pegarIdSacaAtiva() === id) salvarIdSacaAtiva(null);
   },
 
   async ativar(id: string): Promise<void> {
@@ -267,8 +118,8 @@ export const SacaService = {
   },
 
   async pegarAtiva(): Promise<Saca | null> {
-    const id = pegarIdSacaAtiva();
     const todas = await SacaService.listar();
+    const id = pegarIdSacaAtiva();
     if (id) {
       const match = todas.find((s) => s.id === id);
       if (match) return match;
@@ -295,15 +146,5 @@ export const SacaService = {
       const unicos = new Set(daSaca.map((p) => p.codigo_pacote));
       return { saca, total: daSaca.length, unicos: unicos.size };
     });
-  },
-
-  async sincronizarAgora(): Promise<{
-    sincronizados: number;
-    falhas: number;
-    total: number;
-    primeiroErro: string | null;
-    idsRemapeados: Record<string, string>;
-  }> {
-    return sincronizarSacasAgora();
   },
 };

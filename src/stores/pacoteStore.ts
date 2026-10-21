@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote, StatusPacote } from '@/types';
-import { PacoteService, adicionarEntregador, removerEntregador, renomearEntregador, listarEntregadores, listarEntregadoresSyncOffline, invalidarCacheEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
+import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, Saca, ResumoSaca, ResultadoMoverPacote, StatusPacote } from '@/types';
+import { PacoteService, adicionarEntregador, removerEntregador, renomearEntregador, listarEntregadores, invalidarCacheEntregadores, inscreverRealtimePacotes } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 
@@ -41,7 +41,7 @@ type PacoteState = {
   abrirHistoricoSacas: () => void;
   fecharHistoricoSacas: () => void;
 
-  definirEntregador: (nome: string | null) => void;
+  definirEntregador: (nome: string | null) => Promise<void>;
   cadastrarEntregador: (nome: string) => Promise<string[]>;
   removerEntregador: (nome: string) => Promise<string[]>;
   renomearEntregador: (nomeAntigo: string, nomeNovo: string) => Promise<string[]>;
@@ -82,10 +82,11 @@ type PacoteState = {
   }>;
 };
 
-const CHAVE_CACHE = 'ml_pacote_store_v1';
-const CHAVE_CACHE_SACAS = 'ml_sacas_store_v1';
-const CHAVE_CACHE_SACA_ATIVA = 'ml_saca_ativa_store_v1';
-const CHAVE_CACHE_ENTREGADOR_ATIVO = 'ml_entregador_ativo_v1';
+/**
+ * Única preferência guardada no aparelho: qual entregador está ativo na tela.
+ * Nenhum registro (pacote/saca) é armazenado localmente — a fonte é o banco.
+ */
+const CHAVE_ENTREGADOR_ATIVO = 'ml_entregador_ativo_v1';
 
 function recalcular(pacotes: PacoteLidoLocal[]): { entregadoresSaca: string[]; contagens: ContagemEntregador[] } {
   const mapaQtd = new Map<string, number>();
@@ -127,121 +128,40 @@ function arraysIguais(a: string[], b: string[]): boolean {
   return true;
 }
 
-function mesclarPreservandoNaoSincronizados(doBanco: PacoteLidoLocal[], atuaisLocal: PacoteLidoLocal[]): PacoteLidoLocal[] {
-  const mapaLocal = new Map(atuaisLocal.map((p) => [p.id, p]));
-  const mapaBanco = new Map(doBanco.map((p) => [p.id, p]));
-  const saida: PacoteLidoLocal[] = [];
-  for (const p of doBanco) {
-    const local = mapaLocal.get(p.id);
-    if (local) {
-      if (local.sincronizado === false) {
-        saida.push(local);
-      } else {
-        const tLocal = local.updated_at ? new Date(local.updated_at).getTime() : 0;
-        const tBanco = p.updated_at ? new Date(p.updated_at).getTime() : 0;
-        if (tLocal > 0 && tBanco > 0 && tLocal > tBanco) saida.push(local);
-        else saida.push(p);
-      }
-    } else {
-      saida.push(p);
-    }
-  }
-  for (const local of atuaisLocal) {
-    if (!mapaBanco.has(local.id)) saida.push(local);
-  }
-  return saida;
-}
-
 function ordenarNomes(arr: string[]): string[] {
   return [...new Set(arr.map((s) => s.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }),
   );
 }
 
-function carregarDoCache(): PacoteLidoLocal[] {
-  try {
-    const raw = sessionStorage.getItem(CHAVE_CACHE);
-    if (!raw) return [];
-    const arr = JSON.parse(raw) as PacoteLidoLocal[];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
+function chavePacote(p: { codigo_pacote: string; saca_id?: string | null }): string {
+  return `${p.codigo_pacote}__${p.saca_id ?? 'null'}`;
 }
 
-function carregarSacasDoCache(): Saca[] {
+function carregarEntregadorAtivo(): string | null {
   try {
-    const raw = localStorage.getItem(CHAVE_CACHE_SACAS);
-    if (!raw) return [];
-    const arr = JSON.parse(raw) as Saca[];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-function carregarSacaAtivaDoCache(): Saca | null {
-  try {
-    const raw = localStorage.getItem(CHAVE_CACHE_SACA_ATIVA);
-    if (!raw) return null;
-    return JSON.parse(raw) as Saca;
+    return localStorage.getItem(CHAVE_ENTREGADOR_ATIVO);
   } catch {
     return null;
   }
 }
 
-function carregarEntregadorAtivoDoCache(): string | null {
+function salvarEntregadorAtivo(nome: string | null) {
   try {
-    const raw = localStorage.getItem(CHAVE_CACHE_ENTREGADOR_ATIVO);
-    if (!raw) return null;
-    return raw;
-  } catch {
-    return null;
-  }
-}
-
-function salvarCache(lista: PacoteLidoLocal[]) {
-  try {
-    sessionStorage.setItem(CHAVE_CACHE, JSON.stringify(lista));
+    if (nome) localStorage.setItem(CHAVE_ENTREGADOR_ATIVO, nome);
+    else localStorage.removeItem(CHAVE_ENTREGADOR_ATIVO);
   } catch {
     /* noop */
   }
 }
 
-function salvarCacheSacas(lista: Saca[]) {
-  try {
-    localStorage.setItem(CHAVE_CACHE_SACAS, JSON.stringify(lista));
-  } catch {
-    /* noop */
-  }
-}
-
-function salvarCacheSacaAtiva(s: Saca | null) {
-  try {
-    if (s) localStorage.setItem(CHAVE_CACHE_SACA_ATIVA, JSON.stringify(s));
-    else localStorage.removeItem(CHAVE_CACHE_SACA_ATIVA);
-  } catch {
-    /* noop */
-  }
-}
-
-function salvarCacheEntregadorAtivo(nome: string | null) {
-  try {
-    if (nome) localStorage.setItem(CHAVE_CACHE_ENTREGADOR_ATIVO, nome);
-    else localStorage.removeItem(CHAVE_CACHE_ENTREGADOR_ATIVO);
-  } catch {
-    /* noop */
-  }
-}
-
-const pacotesIniciais = carregarDoCache();
-const inicial = recalcular(pacotesIniciais);
+const inicial = recalcular([]);
 
 export const usePacoteStore = create<PacoteState>((set, get) => ({
-  pacotes: pacotesIniciais,
-  sacas: carregarSacasDoCache(),
+  pacotes: [],
+  sacas: [],
   resumos: [],
-  sacaAtiva: carregarSacaAtivaDoCache(),
+  sacaAtiva: null,
   carregando: false,
   carregandoSacas: false,
   ultimoLido: null,
@@ -253,8 +173,8 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   mostrarModalSaca: false,
   mostrarHistoricoSacas: false,
 
-  entregadorAtivo: carregarEntregadorAtivoDoCache(),
-  entregadores: listarEntregadoresSyncOffline(),
+  entregadorAtivo: carregarEntregadorAtivo(),
+  entregadores: [],
   entregadoresSaca: inicial.entregadoresSaca,
   contagensEntregadores: inicial.contagens,
 
@@ -262,33 +182,29 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     try {
       invalidarCacheEntregadores();
       const lista = await listarEntregadores(true);
-      const atual = get().entregadores;
-      if (!arraysIguais(atual, lista)) set({ entregadores: lista });
-    } catch { /* noop */ }
+      if (!arraysIguais(get().entregadores, lista)) set({ entregadores: lista });
+    } catch {
+      /* noop */
+    }
   },
 
   carregarSacas: async () => {
     set({ carregandoSacas: true });
     try {
-      const sacasP = SacaService.listar();
-      const resumosP = SacaService.resumos();
-      const ativaP = SacaService.pegarAtiva();
-      const entregadoresP = (async () => {
-        try { invalidarCacheEntregadores(); return await listarEntregadores(false); }
-        catch { return listarEntregadoresSyncOffline(); }
-      })();
-      const [sacas, resumos, ativa, entregadores] = await Promise.all([sacasP, resumosP, ativaP, entregadoresP]);
-      salvarCacheSacas(sacas);
-      salvarCacheSacaAtiva(ativa);
-      const stateAntigo = get();
+      const [sacas, resumos, ativa, entregadores] = await Promise.all([
+        SacaService.listar(),
+        SacaService.resumos(),
+        SacaService.pegarAtiva(),
+        listarEntregadores(false),
+      ]);
       const patch: Partial<PacoteState> = {
         sacas,
         resumos,
         sacaAtiva: ativa,
         carregandoSacas: false,
       };
-      if (!arraysIguais(stateAntigo.entregadores, entregadores)) patch.entregadores = entregadores;
-      set(patch);
+      if (!arraysIguais(get().entregadores, entregadores)) patch.entregadores = entregadores;
+      set(patch as PacoteState);
     } catch {
       set({ carregandoSacas: false });
     }
@@ -297,7 +213,6 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   definirSacaAtiva: async (sacaId) => {
     await SacaService.ativar(sacaId);
     const saca = (await SacaService.listar()).find((s) => s.id === sacaId) ?? null;
-    salvarCacheSacaAtiva(saca);
     set({ sacaAtiva: saca, mostrarModalSaca: false, mostrarHistoricoSacas: false });
     await get().carregar();
   },
@@ -305,15 +220,12 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   criarSaca: async (nome, descricao) => {
     const saca = await SacaService.criar(nome, descricao ? { descricao } : undefined);
     await get().carregarSacas();
-    salvarCacheSacaAtiva(saca);
-    salvarCache([]);
-    const r = recalcular([]);
     set({
       sacaAtiva: saca,
       mostrarModalSaca: false,
       pacotes: [],
-      entregadoresSaca: r.entregadoresSaca,
-      contagensEntregadores: r.contagens,
+      entregadoresSaca: [],
+      contagensEntregadores: [],
     });
     return saca;
   },
@@ -338,14 +250,11 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     await SacaService.remover(id);
     const a = get().sacaAtiva;
     if (a && a.id === id) {
-      salvarCacheSacaAtiva(null);
-      salvarCache([]);
-      const r = recalcular([]);
       set({
         sacaAtiva: null,
         pacotes: [],
-        entregadoresSaca: r.entregadoresSaca,
-        contagensEntregadores: r.contagens,
+        entregadoresSaca: [],
+        contagensEntregadores: [],
       });
     }
     await get().carregarSacas();
@@ -359,42 +268,36 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
 
   definirEntregador: async (nome) => {
     const limpo = nome ? nome.trim() : null;
-    salvarCacheEntregadorAtivo(limpo);
+    salvarEntregadorAtivo(limpo);
     const patch: Partial<PacoteState> = { entregadorAtivo: limpo };
     if (limpo) {
-      const cadastradosAntigos = get().entregadores;
-      if (cadastradosAntigos.map((s) => s.toLowerCase()).includes(limpo.toLowerCase())) {
-        set(patch as PacoteState);
-        return;
+      const cadastrados = get().entregadores;
+      if (!cadastrados.some((s) => s.toLowerCase() === limpo.toLowerCase())) {
+        const arr = await adicionarEntregador(limpo);
+        patch.entregadores = arr;
       }
-      const arr = await adicionarEntregador(limpo);
-      patch.entregadores = arr;
     }
     set(patch as PacoteState);
   },
 
   cadastrarEntregador: async (nome) => {
     const arr = await adicionarEntregador(nome);
-    const antigos = get().entregadores;
-    if (!arraysIguais(antigos, arr)) set({ entregadores: arr });
+    if (!arraysIguais(get().entregadores, arr)) set({ entregadores: arr });
     return arr;
   },
   removerEntregador: async (nome) => {
     const arr = await removerEntregador(nome);
-    const antigos = get().entregadores;
-    if (!arraysIguais(antigos, arr)) set({ entregadores: arr });
+    if (!arraysIguais(get().entregadores, arr)) set({ entregadores: arr });
     return arr;
   },
   renomearEntregador: async (nomeAntigo, nomeNovo) => {
     const arr = await renomearEntregador(nomeAntigo, nomeNovo);
-    const antigos = get().entregadores;
-    if (!arraysIguais(antigos, arr)) {
+    if (!arraysIguais(get().entregadores, arr)) {
       const patch: Partial<PacoteState> = { entregadores: arr };
       const ativo = get().entregadorAtivo;
       if (ativo && ativo.toLowerCase() === nomeAntigo.trim().toLowerCase()) {
-        const novoLimpo = nomeNovo.trim();
-        salvarCacheEntregadorAtivo(novoLimpo);
-        patch.entregadorAtivo = novoLimpo;
+        salvarEntregadorAtivo(nomeNovo.trim());
+        patch.entregadorAtivo = nomeNovo.trim();
       }
       set(patch as PacoteState);
     }
@@ -405,17 +308,14 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     set({ carregando: true });
     try {
       if (!get().sacas.length || !get().sacaAtiva) await get().carregarSacas();
-      const pacotesP = PacoteService.listar(get().sacaAtiva?.id ?? null);
-      const entregadoresP = (async () => {
-        try { return await listarEntregadores(false); }
-        catch { return listarEntregadoresSyncOffline(); }
-      })();
-      const [lista, entregadores] = await Promise.all([pacotesP, entregadoresP]);
-      const mesclados = mesclarPreservandoNaoSincronizados(lista, get().pacotes);
-      salvarCache(mesclados);
-      const r = recalcular(mesclados);
+      const sacaId = get().sacaAtiva?.id ?? null;
+      const [lista, entregadores] = await Promise.all([
+        PacoteService.listar(sacaId),
+        listarEntregadores(false),
+      ]);
+      const r = recalcular(lista);
       const patch: Partial<PacoteState> = {
-        pacotes: mesclados,
+        pacotes: lista,
         carregando: false,
         entregadoresSaca: r.entregadoresSaca,
         contagensEntregadores: r.contagens,
@@ -431,17 +331,13 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     set({ carregando: true });
     try {
       if (!get().sacas.length) await get().carregarSacas();
-      const pacotesP = PacoteService.listarTodasSacas();
-      const entregadoresP = (async () => {
-        try { return await listarEntregadores(false); }
-        catch { return listarEntregadoresSyncOffline(); }
-      })();
-      const [lista, entregadores] = await Promise.all([pacotesP, entregadoresP]);
-      const mesclados = mesclarPreservandoNaoSincronizados(lista, get().pacotes);
-      salvarCache(mesclados);
-      const r = recalcular(mesclados);
+      const [lista, entregadores] = await Promise.all([
+        PacoteService.listarTodasSacas(),
+        listarEntregadores(false),
+      ]);
+      const r = recalcular(lista);
       const patch: Partial<PacoteState> = {
-        pacotes: mesclados,
+        pacotes: lista,
         carregando: false,
         entregadoresSaca: r.entregadoresSaca,
         contagensEntregadores: r.contagens,
@@ -468,60 +364,38 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         entregador: entregadorAtual ?? extra.entregador ?? undefined,
       });
 
+      const patch: Partial<PacoteState> = { ultimoResultado: resultado };
       let lista = get().pacotes;
-      let mudouLista = false;
-      let novoEntregadorCadastrado = false;
 
       if (resultado.sucesso && resultado.pacote) {
-        const jaTem = lista.some((p) => p.codigo_pacote === resultado.pacote!.codigo_pacote && p.saca_id === (sacaAtual?.id ?? null));
-        if (!jaTem) {
-          lista = [resultado.pacote, ...lista.filter((p) => !(p.codigo_pacote === resultado.pacote!.codigo_pacote && p.saca_id === (sacaAtual?.id ?? null)))];
-          mudouLista = true;
+        const alvo = resultado.pacote;
+        const jaTem = lista.some((p) => p.id === alvo.id || chavePacote(p) === chavePacote(alvo));
+        if (!jaTem) lista = [alvo, ...lista];
+        patch.ultimoLido = alvo;
+        patch.ultimoDuplicado = null;
+        if (alvo.status === 'retorno') {
+          patch.ultimoAlteradoStatus = { id: alvo.id, status: 'retorno', ts: Date.now() };
         }
         if (entregadorAtual) {
           const antigos = get().entregadores;
-          if (!antigos.includes(entregadorAtual)) {
-            adicionarEntregador(entregadorAtual);
-            novoEntregadorCadastrado = true;
+          if (!antigos.some((s) => s.toLowerCase() === entregadorAtual.toLowerCase())) {
+            void adicionarEntregador(entregadorAtual).then((arr) => {
+              if (!arraysIguais(get().entregadores, arr)) set({ entregadores: arr });
+            });
           }
         }
       } else if (resultado.duplicado && resultado.existente) {
-        const jaTem = lista.some((p) => p.codigo_pacote === resultado.existente!.codigo_pacote && p.saca_id === (sacaAtual?.id ?? null));
-        if (!jaTem) {
-          lista = [resultado.existente, ...lista];
-          mudouLista = true;
-        }
-      }
-
-      if (mudouLista) salvarCache(lista);
-
-      const patch: Partial<PacoteState> = { ultimoResultado: resultado };
-      if (resultado.sucesso && resultado.pacote) {
-        patch.ultimoLido = resultado.pacote;
-        patch.ultimoDuplicado = null;
-        if (resultado.pacote.status === 'retorno') {
-          patch.ultimoAlteradoStatus = {
-            id: resultado.pacote.id,
-            status: 'retorno',
-            ts: Date.now(),
-          };
-        }
-      } else if (resultado.duplicado && resultado.existente) {
+        const alvo = resultado.existente;
+        const jaTem = lista.some((p) => p.id === alvo.id || chavePacote(p) === chavePacote(alvo));
+        if (!jaTem) lista = [alvo, ...lista];
         patch.ultimoLido = null;
-        patch.ultimoDuplicado = resultado.existente;
+        patch.ultimoDuplicado = alvo;
       }
-      if (mudouLista) {
-        patch.pacotes = lista;
-        const r = recalcular(lista);
-        patch.entregadoresSaca = r.entregadoresSaca;
-        patch.contagensEntregadores = r.contagens;
-      }
-      if (novoEntregadorCadastrado) {
-        const atuais = get().entregadores;
-        if (!atuais.map((s) => s.toLowerCase()).includes((resultado.pacote?.entregador ?? '').toLowerCase())) {
-          patch.entregadores = ordenarNomes([...atuais, resultado.pacote?.entregador ?? '']);
-        }
-      }
+
+      const r = recalcular(lista);
+      patch.pacotes = lista;
+      patch.entregadoresSaca = r.entregadoresSaca;
+      patch.contagensEntregadores = r.contagens;
       set(patch as PacoteState);
       return resultado;
     } catch (e) {
@@ -549,67 +423,42 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       set({ ultimoResultadoMover: r });
       return r;
     }
-    const anterior = atualPacotes[idx];
-    if (anterior.entregador === limpo) {
+    if (atualPacotes[idx].entregador === limpo) {
       const r: ResultadoMoverPacote = {
         sucesso: true,
         movido: false,
-        pacote: anterior,
+        pacote: atualPacotes[idx],
         mensagem: 'Já está neste entregador',
       };
       set({ ultimoResultadoMover: r });
       return r;
     }
-    const atualizado: PacoteLidoLocal = {
-      ...anterior,
-      entregador: limpo,
-      sincronizado: false,
-    };
-    const nova = [...atualPacotes];
-    nova[idx] = atualizado;
-    salvarCache(nova);
-    const r = recalcular(nova);
+
+    const resultado = await PacoteService.mover(id, limpo, origemMovimento);
+    if (!resultado.sucesso || !resultado.pacote) {
+      set({ ultimoResultadoMover: resultado });
+      return resultado;
+    }
+
+    const lista = [...get().pacotes];
+    const i2 = lista.findIndex((p) => p.id === id);
+    if (i2 >= 0) lista[i2] = resultado.pacote;
+    const r = recalcular(lista);
     const patch: Partial<PacoteState> = {
-      pacotes: nova,
+      pacotes: lista,
       entregadoresSaca: r.entregadoresSaca,
       contagensEntregadores: r.contagens,
-      ultimoMovido: atualizado,
-      ultimoResultadoMover: {
-        sucesso: true,
-        movido: true,
-        pacote: atualizado,
-        mensagem: origemMovimento === 're_scan'
-          ? `${anterior.codigo_pacote} movido para "${limpo}"`
-          : `Pacote movido para "${limpo}"`,
-      },
+      ultimoMovido: resultado.pacote,
+      ultimoResultadoMover: resultado,
     };
-    const cadastradosAntigos = get().entregadores;
-    if (!cadastradosAntigos.map((s) => s.toLowerCase()).includes(limpo.toLowerCase())) {
-      patch.entregadores = ordenarNomes([limpo, ...cadastradosAntigos]);
+    if (!get().entregadores.some((s) => s.toLowerCase() === limpo.toLowerCase())) {
+      patch.entregadores = ordenarNomes([limpo, ...get().entregadores]);
+      void adicionarEntregador(limpo).then((arr) => {
+        if (!arraysIguais(get().entregadores, arr)) set({ entregadores: arr });
+      });
     }
     set(patch as PacoteState);
-
-    void (async () => {
-      try {
-        await PacoteService.mover(id, limpo, origemMovimento);
-        const re = get().pacotes;
-        const i2 = re.findIndex((p) => p.id === id);
-        if (i2 >= 0) {
-          const att = { ...re[i2], sincronizado: true };
-          const nova2 = [...re];
-          nova2[i2] = att;
-          salvarCache(nova2);
-          const r2 = recalcular(nova2);
-          set({
-            pacotes: nova2,
-            entregadoresSaca: r2.entregadoresSaca,
-            contagensEntregadores: r2.contagens,
-          });
-        }
-      } catch { /* noop */ }
-    })();
-
-    return patch.ultimoResultadoMover as ResultadoMoverPacote;
+    return resultado;
   },
 
   adicionarOuMover: async (codigo, origem, extra = {}) => {
@@ -636,179 +485,95 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     return { tipo: 'erro' as const, resultado: tentativaAdicao };
   },
 
-  remover: async (id) => {
-    await PacoteService.remover(id);
-    const atual = get().pacotes.filter((p) => p.id !== id);
-    salvarCache(atual);
-    const r = recalcular(atual);
-    set({
-      pacotes: atual,
-      entregadoresSaca: r.entregadoresSaca,
-      contagensEntregadores: r.contagens,
-    });
-  },
-
-  removerEmLote: async (ids) => {
-    if (!ids.length) return { removidos: 0 };
-    const idSet = new Set(ids);
-    const atual = get().pacotes;
-    const nova = atual.filter((p) => !idSet.has(p.id));
-    const removidos = atual.length - nova.length;
-    if (removidos === 0) return { removidos: 0 };
-    // estado local some imediatamente (banco é a fonte da verdade)
-    salvarCache(nova);
-    const r = recalcular(nova);
-    set({
-      pacotes: nova,
-      entregadoresSaca: r.entregadoresSaca,
-      contagensEntregadores: r.contagens,
-    });
-    // dispara delete em batch no banco em background
-    void (async () => {
-      try { await PacoteService.removerEmLote(ids); } catch { /* noop */ }
-    })();
-    return { removidos };
-  },
-
   definirStatus: async (id, status) => {
+    const confirmado = await PacoteService.definirStatus(id, status);
+    if (!confirmado) return;
     const atual = get().pacotes;
     const idx = atual.findIndex((p) => p.id === id);
     if (idx < 0) return;
-    const anterior = atual[idx];
-    const atualizado: PacoteLidoLocal = {
-      ...anterior,
-      status,
-      sincronizado: false,
-    };
-    const nova = [...atual];
-    nova[idx] = atualizado;
-    salvarCache(nova);
-    const r = recalcular(nova);
+    const lista = [...atual];
+    lista[idx] = confirmado;
+    const r = recalcular(lista);
     set({
-      pacotes: nova,
+      pacotes: lista,
       entregadoresSaca: r.entregadoresSaca,
       contagensEntregadores: r.contagens,
       ultimoAlteradoStatus: { id, status, ts: Date.now() },
     });
-
-    void (async () => {
-      try {
-        const confirmado = await PacoteService.definirStatus(id, status);
-        if (!confirmado) return;
-        const re = get().pacotes;
-        const i2 = re.findIndex((p) => p.id === id);
-        if (i2 >= 0) {
-          const att = { ...re[i2], sincronizado: confirmado.sincronizado ?? true, status: confirmado.status ?? null };
-          const nova2 = [...re];
-          nova2[i2] = att;
-          salvarCache(nova2);
-          const r2 = recalcular(nova2);
-          set({
-            pacotes: nova2,
-            entregadoresSaca: r2.entregadoresSaca,
-            contagensEntregadores: r2.contagens,
-          });
-        }
-      } catch { /* noop */ }
-    })();
   },
 
   definirStatusEmLote: async (ids, status) => {
     if (!ids.length) return;
-    const idSet = new Set(ids);
-    const atual = get().pacotes;
-    const nova: PacoteLidoLocal[] = atual.map((p) => {
-      if (idSet.has(p.id)) return { ...p, status, sincronizado: false };
-      return p;
-    });
-    salvarCache(nova);
-    const r = recalcular(nova);
+    const resultados = await Promise.all(
+      ids.map((id) => PacoteService.definirStatus(id, status).catch(() => null)),
+    );
+    const mapa = new Map(resultados.filter((p): p is PacoteLidoLocal => !!p).map((p) => [p.id, p]));
+    if (!mapa.size) return;
+    const lista = get().pacotes.map((p) => mapa.get(p.id) ?? p);
+    const r = recalcular(lista);
     set({
-      pacotes: nova,
+      pacotes: lista,
       entregadoresSaca: r.entregadoresSaca,
       contagensEntregadores: r.contagens,
     });
-    void (async () => {
-      try {
-        for (const id of ids) {
-          try { await PacoteService.definirStatus(id, status); } catch { /* noop */ }
-        }
-      } catch { /* noop */ }
-    })();
   },
 
   definirEntregadorEmLote: async (ids, entregador) => {
     if (!ids.length) return { atualizados: 0, falhas: 0 };
-    const entregadorLimpo = entregador == null ? '' : entregador.trim();
-    const idSet = new Set(ids);
-    const atual = get().pacotes;
+    const limpo = entregador == null ? '' : entregador.trim();
     let atualizados = 0;
     let falhas = 0;
-    const nova: PacoteLidoLocal[] = atual.map((p) => {
-      if (idSet.has(p.id)) {
-        const novoValor = entregadorLimpo || undefined;
-        if (p.entregador !== novoValor) atualizados++;
-        return { ...p, entregador: novoValor, sincronizado: false };
-      }
-      return p;
-    });
-    if (atualizados === 0) return { atualizados: 0, falhas: 0 };
-    salvarCache(nova);
-    const r = recalcular(nova);
-    set({
-      pacotes: nova,
-      entregadoresSaca: r.entregadoresSaca,
-      contagensEntregadores: r.contagens,
-    });
-    if (entregadorLimpo) adicionarEntregador(entregadorLimpo);
-    void (async () => {
-      const agora = nova.map((p) => ({ ...p }));
-      try {
-        for (const id of ids) {
-          try {
-            const idx = agora.findIndex((p) => p.id === id);
-            if (idx < 0) { falhas++; continue; }
-            if (entregadorLimpo) {
-              const res = await PacoteService.mover(id, entregadorLimpo, 'manual');
-              if (res.sucesso) {
-                agora[idx] = { ...agora[idx], entregador: entregadorLimpo, sincronizado: true };
-              } else {
-                falhas++;
-              }
-            } else if (isSupabaseConfigurado) {
-              const sb = getSupabase();
-              if (sb) {
-                const { error } = await sb.from('pacotes_lidos').update({ entregador: null }).eq('id', id);
-                if (!error) {
-                  agora[idx] = { ...agora[idx], entregador: undefined, sincronizado: true };
-                } else {
-                  falhas++;
-                }
-              } else {
-                falhas++;
-              }
-            }
-          } catch { falhas++; }
-        }
-        salvarCache(agora);
-        const r2 = recalcular(agora);
-        set({
-          pacotes: agora,
-          entregadoresSaca: r2.entregadoresSaca,
-          contagensEntregadores: r2.contagens,
-        });
-      } catch {
+
+    const sb = getSupabase();
+    const resultados = await Promise.all(
+      ids.map(async (id): Promise<PacoteLidoLocal | null> => {
         try {
-          salvarCache(agora);
-          const rFallback = recalcular(agora);
-          set({
-            pacotes: agora,
-            entregadoresSaca: rFallback.entregadoresSaca,
-            contagensEntregadores: rFallback.contagens,
-          });
-        } catch { /* noop */ }
-      }
-    })();
+          if (limpo) {
+            const res = await PacoteService.mover(id, limpo, 'manual');
+            if (res.sucesso && res.pacote) {
+              atualizados++;
+              return res.pacote;
+            }
+            falhas++;
+            return null;
+          }
+          if (!isSupabaseConfigurado || !sb) {
+            falhas++;
+            return null;
+          }
+          const { data, error } = await sb
+            .from('pacotes_lidos')
+            .update({ entregador: null })
+            .eq('id', id)
+            .select('*')
+            .maybeSingle();
+          if (error || !data) {
+            falhas++;
+            return null;
+          }
+          atualizados++;
+          return { ...(data as PacoteLido), sincronizado: true } as PacoteLidoLocal;
+        } catch {
+          falhas++;
+          return null;
+        }
+      }),
+    );
+
+    const mapa = new Map(resultados.filter((p): p is PacoteLidoLocal => !!p).map((p) => [p.id, p]));
+    if (mapa.size) {
+      const lista = get().pacotes.map((p) => mapa.get(p.id) ?? p);
+      const r = recalcular(lista);
+      set({
+        pacotes: lista,
+        entregadoresSaca: r.entregadoresSaca,
+        contagensEntregadores: r.contagens,
+      });
+    }
+    if (limpo) {
+      const arr = await adicionarEntregador(limpo);
+      if (!arraysIguais(get().entregadores, arr)) set({ entregadores: arr });
+    }
     return { atualizados, falhas };
   },
 
@@ -820,10 +585,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     let falhas = 0;
 
     const sacaAtual = get().sacaAtiva;
-    const sacaIdComparar = sacaAtual?.id ?? null;
     const listaOriginal = get().pacotes;
     const pacotesAdicionar: PacoteLidoLocal[] = [];
-    const codigosVistosLocal = new Set<string>();
+    const codigosVistos = new Set<string>();
     const novosEntregadores: string[] = [];
 
     const nomesZonas = Object.keys(porZona);
@@ -850,9 +614,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
             resumoPorZona[nome].duplicados++;
           }
           if (pacoteParaLista) {
-            const chaveDedup = `${pacoteParaLista.codigo_pacote}__${pacoteParaLista.saca_id ?? 'null'}`;
-            if (codigosVistosLocal.has(chaveDedup)) continue;
-            codigosVistosLocal.add(chaveDedup);
+            const chave = chavePacote(pacoteParaLista);
+            if (codigosVistos.has(chave)) continue;
+            codigosVistos.add(chave);
             pacotesAdicionar.push(pacoteParaLista);
             const entNome = pacoteParaLista.entregador;
             if (entNome && !novosEntregadores.some((x) => x.toLowerCase() === entNome.toLowerCase()) && !get().entregadores.some((x) => x.toLowerCase() === entNome.toLowerCase())) {
@@ -866,16 +630,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     }
 
     if (pacotesAdicionar.length > 0) {
-      const codigosNovos = new Map<string, PacoteLidoLocal>();
-      for (const p of pacotesAdicionar) {
-        codigosNovos.set(`${p.codigo_pacote}__${p.saca_id ?? 'null'}`, p);
-      }
-      const listaFiltrada = listaOriginal.filter((p) => {
-        const chave = `${p.codigo_pacote}__${p.saca_id ?? 'null'}`;
-        return !codigosNovos.has(chave);
-      });
+      const chavesNovas = new Set(pacotesAdicionar.map(chavePacote));
+      const listaFiltrada = listaOriginal.filter((p) => !chavesNovas.has(chavePacote(p)));
       const nova = [...pacotesAdicionar, ...listaFiltrada];
-      salvarCache(nova);
       const r = recalcular(nova);
       const patch: Partial<PacoteState> = {
         pacotes: nova,
@@ -883,10 +640,8 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         contagensEntregadores: r.contagens,
       };
       if (novosEntregadores.length > 0) {
-        const atuais = get().entregadores;
-        const proximos = ordenarNomes([...atuais, ...novosEntregadores]);
-        patch.entregadores = proximos;
-        novosEntregadores.forEach((n) => adicionarEntregador(n));
+        patch.entregadores = ordenarNomes([...get().entregadores, ...novosEntregadores]);
+        novosEntregadores.forEach((n) => void adicionarEntregador(n));
       }
       set(patch as PacoteState);
     }
@@ -902,10 +657,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     let falhas = 0;
 
     const sacaAtual = get().sacaAtiva;
-    const sacaIdComparar = sacaAtual?.id ?? null;
     const listaOriginal = get().pacotes;
     const pacotesAdicionar: PacoteLidoLocal[] = [];
-    const codigosVistosLocal = new Set<string>();
+    const codigosVistos = new Set<string>();
     const novosEntregadores: string[] = [];
 
     const nomesEntregadores = Object.keys(porEntregador);
@@ -930,9 +684,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
             resumoPorEntregador[nome].duplicados++;
           }
           if (pacoteParaLista) {
-            const chaveDedup = `${pacoteParaLista.codigo_pacote}__${pacoteParaLista.saca_id ?? 'null'}`;
-            if (codigosVistosLocal.has(chaveDedup)) continue;
-            codigosVistosLocal.add(chaveDedup);
+            const chave = chavePacote(pacoteParaLista);
+            if (codigosVistos.has(chave)) continue;
+            codigosVistos.add(chave);
             pacotesAdicionar.push(pacoteParaLista);
             const entNome = pacoteParaLista.entregador;
             if (entNome && !novosEntregadores.some((x) => x.toLowerCase() === entNome.toLowerCase()) && !get().entregadores.some((x) => x.toLowerCase() === entNome.toLowerCase())) {
@@ -946,16 +700,9 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     }
 
     if (pacotesAdicionar.length > 0) {
-      const codigosNovos = new Map<string, PacoteLidoLocal>();
-      for (const p of pacotesAdicionar) {
-        codigosNovos.set(`${p.codigo_pacote}__${p.saca_id ?? 'null'}`, p);
-      }
-      const listaFiltrada = listaOriginal.filter((p) => {
-        const chave = `${p.codigo_pacote}__${p.saca_id ?? 'null'}`;
-        return !codigosNovos.has(chave);
-      });
+      const chavesNovas = new Set(pacotesAdicionar.map(chavePacote));
+      const listaFiltrada = listaOriginal.filter((p) => !chavesNovas.has(chavePacote(p)));
       const nova = [...pacotesAdicionar, ...listaFiltrada];
-      salvarCache(nova);
       const r = recalcular(nova);
       const patch: Partial<PacoteState> = {
         pacotes: nova,
@@ -963,10 +710,8 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
         contagensEntregadores: r.contagens,
       };
       if (novosEntregadores.length > 0) {
-        const atuais = get().entregadores;
-        const proximos = ordenarNomes([...atuais, ...novosEntregadores]);
-        patch.entregadores = proximos;
-        novosEntregadores.forEach((n) => adicionarEntregador(n));
+        patch.entregadores = ordenarNomes([...get().entregadores, ...novosEntregadores]);
+        novosEntregadores.forEach((n) => void adicionarEntregador(n));
       }
       set(patch as PacoteState);
     }
@@ -988,15 +733,46 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     await get().definirStatus(id, prox);
   },
 
+  remover: async (id) => {
+    await PacoteService.remover(id);
+    const atual = get().pacotes.filter((p) => p.id !== id);
+    const r = recalcular(atual);
+    set({
+      pacotes: atual,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+    });
+  },
+
+  removerEmLote: async (ids) => {
+    if (!ids.length) return { removidos: 0 };
+    const idSet = new Set(ids);
+    const atual = get().pacotes;
+    const nova = atual.filter((p) => !idSet.has(p.id));
+    const removidos = atual.length - nova.length;
+    try {
+      await PacoteService.removerEmLote(ids);
+    } catch {
+      // banco é a fonte da verdade: em caso de falha, recarrega para não mentir na tela
+      await get().carregar();
+      return { removidos: 0 };
+    }
+    const r = recalcular(nova);
+    set({
+      pacotes: nova,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+    });
+    return { removidos };
+  },
+
   limpar: async () => {
     const sacaAtual = get().sacaAtiva;
     await PacoteService.limpar(sacaAtual?.id ?? null);
-    salvarCache([]);
-    const r = recalcular([]);
     set({
       pacotes: [],
-      entregadoresSaca: r.entregadoresSaca,
-      contagensEntregadores: r.contagens,
+      entregadoresSaca: [],
+      contagensEntregadores: [],
       ultimoLido: null,
       ultimoDuplicado: null,
       ultimoResultado: null,
@@ -1059,14 +835,13 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   },
 
   forcarSincronizacaoCompleta: async () => {
-    console.log('[sincronia] INICIO sincronização forçada');
-    const sacas = await SacaService.sincronizarAgora();
-    const pacotes = await PacoteService.sincronizarAgora();
-    console.log('[sincronia] FIM sincronização forçada:', { sacas, pacotes });
-    void get().carregarSacas().then(() => void get().carregar());
+    await get().carregarSacas();
+    await get().carregar();
+    const totalSacas = get().sacas.length;
+    const totalPacotes = get().pacotes.length;
     return {
-      sacas: { sincronizados: sacas.sincronizados, falhas: sacas.falhas, total: sacas.total, primeiroErro: sacas.primeiroErro },
-      pacotes: { sincronizados: pacotes.sincronizados, falhas: pacotes.falhas, total: pacotes.total, primeiroErro: pacotes.primeiroErro },
+      sacas: { sincronizados: totalSacas, falhas: 0, total: totalSacas, primeiroErro: null },
+      pacotes: { sincronizados: totalPacotes, falhas: 0, total: totalPacotes, primeiroErro: null },
     };
   },
 }));

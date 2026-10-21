@@ -1,27 +1,28 @@
-import type { EntregadorCadastrado, PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
+import type { PacoteLido, PacoteLidoLocal, OrigemLeitura, ResultadoAdicaoPacote, ResultadoMoverPacote, StatusPacote } from '@/types';
 import { getSupabase, isSupabaseConfigurado } from '@/lib/supabase';
 import { gerarId, normalizarCodigoPacote, codigosIguaisNormalizados } from '@/lib/utils';
-import { exportarParaCsv, exportarParaXlsx } from '../spreadsheet/ExcelService';
+import { exportarParaXlsx } from '../spreadsheet/ExcelService';
 import { pegarIdSacaAtiva } from './SacaService';
 
-export const CHAVE_LOCAL = 'ml_pacotes_lidos_v1';
-const CHAVE_ENTREGADORES = 'ml_entregadores_v1';
-const CHAVE_ENTREGADORES_BAIXADOS = 'ml_entregadores_baixados_v1';
+/**
+ * Camada de acesso a pacotes.
+ *
+ * FONTE ÚNICA DA VERDADE = Supabase.
+ * Não há cache local de registros: toda leitura vem do banco e toda escrita é
+ * confirmada pelo banco antes de retornar. Isso garante que todos os aparelhos
+ * vejam exatamente o mesmo estado.
+ */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LIMITE_LEITURA = 5000;
 
 let _realtimeInscrito = false;
 let _realtimeCallback: ((tipo: 'pacotes' | 'sacas' | 'entregadores') => void) | null = null;
 let _realtimeRef = 0;
-let _ultimoSyncAllTs = 0;
-let forcarSyncAllRef = false;
-let _ultimoSyncEntregadoresTs = 0;
+
+// cache curto apenas em memória para evitar rajadas de requisições num mesmo tick
 let _cacheEntregadores: string[] | null = null;
 let _cacheEntregadoresTs = 0;
-
-function igualArrayString(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
 
 function ordenarNomes(arr: string[]): string[] {
   return [...new Set(arr.map((s) => s.trim()).filter(Boolean))].sort((a, b) =>
@@ -29,188 +30,115 @@ function ordenarNomes(arr: string[]): string[] {
   );
 }
 
-function lerLocalEntregadoresOffline(): string[] {
-  try {
-    const raw = localStorage.getItem(CHAVE_ENTREGADORES);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? ordenarNomes(arr) : [];
-  } catch {
-    return [];
-  }
+function igualArrayString(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
-function salvarLocalEntregadoresOffline(nomes: string[]) {
-  try {
-    localStorage.setItem(CHAVE_ENTREGADORES, JSON.stringify(ordenarNomes(nomes)));
-  } catch {
-    /* noop */
+/** Remove duplicatas de id e de código normalizado dentro da mesma saca. */
+function deduplicarLidos(rows: PacoteLido[]): PacoteLidoLocal[] {
+  const idsVistos = new Set<string>();
+  const chavesPorSaca = new Map<string, Set<string>>();
+  const saida: PacoteLidoLocal[] = [];
+  for (const item of rows) {
+    const chaveSaca = item.saca_id ?? '__null__';
+    if (item.id && idsVistos.has(item.id)) continue;
+    const norm = normalizarCodigoPacote(item.codigo_pacote);
+    let set = chavesPorSaca.get(chaveSaca);
+    if (!set) {
+      set = new Set<string>();
+      chavesPorSaca.set(chaveSaca, set);
+    }
+    if (norm && set.has(norm)) continue;
+    if (norm) set.add(norm);
+    if (item.id) idsVistos.add(item.id);
+    saida.push({ ...item, sincronizado: true });
   }
+  return saida;
 }
 
-export function listarEntregadoresSyncOffline(): string[] {
-  return lerLocalEntregadoresOffline();
-}
+/* ------------------------------------------------------------------ */
+/* Entregadores                                                        */
+/* ------------------------------------------------------------------ */
 
 export async function listarEntregadores(force = false): Promise<string[]> {
   const agora = Date.now();
-  const cacheValido = _cacheEntregadores && agora - _cacheEntregadoresTs < 2000 && !force;
-  if (cacheValido && _cacheEntregadores) return _cacheEntregadores;
-
-  const offline = lerLocalEntregadoresOffline();
-
-  if (!isSupabaseConfigurado) {
-    const r = offline;
-    _cacheEntregadores = r;
-    _cacheEntregadoresTs = agora;
-    return r;
+  if (!force && _cacheEntregadores && agora - _cacheEntregadoresTs < 3000) {
+    return _cacheEntregadores;
   }
   const sb = getSupabase();
-  if (!sb) {
-    const r = offline;
-    _cacheEntregadores = r;
-    _cacheEntregadoresTs = agora;
-    return r;
-  }
+  if (!isSupabaseConfigurado || !sb) return _cacheEntregadores ?? [];
   try {
-    const ultimoBaixado = (() => {
-      try {
-        const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
-        return raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
-      } catch {
-        return [];
-      }
-    })();
-    const usarBanco = force || agora - _ultimoSyncEntregadoresTs > 15000;
-    let baixados: EntregadorCadastrado[] = ultimoBaixado;
-    if (usarBanco) {
-      const { data } = await sb.from('entregadores').select('id,nome,created_at').order('created_at', { ascending: false }).limit(500);
-      if (data && Array.isArray(data)) {
-        baixados = data as EntregadorCadastrado[];
-        _ultimoSyncEntregadoresTs = agora;
-        try { localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(baixados)); } catch { /* noop */ }
-      }
-    }
-    const nomesBanco = ordenarNomes(baixados.map((e) => e.nome));
-    const merged = ordenarNomes([...offline, ...nomesBanco]);
-    salvarLocalEntregadoresOffline(merged);
-    _cacheEntregadores = merged;
+    const { data, error } = await sb
+      .from('entregadores')
+      .select('nome')
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    if (error || !data) return _cacheEntregadores ?? [];
+    const nomes = ordenarNomes((data as Array<{ nome: string }>).map((e) => e.nome));
+    _cacheEntregadores = nomes;
     _cacheEntregadoresTs = agora;
-    return merged;
+    return nomes;
   } catch {
-    const r = offline;
-    _cacheEntregadores = r;
-    _cacheEntregadoresTs = agora;
-    return r;
+    return _cacheEntregadores ?? [];
   }
 }
 
 export async function adicionarEntregador(nome: string): Promise<string[]> {
   const limpo = nome.trim();
-  if (!limpo) return listarEntregadores();
-  const offlineAgora = lerLocalEntregadoresOffline();
-  if (offlineAgora.map((s) => s.toLowerCase()).includes(limpo.toLowerCase())) {
-    return ordenarNomes(offlineAgora);
+  if (!limpo) return listarEntregadores(true);
+  const sb = getSupabase();
+  if (isSupabaseConfigurado && sb) {
+    try {
+      await sb.from('entregadores').insert({ nome: limpo });
+    } catch {
+      /* provável conflito de unique: já existe */
+    }
   }
-  const localAtualizado = ordenarNomes([limpo, ...offlineAgora]);
-  salvarLocalEntregadoresOffline(localAtualizado);
-  _cacheEntregadores = localAtualizado;
-  _cacheEntregadoresTs = Date.now();
-
-  if (isSupabaseConfigurado && getSupabase()) {
-    void (async () => {
-      const sb = getSupabase()!;
-      try {
-        const { data } = await sb
-          .from('entregadores')
-          .insert({ nome: limpo })
-          .select('id,nome,created_at')
-          .maybeSingle();
-        if (data) {
-          try {
-            const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
-            const arr: EntregadorCadastrado[] = raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
-            const jaTem = arr.some((e) => e.id === (data as EntregadorCadastrado).id);
-            if (!jaTem) {
-              arr.unshift(data as EntregadorCadastrado);
-              localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(arr));
-            }
-          } catch { /* noop */ }
-        }
-      } catch {
-        /* noop - provavel unique conflito, ja existe */
-      }
-    })();
-  }
-  return localAtualizado;
+  return listarEntregadores(true);
 }
 
 export async function removerEntregador(nome: string): Promise<string[]> {
   const limpo = nome.trim();
-  if (!limpo) return listarEntregadores();
-  const offlineAgora = lerLocalEntregadoresOffline().filter((e) => e.toLowerCase() !== limpo.toLowerCase());
-  salvarLocalEntregadoresOffline(offlineAgora);
-  _cacheEntregadores = offlineAgora;
-  _cacheEntregadoresTs = Date.now();
-
-  if (isSupabaseConfigurado && getSupabase()) {
-    void (async () => {
-      const sb = getSupabase()!;
-      try {
-        await sb.from('entregadores').delete().ilike('nome', limpo);
-      } catch { /* noop */ }
-      try {
-        const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
-        const arr: EntregadorCadastrado[] = raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
-        const filtrado = arr.filter((e) => e.nome.toLowerCase() !== limpo.toLowerCase());
-        localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(filtrado));
-      } catch { /* noop */ }
-    })();
+  if (!limpo) return listarEntregadores(true);
+  const sb = getSupabase();
+  if (isSupabaseConfigurado && sb) {
+    try {
+      await sb.from('entregadores').delete().ilike('nome', limpo);
+    } catch {
+      /* noop */
+    }
   }
-  return offlineAgora;
+  return listarEntregadores(true);
 }
 
 export async function renomearEntregador(nomeAntigo: string, nomeNovo: string): Promise<string[]> {
   const limpoAntigo = nomeAntigo.trim();
   const limpoNovo = nomeNovo.trim();
-  if (!limpoAntigo || !limpoNovo) return listarEntregadores();
-  if (limpoAntigo.toLowerCase() === limpoNovo.toLowerCase()) return listarEntregadores();
-
-  const offlineAgora = lerLocalEntregadoresOffline();
-  const existeConflito = offlineAgora.some((e) => e.toLowerCase() === limpoNovo.toLowerCase());
-  if (existeConflito) return ordenarNomes(offlineAgora);
-
-  const localAtualizado = ordenarNomes(
-    offlineAgora.map((e) => (e.toLowerCase() === limpoAntigo.toLowerCase() ? limpoNovo : e)),
-  );
-  salvarLocalEntregadoresOffline(localAtualizado);
-  _cacheEntregadores = localAtualizado;
-  _cacheEntregadoresTs = Date.now();
-
-  if (isSupabaseConfigurado && getSupabase()) {
-    void (async () => {
-      const sb = getSupabase()!;
-      try {
-        await sb.from('entregadores').update({ nome: limpoNovo }).ilike('nome', limpoAntigo);
-      } catch { /* noop */ }
-      try {
-        const raw = localStorage.getItem(CHAVE_ENTREGADORES_BAIXADOS);
-        const arr: EntregadorCadastrado[] = raw ? (JSON.parse(raw) as EntregadorCadastrado[]) : [];
-        const atualizado = arr.map((e) =>
-          e.nome.toLowerCase() === limpoAntigo.toLowerCase() ? { ...e, nome: limpoNovo } : e,
-        );
-        localStorage.setItem(CHAVE_ENTREGADORES_BAIXADOS, JSON.stringify(atualizado));
-      } catch { /* noop */ }
-    })();
+  if (!limpoAntigo || !limpoNovo) return listarEntregadores(true);
+  if (limpoAntigo.toLowerCase() === limpoNovo.toLowerCase()) return listarEntregadores(true);
+  const sb = getSupabase();
+  if (isSupabaseConfigurado && sb) {
+    try {
+      await sb.from('entregadores').update({ nome: limpoNovo }).ilike('nome', limpoAntigo);
+    } catch {
+      /* noop */
+    }
   }
-  return localAtualizado;
+  return listarEntregadores(true);
 }
 
 export function invalidarCacheEntregadores() {
   _cacheEntregadores = null;
   _cacheEntregadoresTs = 0;
-  _ultimoSyncEntregadoresTs = 0;
 }
+
+export { igualArrayString };
+
+/* ------------------------------------------------------------------ */
+/* Realtime                                                            */
+/* ------------------------------------------------------------------ */
 
 export function inscreverRealtimePacotes(
   onMudouPacotes: () => void,
@@ -226,18 +154,8 @@ export function inscreverRealtimePacotes(
 
   const wrapperCb = (tipo: 'pacotes' | 'sacas' | 'entregadores') => {
     if (tipo === 'pacotes') {
-      try {
-        sessionStorage.removeItem('ml_pacote_store_v1');
-      } catch {
-        /* noop */
-      }
       onMudouPacotes();
     } else if (tipo === 'sacas') {
-      try {
-        localStorage.removeItem('ml_sacas_store_v1');
-      } catch {
-        /* noop */
-      }
       onMudouSacas();
     } else {
       invalidarCacheEntregadores();
@@ -303,36 +221,18 @@ export function inscreverRealtimePacotes(
   }
 }
 
-function lerLocal(): PacoteLidoLocal[] {
-  try {
-    const raw = localStorage.getItem(CHAVE_LOCAL);
-    if (!raw) return [];
-    const arr = JSON.parse(raw) as PacoteLidoLocal[];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-function salvarLocal(lista: PacoteLidoLocal[]) {
-  localStorage.setItem(CHAVE_LOCAL, JSON.stringify(lista));
-}
-
-function encontrarPorCodigo(lista: PacoteLidoLocal[], codigo: string, sacaId: string | null): PacoteLidoLocal | undefined {
-  return lista.find((p) => codigosIguaisNormalizados(p.codigo_pacote, codigo) && (sacaId ? p.saca_id === sacaId : !p.saca_id));
-}
+/* ------------------------------------------------------------------ */
+/* Helpers internos                                                    */
+/* ------------------------------------------------------------------ */
 
 async function buscarNoBancoPorCodigo(codigo: string, sacaId: string | null): Promise<PacoteLidoLocal | null> {
-  if (!isSupabaseConfigurado) return null;
   const sb = getSupabase();
-  if (!sb) return null;
+  if (!isSupabaseConfigurado || !sb) return null;
   const codNorm = normalizarCodigoPacote(codigo);
+  if (!codNorm) return null;
   try {
-    let query = sb
-      .from('pacotes_lidos')
-      .select('*');
-    if (sacaId) query = query.eq('saca_id', sacaId);
-    else query = query.is('saca_id', null);
+    let query = sb.from('pacotes_lidos').select('*');
+    query = sacaId ? query.eq('saca_id', sacaId) : query.is('saca_id', null);
     const { data } = await query;
     if (!data || !Array.isArray(data)) return null;
     const match = (data as PacoteLido[]).find((p) => codigosIguaisNormalizados(p.codigo_pacote, codNorm));
@@ -346,212 +246,57 @@ async function buscarNoBancoPorCodigo(codigo: string, sacaId: string | null): Pr
 async function buscarHistoricoStatusPorCodigo(codigo: string, sacaAtualId: string | null): Promise<StatusPacote | null> {
   const alvo = normalizarCodigoPacote(codigo);
   if (!alvo) return null;
-  const locais = lerLocal();
-  const mesmosCodigosLocal = locais.filter((p) =>
-    codigosIguaisNormalizados(p.codigo_pacote, alvo) &&
-    (sacaAtualId ? p.saca_id !== sacaAtualId : true),
-  );
-  const maisRecente = [...mesmosCodigosLocal].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  if (maisRecente?.status && ['retorno', 'lido', 'entregue', 'devolucao'].includes(maisRecente.status)) return maisRecente.status;
-
-  if (isSupabaseConfigurado && getSupabase()) {
-    const sb = getSupabase()!;
-    try {
-      let q = sb.from('pacotes_lidos').select('status,created_at,codigo_pacote,saca_id');
-      if (sacaAtualId) q = q.neq('saca_id', sacaAtualId);
-      q = q.order('created_at', { ascending: false }).limit(10);
-      const { data } = await q;
-      if (data && Array.isArray(data)) {
-        for (const row of data as Array<{ status?: unknown; created_at?: string; codigo_pacote?: string | null; saca_id?: string | null }>) {
-          const s = row.status as StatusPacote | null | undefined;
-          if (s && ['retorno', 'lido', 'entregue', 'devolucao'].includes(s) && codigosIguaisNormalizados(row.codigo_pacote, alvo)) return s;
-        }
-      }
-    } catch {
-      /* noop */
-    }
-  }
-  const ultimoStatus = maisRecente?.status as StatusPacote | null | undefined;
-  return (ultimoStatus && ['retorno', 'lido', 'entregue', 'devolucao'].includes(ultimoStatus)) ? ultimoStatus : null;
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export async function corrigirSacaIdsNosPacotes(mapaIdAntigoParaNovo: Record<string, string>): Promise<number> {
-  if (!mapaIdAntigoParaNovo || !Object.keys(mapaIdAntigoParaNovo).length) return 0;
-  const locais = lerLocal();
-  let alterados = 0;
-  for (let i = 0; i < locais.length; i++) {
-    const p = locais[i];
-    if (p.saca_id && mapaIdAntigoParaNovo[p.saca_id]) {
-      locais[i] = { ...p, saca_id: mapaIdAntigoParaNovo[p.saca_id], sincronizado: false };
-      alterados += 1;
-    }
-  }
-  if (alterados > 0) {
-    salvarLocal(locais);
-    console.log('[sincronia] corrigidos', alterados, 'pacotes com saca_id desatualizado');
-  }
-  return alterados;
-}
-
-async function sincronizarComSupabase(): Promise<{ sincronizados: number; falhas: number; total: number; primeiroErro: string | null }> {
-  if (!isSupabaseConfigurado) return { sincronizados: 0, falhas: 0, total: 0, primeiroErro: null };
   const sb = getSupabase();
-  if (!sb) return { sincronizados: 0, falhas: 0, total: 0, primeiroErro: null };
-
-  const locais = lerLocal();
-  let ok = 0;
-  let falha = 0;
-  let primeiroErro: string | null = null;
-
-  console.log('[sincronia] processando', locais.length, 'pacotes locais');
-
-  for (let i = 0; i < locais.length; i++) {
-    const p = locais[i];
-    try {
-      const basePayload = {
-        codigo_pacote: p.codigo_pacote,
-        tipo: p.tipo ?? null,
-        origem: p.origem,
-        metadados: p.metadados ?? {},
-        created_at: p.created_at,
-        saca_id: p.saca_id ?? null,
-        entregador: p.entregador ?? null,
-        status: p.status ?? null,
-      };
-
-      const idValido = UUID_RE.test(p.id ?? '');
-
-      if (idValido) {
-        const { error } = await sb
-          .from('pacotes_lidos')
-          .upsert({ id: p.id, ...basePayload }, { onConflict: 'id' });
-        if (!error) {
-          locais[i] = { ...p, sincronizado: true };
-          ok += 1;
-          continue;
-        }
-        console.warn('[sincronia] upsert pacote por id falhou, tentando insert sem id:', p.id, error);
-        if (!primeiroErro) primeiroErro = `upsert: ${(error as { message?: string })?.message ?? String(error)}`;
-      }
-
-      const { data, error: insertErr } = await sb
-        .from('pacotes_lidos')
-        .insert(basePayload)
-        .select('id')
-        .maybeSingle();
-      if (!insertErr && data) {
-        locais[i] = { ...p, id: (data as { id: string }).id, sincronizado: true };
-        ok += 1;
-      } else {
-        if (insertErr && /duplicate|unique|23505/i.test((insertErr as { message?: string; code?: string }).message ?? (insertErr as { code?: string }).code ?? '')) {
-          locais[i] = { ...p, sincronizado: true };
-          ok += 1;
-        } else {
-          const msg = (insertErr as { message?: string; code?: string })?.message
-            ?? (insertErr as { code?: string })?.code
-            ?? 'erro desconhecido';
-          console.error('[sincronia] falha definitiva pacote:', p.codigo_pacote, insertErr);
-          if (!primeiroErro) primeiroErro = `pacote ${p.codigo_pacote}: ${msg}`;
-          falha += 1;
+  if (!isSupabaseConfigurado || !sb) return null;
+  try {
+    let q = sb.from('pacotes_lidos').select('status,created_at,codigo_pacote,saca_id');
+    if (sacaAtualId) q = q.neq('saca_id', sacaAtualId);
+    q = q.order('created_at', { ascending: false }).limit(50);
+    const { data } = await q;
+    if (data && Array.isArray(data)) {
+      for (const row of data as Array<{ status?: unknown; codigo_pacote?: string | null }>) {
+        const s = row.status as StatusPacote | null | undefined;
+        if (s && ['retorno', 'lido', 'entregue', 'devolucao'].includes(s) && codigosIguaisNormalizados(row.codigo_pacote, alvo)) {
+          return s;
         }
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('[sincronia] catch pacote:', p?.codigo_pacote, e);
-      if (!primeiroErro) primeiroErro = `catch: ${msg}`;
-      falha += 1;
     }
+  } catch {
+    /* noop */
   }
-  salvarLocal(locais);
-  console.log('[sincronia] resultado pacotes:', { sincronizados: ok, falhas: falha, total: locais.length });
-  return { sincronizados: ok, falhas: falha, total: locais.length, primeiroErro };
+  return null;
 }
+
+/* ------------------------------------------------------------------ */
+/* API pública                                                         */
+/* ------------------------------------------------------------------ */
 
 export const PacoteService = {
   async listarTodasSacas(): Promise<PacoteLidoLocal[]> {
-    if (!isSupabaseConfigurado) {
-      return lerLocal().sort((a, b) => b.created_at.localeCompare(a.created_at));
-    }
-    try {
-      const agora = Date.now();
-      const forcarSync = forcarSyncAllRef;
-      if (forcarSync || agora - _ultimoSyncAllTs > 25000) {
-        forcarSyncAllRef = false;
-        _ultimoSyncAllTs = agora;
-        try {
-          await sincronizarComSupabase();
-        } catch {
-          /* noop - ainda tenta pegar do banco abaixo */
-        }
-      }
-      const sb = getSupabase();
-      if (!sb) return lerLocal();
-
-      const { data, error } = await sb
-        .from('pacotes_lidos')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5000);
-
-      if (error || !data) return lerLocal();
-
-      const locais = lerLocal();
-      const mapaLocal = new Map(locais.map((p) => [p.id, p]));
-
-      const todos: PacoteLidoLocal[] = [];
-      const idsVistos = new Set<string>();
-      const chavesNormVistas = new Map<string | null, Set<string>>();
-      const getSacaKey = (s: string | null) => s ?? '__null__';
-      const temChaveDuplicadaNormalizada = (p: PacoteLido): boolean => {
-        const sk = getSacaKey(p.saca_id ?? null);
-        const set = chavesNormVistas.get(sk);
-        if (!set) return false;
-        const codNorm = normalizarCodigoPacote(p.codigo_pacote);
-        return !!(codNorm && set.has(codNorm));
-      };
-      const registrarChaveNormalizada = (p: PacoteLido): void => {
-        const sk = getSacaKey(p.saca_id ?? null);
-        if (!chavesNormVistas.has(sk)) chavesNormVistas.set(sk, new Set());
-        const codNorm = normalizarCodigoPacote(p.codigo_pacote);
-        if (codNorm) chavesNormVistas.get(sk)!.add(codNorm);
-      };
-
-      for (const item of data as PacoteLido[]) {
-        if (idsVistos.has(item.id)) continue;
-        if (temChaveDuplicadaNormalizada(item)) continue;
-        idsVistos.add(item.id);
-        registrarChaveNormalizada(item);
-        todos.push({ ...item, sincronizado: true });
-      }
-
-      const idsBanco = new Set<string>();
-      for (const d of data as PacoteLido[]) idsBanco.add(d.id);
-
-      for (const local of locais) {
-        if (idsVistos.has(local.id)) continue;
-        if (temChaveDuplicadaNormalizada(local)) continue;
-        if (!idsBanco.has(local.id) && local.sincronizado === true) continue;
-        idsVistos.add(local.id);
-        registrarChaveNormalizada(local);
-        todos.push(local);
-      }
-
-      const locaisAlinhados = locais.filter((p) => idsBanco.has(p.id) || p.sincronizado === false);
-      if (locaisAlinhados.length !== locais.length) salvarLocal(locaisAlinhados);
-
-      todos.sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return todos;
-    } catch {
-      return lerLocal();
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) return [];
+    const { data, error } = await sb
+      .from('pacotes_lidos')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(LIMITE_LEITURA);
+    if (error) throw new Error(error.message);
+    return deduplicarLidos((data ?? []) as PacoteLido[]);
   },
 
   async listar(sacaIdArg?: string | null): Promise<PacoteLidoLocal[]> {
     const sacaId = sacaIdArg ?? pegarIdSacaAtiva();
-    const todos = await PacoteService.listarTodasSacas();
-    return todos.filter((p) => (sacaId ? p.saca_id === sacaId : !p.saca_id));
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) return [];
+    let q = sb
+      .from('pacotes_lidos')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(LIMITE_LEITURA);
+    q = sacaId ? q.eq('saca_id', sacaId) : q.is('saca_id', null);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return deduplicarLidos((data ?? []) as PacoteLido[]);
   },
 
   async adicionar(
@@ -564,142 +309,89 @@ export const PacoteService = {
       return { sucesso: false, duplicado: false, mensagem: 'Código vazio' };
     }
 
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) {
+      return { sucesso: false, duplicado: false, mensagem: 'Banco de dados não configurado' };
+    }
+
     const saca_id = extra.saca_id ?? pegarIdSacaAtiva() ?? null;
     const entregador = extra.entregador ?? null;
-    const locais = lerLocal();
-    const jaExisteLocal = encontrarPorCodigo(locais, codExtraido, saca_id);
-    if (jaExisteLocal) {
-      return {
-        sucesso: false,
-        duplicado: true,
-        existente: jaExisteLocal,
-        mensagem: `ID ${codExtraido} já foi contado nesta saca`,
-      };
-    }
 
-    const jaExisteBanco = await buscarNoBancoPorCodigo(codExtraido, saca_id);
-    if (jaExisteBanco) {
-      if (!jaExisteLocal) {
-        locais.unshift(jaExisteBanco);
-        salvarLocal(locais);
+    try {
+      const jaExisteBanco = await buscarNoBancoPorCodigo(codExtraido, saca_id);
+      if (jaExisteBanco) {
+        return {
+          sucesso: false,
+          duplicado: true,
+          existente: jaExisteBanco,
+          mensagem: `ID ${codExtraido} já foi contado nesta saca`,
+        };
       }
-      return {
-        sucesso: false,
-        duplicado: true,
-        existente: jaExisteBanco,
-        mensagem: `ID ${codExtraido} já está nesta saca no banco`,
+
+      let statusHerado: StatusPacote | null = extra.status ?? null;
+      if (extra.status == null) {
+        statusHerado = await buscarHistoricoStatusPorCodigo(codExtraido, saca_id);
+      }
+
+      const novo: PacoteLidoLocal = {
+        id: extra.id ?? gerarId(),
+        codigo_pacote: codExtraido,
+        tipo: extra.tipo ?? null,
+        origem,
+        metadados: extra.metadados ?? null,
+        created_at: extra.created_at ?? new Date().toISOString(),
+        updated_at: extra.updated_at ?? null,
+        user_id: extra.user_id ?? null,
+        saca_id,
+        entregador,
+        zona_ml: extra.zona_ml ?? null,
+        status: extra.status ?? statusHerado,
+        sincronizado: true,
       };
-    }
 
-    let statusHerado: StatusPacote | null = null;
-    const locaisHist = lerLocal();
-    const mesmoCodigoLocalSemSaca = locaisHist
-      .filter((p) => codigosIguaisNormalizados(p.codigo_pacote, codExtraido) && (saca_id ? p.saca_id !== saca_id : true))
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-    if (mesmoCodigoLocalSemSaca?.status && ['retorno', 'lido', 'entregue', 'devolucao'].includes(mesmoCodigoLocalSemSaca.status)) {
-      statusHerado = mesmoCodigoLocalSemSaca.status;
-    }
+      const payload = {
+        id: novo.id,
+        codigo_pacote: novo.codigo_pacote,
+        tipo: novo.tipo,
+        origem: novo.origem,
+        metadados: novo.metadados ?? {},
+        created_at: novo.created_at,
+        saca_id: novo.saca_id,
+        entregador: novo.entregador ?? null,
+        zona_ml: novo.zona_ml ?? null,
+        status: novo.status ?? null,
+      };
 
-    const novo: PacoteLidoLocal = {
-      id: extra.id ?? gerarId(),
-      codigo_pacote: codExtraido,
-      tipo: extra.tipo ?? null,
-      origem,
-      metadados: extra.metadados ?? null,
-      created_at: extra.created_at ?? new Date().toISOString(),
-      updated_at: extra.updated_at ?? null,
-      user_id: extra.user_id ?? null,
-      saca_id,
-      entregador,
-      zona_ml: extra.zona_ml ?? null,
-      status: extra.status ?? statusHerado,
-      sincronizado: false,
-    };
-
-    locais.unshift(novo);
-    salvarLocal(locais);
-
-    void (async () => {
-      try {
-        const bancoHist = await buscarHistoricoStatusPorCodigo(codExtraido, saca_id);
-        if (bancoHist && bancoHist !== (novo.status ?? null)) {
-          const reais = lerLocal();
-          const idx = reais.findIndex((p) => p.id === novo.id);
-          if (idx >= 0) {
-            reais[idx] = { ...reais[idx], status: bancoHist, sincronizado: false };
-            salvarLocal(reais);
-            try {
-              const sb = getSupabase();
-              if (sb) {
-                await sb.from('pacotes_lidos').update({ status: bancoHist }).eq('id', novo.id);
-                const ok = lerLocal();
-                const i2 = ok.findIndex((p) => p.id === novo.id);
-                if (i2 >= 0) {
-                  ok[i2] = { ...ok[i2], sincronizado: true };
-                  salvarLocal(ok);
-                }
-              }
-            } catch { /* noop */ }
-            const cb = _realtimeCallback;
-            if (cb) cb('pacotes');
+      const { error } = await sb.from('pacotes_lidos').insert(payload);
+      if (error) {
+        if (/duplicate|unique|23505/i.test(error.message ?? error.code ?? '')) {
+          const noBanco = await buscarNoBancoPorCodigo(codExtraido, saca_id);
+          if (noBanco) {
+            return {
+              sucesso: false,
+              duplicado: true,
+              existente: noBanco,
+              mensagem: `ID ${codExtraido} já está nesta saca`,
+            };
           }
         }
-      } catch { /* noop */ }
-    })();
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          const payload = {
-            id: novo.id,
-            codigo_pacote: novo.codigo_pacote,
-            tipo: novo.tipo,
-            origem: novo.origem,
-            metadados: novo.metadados ?? {},
-            created_at: novo.created_at,
-            saca_id: novo.saca_id,
-            entregador: novo.entregador ?? null,
-            zona_ml: novo.zona_ml ?? null,
-            status: novo.status ?? null,
-          };
-          const { error } = await sb.from('pacotes_lidos').insert(payload);
-          if (error && /duplicate|unique|23505/i.test(error.message ?? error.code ?? '')) {
-            const atualizados = lerLocal().filter((p) => !(codigosIguaisNormalizados(p.codigo_pacote, codExtraido) && p.saca_id === saca_id));
-            const noBanco = await buscarNoBancoPorCodigo(codExtraido, saca_id);
-            if (noBanco) {
-              atualizados.unshift(noBanco);
-              salvarLocal(atualizados);
-              return {
-                sucesso: false,
-                duplicado: true,
-                existente: noBanco,
-                mensagem: `ID ${codExtraido} já está nesta saca no banco`,
-              };
-            }
-          }
-          if (!error) {
-            novo.sincronizado = true;
-            const atualizados = lerLocal();
-            const idx = atualizados.findIndex((p) => p.id === novo.id);
-            if (idx >= 0) {
-              atualizados[idx] = { ...atualizados[idx], sincronizado: true };
-              salvarLocal(atualizados);
-            }
-          }
-        }
-      } catch {
-        /* noop - mantem local e sincroniza depois */
+        return { sucesso: false, duplicado: false, mensagem: error.message ?? 'Falha ao gravar no banco' };
       }
-    }
 
-    return {
-      sucesso: true,
-      duplicado: false,
-      pacote: novo,
-      mensagem: `ID ${codExtraido} contado com sucesso`,
-      statusHerdado: statusHerado,
-    };
+      return {
+        sucesso: true,
+        duplicado: false,
+        pacote: novo,
+        mensagem: `ID ${codExtraido} contado com sucesso`,
+        statusHerdado: statusHerado,
+      };
+    } catch (e) {
+      return {
+        sucesso: false,
+        duplicado: false,
+        mensagem: e instanceof Error ? e.message : 'Erro desconhecido',
+      };
+    }
   },
 
   async mover(
@@ -711,151 +403,75 @@ export const PacoteService = {
     if (!entregadorLimpo) {
       return { sucesso: false, movido: false, mensagem: 'Entregador inválido' };
     }
-    const locais = lerLocal();
-    const idx = locais.findIndex((p) => p.id === id);
-    if (idx < 0) {
-      return { sucesso: false, movido: false, mensagem: 'Pacote não encontrado localmente' };
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) {
+      return { sucesso: false, movido: false, mensagem: 'Banco de dados não configurado' };
     }
-
-    const anterior = locais[idx];
-    if (anterior.entregador === entregadorLimpo) {
-      return { sucesso: true, movido: false, pacote: anterior, mensagem: 'Já está neste entregador' };
-    }
-
-    const atualizado: PacoteLidoLocal = {
-      ...anterior,
-      entregador: entregadorLimpo,
-      sincronizado: false,
-    };
-    locais[idx] = atualizado;
-    salvarLocal(locais);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          const { error } = await sb
-            .from('pacotes_lidos')
-            .update({ entregador: entregadorLimpo })
-            .eq('id', id);
-          if (!error) {
-            const locais2 = lerLocal();
-            const idx2 = locais2.findIndex((p) => p.id === id);
-            if (idx2 >= 0) {
-              locais2[idx2] = { ...locais2[idx2], sincronizado: true };
-              salvarLocal(locais2);
-              atualizado.sincronizado = true;
-            }
-          }
-        }
-      } catch {
-        /* noop - marca como não sincronizado e sincroniza depois */
+    try {
+      const { data, error } = await sb
+        .from('pacotes_lidos')
+        .update({ entregador: entregadorLimpo })
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (error) {
+        return { sucesso: false, movido: false, mensagem: error.message };
       }
+      const pacote = data ? ({ ...(data as PacoteLido), sincronizado: true } as PacoteLidoLocal) : undefined;
+      return {
+        sucesso: true,
+        movido: true,
+        pacote,
+        mensagem: origemMovimento === 're_scan'
+          ? `Movido para "${entregadorLimpo}"`
+          : `Pacote movido para "${entregadorLimpo}"`,
+      };
+    } catch (e) {
+      return { sucesso: false, movido: false, mensagem: e instanceof Error ? e.message : 'Erro desconhecido' };
     }
-
-    adicionarEntregador(entregadorLimpo);
-
-    return {
-      sucesso: true,
-      movido: true,
-      pacote: atualizado,
-      mensagem: origemMovimento === 're_scan'
-        ? `${anterior.codigo_pacote} movido para "${entregadorLimpo}"`
-        : `Pacote movido para "${entregadorLimpo}"`,
-    };
   },
 
   async definirStatus(id: string, status: StatusPacote | null): Promise<PacoteLidoLocal | null> {
-    const locais = lerLocal();
-    const idx = locais.findIndex((p) => p.id === id);
-    if (idx < 0) return null;
-    const anterior = locais[idx];
-    const atualizado: PacoteLidoLocal = {
-      ...anterior,
-      status,
-      sincronizado: false,
-    };
-    locais[idx] = atualizado;
-    salvarLocal(locais);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          const { error } = await sb
-            .from('pacotes_lidos')
-            .update({ status })
-            .eq('id', id);
-          if (!error) {
-            const locais2 = lerLocal();
-            const idx2 = locais2.findIndex((p) => p.id === id);
-            if (idx2 >= 0) {
-              locais2[idx2] = { ...locais2[idx2], sincronizado: true };
-              salvarLocal(locais2);
-              atualizado.sincronizado = true;
-            }
-          }
-        }
-      } catch {
-        /* noop */
-      }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) return null;
+    try {
+      const { data, error } = await sb
+        .from('pacotes_lidos')
+        .update({ status })
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (error || !data) return null;
+      return { ...(data as PacoteLido), sincronizado: true } as PacoteLidoLocal;
+    } catch {
+      return null;
     }
-    return atualizado;
   },
 
   async remover(id: string): Promise<void> {
-    const locais = lerLocal().filter((p) => p.id !== id);
-    salvarLocal(locais);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          await sb.from('pacotes_lidos').delete().eq('id', id);
-        }
-      } catch {
-        /* noop */
-      }
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
+    const { error } = await sb.from('pacotes_lidos').delete().eq('id', id);
+    if (error) throw new Error(error.message);
   },
 
   async removerEmLote(ids: string[]): Promise<{ removidos: number }> {
     if (!ids.length) return { removidos: 0 };
-    const idSet = new Set(ids);
-    const locais = lerLocal().filter((p) => !idSet.has(p.id));
-    salvarLocal(locais);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          await sb.from('pacotes_lidos').delete().in('id', ids);
-        }
-      } catch {
-        /* noop */
-      }
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
+    const { error } = await sb.from('pacotes_lidos').delete().in('id', ids);
+    if (error) throw new Error(error.message);
     return { removidos: ids.length };
   },
 
   async limpar(sacaIdArg?: string | null): Promise<void> {
     const sacaId = sacaIdArg ?? pegarIdSacaAtiva();
-    const restantes = lerLocal().filter((p) => (sacaId ? p.saca_id !== sacaId : !!p.saca_id));
-    salvarLocal(restantes);
-
-    if (isSupabaseConfigurado) {
-      try {
-        const sb = getSupabase();
-        if (sb) {
-          let q = sb.from('pacotes_lidos').delete();
-          if (sacaId) q = q.eq('saca_id', sacaId);
-          else q = q.is('saca_id', null);
-          await q;
-        }
-      } catch {
-        /* noop */
-      }
-    }
+    const sb = getSupabase();
+    if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
+    let q = sb.from('pacotes_lidos').delete();
+    q = sacaId ? q.eq('saca_id', sacaId) : q.is('saca_id', null);
+    const { error } = await q;
+    if (error) throw new Error(error.message);
   },
 
   async contar(sacaIdArg?: string | null): Promise<{ total: number; unicos: number }> {
@@ -889,40 +505,43 @@ export const PacoteService = {
     exportarParaXlsx(linhas, finalNome, 'Pacotes');
   },
 
-  async sincronizarAgora(): Promise<{ sincronizados: number; falhas: number; total: number; primeiroErro: string | null }> {
-    forcarSyncAllRef = true;
-    _ultimoSyncAllTs = 0;
-    const r = await sincronizarComSupabase();
-    console.log('[sincronia] resultado pacotes:', r);
-    return r;
-  },
-
-  exportarBackupJson(): {
+  async exportarBackupJson(): Promise<{
     versao: number;
     extraidoEm: string;
     pacotes: PacoteLidoLocal[];
+    sacas: unknown;
     sacaAtivaId: string | null;
     entregadorAtivo: string | null;
-    sacasStoreCache: unknown;
-    pacoteStoreCache: unknown;
-  } {
+  }> {
+    const pacotes = await PacoteService.listarTodasSacas();
+    let sacas: unknown = [];
+    const sb = getSupabase();
+    if (isSupabaseConfigurado && sb) {
+      try {
+        const { data } = await sb.from('sacas').select('*').order('created_at', { ascending: false }).limit(500);
+        sacas = data ?? [];
+      } catch {
+        /* noop */
+      }
+    }
     return {
-      versao: 1,
+      versao: 2,
       extraidoEm: new Date().toISOString(),
-      pacotes: lerLocal(),
-      sacaAtivaId: localStorage.getItem('ml_saca_ativa_id_v1'),
-      entregadorAtivo: localStorage.getItem('ml_entregador_ativo_v1'),
-      sacasStoreCache: (() => {
-        try { return JSON.parse(localStorage.getItem('ml_sacas_store_v1') ?? 'null'); } catch { return null; }
-      })(),
-      pacoteStoreCache: (() => {
-        try { return JSON.parse(sessionStorage.getItem('ml_pacote_store_v1') ?? 'null'); } catch { return null; }
+      pacotes,
+      sacas,
+      sacaAtivaId: pegarIdSacaAtiva(),
+      entregadorAtivo: (() => {
+        try {
+          return localStorage.getItem('ml_entregador_ativo_v1');
+        } catch {
+          return null;
+        }
       })(),
     };
   },
 
-  baixarArquivoBackup(): void {
-    const payload = PacoteService.exportarBackupJson();
+  async baixarArquivoBackup(): Promise<void> {
+    const payload = await PacoteService.exportarBackupJson();
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -935,21 +554,34 @@ export const PacoteService = {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   },
 
-  importarBackupJson(
-    payload: unknown,
-  ): {
-    ok: boolean;
-    pacotesRestaurados: number;
-    erro?: string;
-  } {
+  async importarBackupJson(payload: unknown): Promise<{ ok: boolean; pacotesRestaurados: number; erro?: string }> {
     try {
       if (!payload || typeof payload !== 'object') throw new Error('Arquivo inválido');
-      const p = payload as { pacotes?: PacoteLidoLocal[]; sacaAtivaId?: string | null; entregadorAtivo?: string | null };
+      const p = payload as { pacotes?: PacoteLidoLocal[] };
       if (!Array.isArray(p.pacotes)) throw new Error('Arquivo sem campo "pacotes" array');
-      salvarLocal(p.pacotes);
-      if (typeof p.sacaAtivaId === 'string' && p.sacaAtivaId) localStorage.setItem('ml_saca_ativa_id_v1', p.sacaAtivaId);
-      if (typeof p.entregadorAtivo === 'string' && p.entregadorAtivo) localStorage.setItem('ml_entregador_ativo_v1', p.entregadorAtivo);
-      return { ok: true, pacotesRestaurados: p.pacotes.length };
+      const sb = getSupabase();
+      if (!isSupabaseConfigurado || !sb) throw new Error('Banco de dados não configurado');
+
+      const rows = p.pacotes
+        .filter((x) => x && x.codigo_pacote)
+        .map((x) => ({
+          id: x.id && UUID_RE.test(x.id) ? x.id : gerarId(),
+          codigo_pacote: normalizarCodigoPacote(x.codigo_pacote),
+          tipo: x.tipo ?? null,
+          origem: x.origem ?? 'manual',
+          metadados: x.metadados ?? {},
+          created_at: x.created_at ?? new Date().toISOString(),
+          saca_id: x.saca_id ?? null,
+          entregador: x.entregador ?? null,
+          zona_ml: x.zona_ml ?? null,
+          status: x.status ?? null,
+        }));
+
+      if (rows.length) {
+        const { error } = await sb.from('pacotes_lidos').upsert(rows, { onConflict: 'id' });
+        if (error) throw new Error(error.message);
+      }
+      return { ok: true, pacotesRestaurados: rows.length };
     } catch (e) {
       const mensagem = e instanceof Error ? e.message : 'Erro desconhecido';
       console.error('[backup] importarBackupJson falhou:', e);

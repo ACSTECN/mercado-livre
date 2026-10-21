@@ -2548,15 +2548,6 @@ export default function ContagemPage() {
     const nome = `Saca ${pad(h.getDate())}/${pad(h.getMonth() + 1)}/${h.getFullYear()}`;
     void criarSaca(nome, '');
   };
-  const salvarIdSacaAtivaJS = (id: string | null) => {
-    try {
-      if (id) localStorage.setItem('ml_saca_ativa_id_v1', id);
-      else localStorage.removeItem('ml_saca_ativa_id_v1');
-    } catch {
-      /* noop */
-    }
-  };
-
   const [menuAberto, setMenuAberto] = React.useState(false);
   const [gerenciarEntregadoresAberto, setGerenciarEntregadoresAberto] = React.useState(false);
   const [modalImportJsonAberto, setModalImportJsonAberto] = React.useState(false);
@@ -2725,9 +2716,11 @@ export default function ContagemPage() {
 
       <div className="max-w-[1580px] mx-auto px-2 sm:px-3 lg:px-4 py-3 sm:py-5 space-y-4 sm:space-y-5 animate-fade-in">
         {/* ===== HEADER COMPACTO ===== */}
-        <header className="relative overflow-hidden flex items-center gap-3 sm:gap-4 bg-[linear-gradient(135deg,rgba(19,29,50,0.94),rgba(11,19,34,0.9))] rounded-[1.9rem] px-4 sm:px-5 py-3.5 border border-white/10 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
-          <span aria-hidden className="absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r from-ml-blue via-violet-500 to-emerald-400" />
-          <span aria-hidden className="absolute -top-20 right-0 h-48 w-48 rounded-full bg-blue-400/120/10 blur-3xl" />
+        <header className="relative flex items-center gap-3 sm:gap-4 bg-[linear-gradient(135deg,rgba(19,29,50,0.94),rgba(11,19,34,0.9))] rounded-[1.9rem] px-4 sm:px-5 py-3.5 border border-white/10 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+          <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.9rem]">
+            <span className="absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r from-ml-blue via-violet-500 to-emerald-400" />
+            <span className="absolute -top-20 right-0 h-48 w-48 rounded-full bg-blue-400/10 blur-3xl" />
+          </span>
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="h-11 w-11 shrink-0 rounded-2xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-[0_14px_28px_rgba(52,131,250,0.22)]">
               <Boxes className="h-5 w-5" />
@@ -2907,7 +2900,7 @@ export default function ContagemPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => acaoMenu(() => { PacoteService.baixarArquivoBackup(); setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo.' }); setTimeout(() => setBackupMsg(null), 5000); })}
+                    onClick={() => acaoMenu(async () => { await PacoteService.baixarArquivoBackup(); setBackupMsg({ ok: true, texto: '✅ Arquivo JSON baixado. Guarde esse arquivo.' }); setTimeout(() => setBackupMsg(null), 5000); })}
                     className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-xl text-[12.5px] font-bold text-slate-300 hover:bg-white/[0.06] transition"
                   >
                     <FileJson className="h-4 w-4 text-emerald-300 shrink-0" />
@@ -2932,7 +2925,7 @@ export default function ContagemPage() {
                       try {
                         const texto = await arquivo.text();
                         const obj = JSON.parse(texto);
-                        const r = PacoteService.importarBackupJson(obj);
+                        const r = await PacoteService.importarBackupJson(obj);
                         if (!r.ok) throw new Error(r.erro ?? 'falhou');
                         setBackupMsg({ ok: true, texto: `✅ ${r.pacotesRestaurados} pacotes restaurados. Recarregando…` });
                         setTimeout(() => window.location.reload(), 1800);
@@ -3715,7 +3708,7 @@ export default function ContagemPage() {
 
         {/* ===== POPUPS MENORES ===== */}
         {diagnostico && (
-          <div className={`fixed bottom-4 right-4 z-[90] w-[280px] sm:w-[380px] rounded-2xl p-3.5 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-sky-400/30' : 'bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-red-400/30'}`}>
+          <div className={`fixed bottom-28 right-4 z-[90] w-[280px] sm:w-[380px] rounded-2xl p-3.5 shadow-2xl ring-1 animate-slide-up whitespace-pre-line ${diagnostico.ok ? 'bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-sky-400/30' : 'bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-red-400/30'}`}>
             <div className="flex items-center gap-2">
               {diagnostico.ok ? (
                 <Database className="h-4 w-4 text-sky-300 shrink-0" />
@@ -3729,7 +3722,7 @@ export default function ContagemPage() {
         )}
 
         {backupMsg && (
-          <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[92vw] rounded-2xl px-4 py-3 shadow-2xl ring-1 whitespace-pre-line animate-slide-up ${backupMsg.ok ? 'bg-emerald-400/12 ring-emerald-400/30' : 'bg-red-400/12 ring-red-400/30'}`}>
+          <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[90] max-w-[92vw] rounded-2xl px-4 py-3 shadow-2xl ring-1 whitespace-pre-line animate-slide-up ${backupMsg.ok ? 'bg-emerald-400/12 ring-emerald-400/30' : 'bg-red-400/12 ring-red-400/30'}`}>
             <p className={`text-[12px] font-bold leading-snug ${backupMsg.ok ? 'text-emerald-200' : 'text-red-200'}`}>
               {backupMsg.texto}
             </p>
@@ -3737,7 +3730,7 @@ export default function ContagemPage() {
         )}
 
         {resultadoSync && !sincronizando && (
-          <div className="fixed bottom-4 right-4 z-[90] w-[270px] sm:w-[330px] rounded-2xl bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-1 ring-white/10 shadow-2xl p-3.5 animate-slide-up">
+          <div className="fixed bottom-28 right-4 z-[90] w-[270px] sm:w-[330px] rounded-2xl bg-[linear-gradient(180deg,rgba(19,29,50,0.92),rgba(11,19,34,0.86))] ring-1 ring-white/10 shadow-2xl p-3.5 animate-slide-up">
             <div className="flex items-center gap-2 mb-2">
               {resultadoSync.sacas.falhas === 0 && resultadoSync.pacotes.falhas === 0 ? (
                 <>
