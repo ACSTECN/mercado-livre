@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Link from 'next/link';
-import { FileSearch, History, Home as HomeIcon, Upload } from 'lucide-react';
+import { BarChart3, FileSearch, History, Home as HomeIcon, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PersistGateProvider } from '@/components/PersistGateProvider';
 
@@ -26,6 +26,7 @@ const navItems = [
   { href: '/', label: 'Início', icon: HomeIcon },
   { href: '/importar', label: 'Planilha', icon: Upload },
   { href: '/escanear', label: 'Escanear', icon: FileSearch, destaque: true },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { href: '/historico', label: 'Histórico', icon: History },
 ];
 
@@ -53,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1 container-app py-4 pb-28">{children}</main>
 
           <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-black/5 bg-white/90 backdrop-blur-lg safe-bottom">
-            <div className="container-app grid grid-cols-4 gap-1 py-2">
+            <div className="container-app grid grid-cols-5 gap-1 py-2">
               {navItems.map((item) => (
                 <Link
                   key={item.href}

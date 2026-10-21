@@ -819,6 +819,25 @@ export const PacoteService = {
     }
   },
 
+  async removerEmLote(ids: string[]): Promise<{ removidos: number }> {
+    if (!ids.length) return { removidos: 0 };
+    const idSet = new Set(ids);
+    const locais = lerLocal().filter((p) => !idSet.has(p.id));
+    salvarLocal(locais);
+
+    if (isSupabaseConfigurado) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          await sb.from('pacotes_lidos').delete().in('id', ids);
+        }
+      } catch {
+        /* noop */
+      }
+    }
+    return { removidos: ids.length };
+  },
+
   async limpar(sacaIdArg?: string | null): Promise<void> {
     const sacaId = sacaIdArg ?? pegarIdSacaAtiva();
     const restantes = lerLocal().filter((p) => (sacaId ? p.saca_id !== sacaId : !!p.saca_id));

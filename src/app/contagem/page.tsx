@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,6 @@ import {
   RotateCcw,
   Clock,
   CheckCircle2,
-  Sparkles,
   XCircle,
   Hash,
   AlertTriangle,
@@ -58,9 +58,6 @@ import {
   Upload,
   WifiOff,
   BarChart3,
-  PieChart as PieIcon,
-  TrendingUp,
-  Layers,
   Route,
   FileText,
   Copy,
@@ -70,21 +67,6 @@ import {
 } from 'lucide-react';
 import { formatarData, truncate } from '@/lib/utils';
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  Cell,
-  PieChart,
-  Pie,
-  AreaChart,
-  Area,
-} from 'recharts';
-import {
   NEXT_PUBLIC_SUPABASE_URL_DEBUG,
   NEXT_PUBLIC_SUPABASE_ANON_KEY_DEBUG,
   VERSAO_HARDCODED_CHAVE,
@@ -93,7 +75,7 @@ import { PacoteService } from '@/services/packages/PacoteService';
 import { SacaService } from '@/services/packages/SacaService';
 import { parsearJsonRotasML, parsearJsonZonasML, type ResultadoParseRotas, type ResultadoParseZonas } from '@/services/routes/MlRoutesImportService';
 
-type Modo = 'camera' | 'leitor' | 'manual' | 'dashboard';
+type Modo = 'camera' | 'leitor' | 'manual';
 
 const MODO_META: Record<
   Modo,
@@ -102,7 +84,6 @@ const MODO_META: Record<
   camera: { label: 'Câmera / QR', icon: QrCode, origem: 'camera' },
   leitor: { label: 'Leitor externo', icon: Usb, origem: 'leitor_externo' },
   manual: { label: 'Digitar ID', icon: PencilLine, origem: 'manual' },
-  dashboard: { label: 'Dashboard', icon: BarChart3 },
 };
 
 type TipoFeedback = 'sucesso' | 'duplicado' | 'erro' | 'movido' | null;
@@ -1977,776 +1958,6 @@ function ModalAtribuirEntregadorLote({
   );
 }
 
-const PALETA_DASH = [
-  '#6366f1', '#10b981', '#8b5cf6', '#f59e0b', '#0ea5e9',
-  '#ec4899', '#14b8a6', '#f43f5e', '#84cc16', '#3b82f6',
-  '#d946ef', '#64748b',
-];
-
-type ContagemEntregador = { nome: string; qtd: number; retornos: number; entregues: number; devolucoes: number; lidos: number };
-type ResumoSacaDash = { saca: { id: string; nome: string; created_at: string; status: string }; total: number; unicos: number };
-const pctDash = (n: number, tot: number): string => (!tot ? '0' : ((n / tot) * 100).toFixed(0));
-
-function TelaDashboard({
-  pacotes,
-  total,
-  unicos,
-  contagensEntregadores,
-  contagensZonas,
-  entregadoresCadastrados,
-  resumos,
-  hojeFormatado,
-  sacaAtiva,
-}: {
-  pacotes: PacoteLidoLocal[];
-  total: number;
-  unicos: number;
-  contagensEntregadores: ContagemEntregador[];
-  contagensZonas: Array<{
-    nome: string;
-    qtd: number;
-    retornos: number;
-    entregues: number;
-    devolucoes: number;
-    lidos: number;
-    entregadores: number;
-  }>;
-  entregadoresCadastrados: string[];
-  resumos: ResumoSacaDash[];
-  hojeFormatado: string;
-  sacaAtiva: { id: string; nome: string; status: string } | null;
-}) {
-  const retornos = React.useMemo(
-    () => contagensEntregadores.reduce((acc, c) => acc + (c.retornos ?? 0), 0),
-    [contagensEntregadores],
-  );
-  const entregues = React.useMemo(
-    () => contagensEntregadores.reduce((acc, c) => acc + (c.entregues ?? 0), 0),
-    [contagensEntregadores],
-  );
-  const devolucoes = React.useMemo(
-    () => contagensEntregadores.reduce((acc, c) => acc + (c.devolucoes ?? 0), 0),
-    [contagensEntregadores],
-  );
-  const lidosMarcados = React.useMemo(
-    () => contagensEntregadores.reduce((acc, c) => acc + (c.lidos ?? 0), 0),
-    [contagensEntregadores],
-  );
-
-  const entregadoresAtivos = React.useMemo(
-    () => contagensEntregadores.filter((c) => c.qtd > 0).length,
-    [contagensEntregadores],
-  );
-  const mediaPorEntregador = entregadoresAtivos > 0 ? (total / entregadoresAtivos) : 0;
-  const taxaRetornos = total > 0 ? (retornos / total) * 100 : 0;
-  const taxaUnicos = total > 0 ? (unicos / total) * 100 : 0;
-  const duplicadosBloqueados = Math.max(0, total - unicos);
-
-  const dadosBarrasEntregador = React.useMemo(() => {
-    const ordenado = [...contagensEntregadores].sort((a, b) => b.qtd - a.qtd);
-    return ordenado.map((c, idx) => ({
-      nome: c.nome.length > 14 ? c.nome.slice(0, 13) + '…' : c.nome,
-      nomeCompleto: c.nome,
-      cor: PALETA_DASH[idx % PALETA_DASH.length],
-      normais: c.qtd - c.retornos,
-      retornos: c.retornos,
-      total: c.qtd,
-    }));
-  }, [contagensEntregadores]);
-
-  const maxBarra = React.useMemo(
-    () => Math.max(1, ...dadosBarrasEntregador.map((d) => d.total)),
-    [dadosBarrasEntregador],
-  );
-
-  const dadosDonut = React.useMemo(() => {
-    return dadosBarrasEntregador.map((d) => ({
-      name: d.nome,
-      fullName: d.nomeCompleto,
-      value: d.total,
-      fill: d.cor,
-    })).filter((d) => d.value > 0);
-  }, [dadosBarrasEntregador]);
-
-  const dadosLinhaHorario = React.useMemo(() => {
-    const buckets = new Array(24).fill(0);
-    for (const p of pacotes) {
-      try {
-        const d = new Date(p.created_at);
-        const h = d.getHours();
-        if (Number.isFinite(h) && h >= 0 && h < 24) buckets[h] += 1;
-      } catch { /* noop */ }
-    }
-    return buckets.map((v, i) => ({ hora: `${String(i).padStart(2, '0')}h`, qtd: v }));
-  }, [pacotes]);
-
-  const dadosUltimasSacas = React.useMemo(() => {
-    const ultimas = [...resumos]
-      .sort((a, b) => (b.saca.created_at ?? '').localeCompare(a.saca.created_at ?? ''))
-      .slice(0, 7);
-    return ultimas.map((r) => ({
-      nome: r.saca.nome.length > 10 ? r.saca.nome.slice(0, 9) + '…' : r.saca.nome,
-      nomeCompleto: r.saca.nome,
-      total: r.total,
-      unicos: r.unicos,
-      status: r.saca.status,
-    })).reverse();
-  }, [resumos]);
-
-  const origemDistribuicao = React.useMemo(() => {
-    const m = new Map<OrigemLeitura, number>();
-    m.set('camera', 0);
-    m.set('leitor_externo', 0);
-    m.set('manual', 0);
-    for (const p of pacotes) {
-      const k: OrigemLeitura = (p.origem as OrigemLeitura) ?? 'leitor_externo';
-      m.set(k, (m.get(k) ?? 0) + 1);
-    }
-    return [
-      { name: 'Câmera', value: m.get('camera') ?? 0, fill: '#6366f1' },
-      { name: 'Leitor', value: m.get('leitor_externo') ?? 0, fill: '#10b981' },
-      { name: 'Manual', value: m.get('manual') ?? 0, fill: '#f59e0b' },
-    ].filter((o) => o.value > 0);
-  }, [pacotes]);
-
-  return (
-    <div className="space-y-3 sm:space-y-4 animate-fade-in">
-      {/* ===== KPIs ===== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
-        {[
-          { label: 'Total lidos', valor: total, sub: 'registros recebidos', icon: Package, grad: 'from-indigo-500 to-violet-500', badge: null },
-          { label: 'Únicos', valor: unicos, sub: `${taxaUnicos.toFixed(1)}% aproveit.`, icon: CheckCircle2, grad: 'from-emerald-500 to-teal-500', badge: duplicadosBloqueados > 0 ? `${duplicadosBloqueados} dup` : null },
-          { label: 'Lidos', valor: lidosMarcados, sub: 'marcados lido', icon: CheckCheck, grad: 'from-sky-500 to-blue-500', badge: lidosMarcados > 0 ? `${pctDash(lidosMarcados,total)}%` : null },
-          { label: 'Entregues', valor: entregues, sub: 'marcados entregue', icon: Truck, grad: 'from-teal-500 to-emerald-600', badge: entregues > 0 ? `${pctDash(entregues,total)}%` : null },
-          { label: 'Retornos', valor: retornos, sub: `${taxaRetornos.toFixed(1)}% do total`, icon: RefreshCw, grad: 'from-orange-500 to-amber-500', badge: taxaRetornos > 15 ? 'ALTO' : null },
-          { label: 'Devoluções', valor: devolucoes, sub: 'marcados devolução', icon: Undo2, grad: 'from-rose-500 to-pink-500', badge: devolucoes > 0 ? `${pctDash(devolucoes,total)}%` : null },
-          { label: 'Média / Entr.', valor: mediaPorEntregador.toFixed(mediaPorEntregador >= 10 ? 0 : 1), sub: `${entregadoresAtivos} ativo${entregadoresAtivos !== 1 ? 's' : ''}`, icon: Users, grad: 'from-violet-500 to-fuchsia-500', badge: null },
-          { label: 'Sacas', valor: resumos.length, sub: sacaAtiva ? sacaAtiva.status === 'aberta' ? '1 aberta agora' : 'todas fechadas' : 'sem ativa', icon: Layers, grad: 'from-fuchsia-500 to-purple-600', badge: sacaAtiva?.status === 'aberta' ? 'ABERTA' : null },
-        ].map((k, i) => {
-          const KIcon = k.icon;
-          const BadgeComp = k.badge;
-          return (
-            <div
-              key={i}
-              className="relative rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-3.5 overflow-hidden"
-            >
-              <div className={`absolute -top-8 -right-8 h-20 w-20 rounded-full bg-gradient-to-br opacity-15 ${k.grad}`} />
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className={`h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br ${k.grad} text-white flex items-center justify-center shadow-sm`}>
-                  <KIcon className="h-4 w-4" />
-                </div>
-                {BadgeComp && (
-                  <span className={`shrink-0 text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ring-1 ${
-                    /ALTO|aberta/i.test(BadgeComp)
-                      ? 'bg-red-50 text-red-700 ring-red-200'
-                      : 'bg-neutral-100 text-neutral-600 ring-neutral-200'
-                  }`}>
-                    {BadgeComp}
-                  </span>
-                )}
-              </div>
-              <div className="text-[22px] sm:text-[24px] font-black tracking-tight text-neutral-900 tabular-nums leading-none">
-                {typeof k.valor === 'number' ? k.valor.toLocaleString('pt-BR') : k.valor}
-              </div>
-              <div className="mt-1.5">
-                <div className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500 leading-none">
-                  {k.label}
-                </div>
-                <div className="text-[11.5px] font-semibold text-neutral-500 mt-0.5 leading-tight">
-                  {k.sub}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ===== GRAFICOS LINHA 1 ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        {/* GRÁFICO BARRAS ENTREGADORES */}
-        <div className="lg:col-span-2 rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-          <div className="flex items-end justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center">
-                  <BarChart3 className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Por entregador</h3>
-              </div>
-              <p className="text-[11.5px] font-semibold text-neutral-500 mt-0.5">
-                Volume de pacotes · empilhado com retornos
-              </p>
-            </div>
-            {entregadoresAtivos > 0 && (
-              <span className="shrink-0 text-[10.5px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/60">
-                {entregadoresAtivos} entreg.
-              </span>
-            )}
-          </div>
-
-          {dadosBarrasEntregador.length === 0 ? (
-            <div className="py-14 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
-              <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
-                <BarChart3 className="h-6 w-6" />
-              </div>
-              <div className="text-[13px] font-bold text-neutral-700">Sem dados ainda</div>
-              <div className="text-[11.5px] text-neutral-500 mt-0.5">Bipe pacotes para visualizar aqui.</div>
-            </div>
-          ) : (
-            <>
-              <div className="h-[240px] sm:h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dadosBarrasEntregador} margin={{ top: 8, right: 12, bottom: 8, left: -14 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                    <XAxis dataKey="nome" tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} />
-                    <YAxis tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} width={40} />
-                    <Tooltip
-                      cursor={{ fill: '#f8fafc', opacity: 0.7 }}
-                      contentStyle={{
-                        borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                        fontSize: 12.5, fontWeight: 600, padding: '10px 12px',
-                      }}
-                      formatter={(value: any, name: any) => [
-                        value.toLocaleString('pt-BR'),
-                        name === 'normais' ? 'Normais' : 'Retornos',
-                      ]}
-                    />
-                    <Legend
-                      iconType="rect"
-                      wrapperStyle={{ fontSize: 11.5, fontWeight: 700, paddingTop: 8 }}
-                      formatter={(value) => <span className="text-neutral-600">{value === 'normais' ? 'Normais' : 'Retornos'}</span>}
-                    />
-                    <Bar dataKey="normais" stackId="a" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="retornos" stackId="a" fill="#f97316" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Barras manuais detalhe (TOP 8) */}
-              <div className="mt-3 space-y-1.5 max-h-[220px] overflow-auto pr-1">
-                {dadosBarrasEntregador.slice(0, 8).map((d, i) => (
-                  <div key={i} className="group">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.cor }} />
-                        <span className="text-[12px] font-bold text-neutral-700 truncate">{d.nomeCompleto}</span>
-                      </div>
-                      <div className="shrink-0 text-[11.5px] font-black tabular-nums text-neutral-600 flex items-center gap-1.5">
-                        <span>{d.total.toLocaleString('pt-BR')}</span>
-                        {d.retornos > 0 && (
-                          <span className="text-orange-600 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-orange-50 ring-1 ring-orange-200/60">
-                            <RefreshCw className="h-2.5 w-2.5" /> {d.retornos}
-                          </span>
-                        )}
-                        <span className="text-neutral-400 text-[10px]">
-                          {total > 0 ? ((d.total / total) * 100).toFixed(1) : 0}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${(d.total / maxBarra) * 100}%`,
-                          background: `linear-gradient(90deg, ${d.cor}dd, ${d.cor}aa)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* DONUT DISTRIBUIÇÃO */}
-        <div className="rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-          <div className="flex items-end justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center">
-                  <PieIcon className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Distribuição</h3>
-              </div>
-              <p className="text-[11.5px] font-semibold text-neutral-500 mt-0.5">Participação por entregador</p>
-            </div>
-          </div>
-
-          {dadosDonut.length === 0 ? (
-            <div className="py-14 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
-              <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
-                <PieIcon className="h-6 w-6" />
-              </div>
-              <div className="text-[13px] font-bold text-neutral-700">Sem distribuição</div>
-              <div className="text-[11.5px] text-neutral-500 mt-0.5">Dados aparecem após bipe.</div>
-            </div>
-          ) : (
-            <>
-              <div className="h-[200px] sm:h-[220px] w-full relative">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={dadosDonut}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={58}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      dataKey="value"
-                    >
-                      {dadosDonut.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 14, border: '1px solid #e2e8f0', fontSize: 12,
-                        fontWeight: 600, padding: '8px 10px', boxShadow: '0 8px 20px -5px rgba(0,0,0,0.1)',
-                      }}
-                      formatter={(value: any, name: any, _props: any, payload: any) => {
-                        const full = (payload as { payload?: { fullName?: string } })?.payload?.fullName ?? name;
-                        return [
-                          `${value.toLocaleString('pt-BR')} (${total > 0 ? ((value / total) * 100).toFixed(1) : 0}%)`,
-                          full,
-                        ];
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <div className="text-[26px] font-black tracking-tight text-neutral-900 tabular-nums leading-none">
-                    {total.toLocaleString('pt-BR')}
-                  </div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mt-1">Total</div>
-                </div>
-              </div>
-              <div className="mt-2 max-h-[160px] overflow-auto space-y-1 pr-1">
-                {dadosDonut.slice(0, 10).map((d, i) => {
-                  const pct = total > 0 ? (d.value / total) * 100 : 0;
-                  return (
-                    <div key={i} className="flex items-center justify-between gap-2 py-0.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.fill }} />
-                        <span className="text-[11.5px] font-bold text-neutral-700 truncate">{d.fullName}</span>
-                      </div>
-                      <span className="text-[11px] font-black tabular-nums text-neutral-500 shrink-0">
-                        {pct.toFixed(1)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ===== GRAFICOS LINHA 2 ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        {/* EVOLUÇÃO POR HORÁRIO */}
-        <div className="lg:col-span-2 rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-          <div className="flex items-end justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white flex items-center justify-center">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Ritmo hoje</h3>
-              </div>
-              <p className="text-[11.5px] font-semibold text-neutral-500 mt-0.5">
-                Pacotes por horário · {hojeFormatado}
-              </p>
-            </div>
-            {total > 0 && (
-              <span className="shrink-0 text-[10.5px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60">
-                Pico {(() => {
-                  const m = Math.max(...dadosLinhaHorario.map((d) => d.qtd));
-                  const p = dadosLinhaHorario.find((d) => d.qtd === m);
-                  return `${p?.hora ?? '--'} (${m})`;
-                })()}
-              </span>
-            )}
-          </div>
-
-          <div className="h-[220px] sm:h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dadosLinhaHorario} margin={{ top: 8, right: 12, bottom: 4, left: -14 }}>
-                <defs>
-                  <linearGradient id="gradHorario" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="hora" tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} interval={1} />
-                <YAxis tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} width={36} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 14, border: '1px solid #e2e8f0', fontSize: 12,
-                    fontWeight: 600, padding: '8px 10px', boxShadow: '0 8px 20px -5px rgba(0,0,0,0.1)',
-                  }}
-                  formatter={(value: any) => [`${value} pacote${value !== 1 ? 's' : ''}`, 'Volume']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="qtd"
-                  stroke="#10b981"
-                  strokeWidth={2.5}
-                  fill="url(#gradHorario)"
-                  activeDot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* PAÍNEL INFO + ORIGENS */}
-        <div className="space-y-3 sm:space-y-4">
-          <div className="rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center">
-                <Boxes className="h-3.5 w-3.5" />
-              </div>
-              <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Origem dos dados</h3>
-            </div>
-            {origemDistribuicao.length === 0 ? (
-              <div className="py-8 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
-                <div className="text-[13px] font-bold text-neutral-700">Sem leituras</div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {origemDistribuicao.map((o, i) => {
-                  const pct = total > 0 ? (o.value / total) * 100 : 0;
-                  return (
-                    <div key={i}>
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-[12px] font-bold text-neutral-700 flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: o.fill }} />
-                          {o.name}
-                        </span>
-                        <span className="text-[11.5px] font-black tabular-nums text-neutral-600">
-                          {o.value.toLocaleString('pt-BR')} · {pct.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 w-full bg-neutral-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${pct}%`,
-                            background: `linear-gradient(90deg, ${o.fill}, ${o.fill}99)`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 shadow-lg p-[1px]">
-            <div className="rounded-[14px] bg-white p-3 sm:p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 text-white flex items-center justify-center">
-                  <Clock className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[14px] font-black tracking-tight text-neutral-900">
-                  {sacaAtiva ? 'Saca atual' : 'Resumo do dia'}
-                </h3>
-              </div>
-              <div className="rounded-xl bg-gradient-to-br from-indigo-50 via-violet-50 to-fuchsia-50 p-3 ring-1 ring-indigo-100/80">
-                {sacaAtiva ? (
-                  <div className="truncate text-[13.5px] font-black text-indigo-900 mb-1 leading-tight">
-                    {sacaAtiva.nome}
-                  </div>
-                ) : (
-                  <div className="text-[12.5px] font-bold text-amber-700 mb-1">Sem saca ativa</div>
-                )}
-                <div className="grid grid-cols-3 gap-1 mt-2">
-                  {[
-                    { k: 'Lidos', v: total, c: 'text-indigo-700' },
-                    { k: 'Únicos', v: unicos, c: 'text-emerald-700' },
-                    { k: 'Retornos', v: retornos, c: 'text-orange-700' },
-                  ].map((kv, i) => (
-                    <div key={i} className="bg-white/70 rounded-lg p-2 text-center ring-1 ring-white/80">
-                      <div className={`text-[16px] font-black tabular-nums leading-none ${kv.c}`}>{kv.v}</div>
-                      <div className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500 mt-1">{kv.k}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== GRÁFICO ULTIMAS SACAS ===== */}
-      <div className="rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-        <div className="flex items-end justify-between gap-3 mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center">
-                <Layers className="h-3.5 w-3.5" />
-              </div>
-              <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Últimas sacas</h3>
-            </div>
-            <p className="text-[11.5px] font-semibold text-neutral-500 mt-0.5">
-              Comparativo total vs únicos · últimas {dadosUltimasSacas.length}
-            </p>
-          </div>
-        </div>
-        {dadosUltimasSacas.length === 0 ? (
-          <div className="py-14 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
-            <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
-              <Layers className="h-6 w-6" />
-            </div>
-            <div className="text-[13px] font-bold text-neutral-700">Nenhuma saca registrada</div>
-          </div>
-        ) : (
-          <div className="h-[230px] sm:h-[260px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dadosUltimasSacas} margin={{ top: 8, right: 12, bottom: 8, left: -14 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="nome" tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} width={36} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 14, border: '1px solid #e2e8f0', fontSize: 12,
-                    fontWeight: 600, padding: '8px 10px', boxShadow: '0 8px 20px -5px rgba(0,0,0,0.1)',
-                  }}
-                  formatter={(value: any, name: any, _p: any, payload: any) => {
-                    const nomeFull = (payload as { payload?: { nomeCompleto?: string } })?.payload?.nomeCompleto;
-                    const st = (payload as { payload?: { status?: string } })?.payload?.status;
-                    return [
-                      `${value.toLocaleString('pt-BR')} ${name === 'total' ? '(bruto)' : '(líquido)'}${st ? ` · ${st}` : ''}`,
-                      nomeFull ?? name,
-                    ];
-                  }}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 11.5, fontWeight: 700, paddingTop: 8 }}
-                  formatter={(value) => <span className="text-neutral-600">{value === 'total' ? 'Total lido' : 'Únicos'}</span>}
-                />
-                <Bar dataKey="total" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="unicos" fill="#10b981" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* ===== GRÁFICO ZONAS ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <div className="lg:col-span-2 rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-          <div className="flex items-end justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center">
-                  <MapPin className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Por zona ML</h3>
-              </div>
-              <p className="text-[11.5px] font-semibold text-neutral-500 mt-0.5">
-                Pacotes por zona importada · apenas nesta saca
-              </p>
-            </div>
-            {contagensZonas.filter((z) => z.nome !== '— Sem zona —').length > 0 && (
-              <span className="shrink-0 text-[10.5px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-200/60">
-                {contagensZonas.filter((z) => z.nome !== '— Sem zona —').length} zona{contagensZonas.filter((z) => z.nome !== '— Sem zona —').length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-
-          {contagensZonas.filter((z) => z.nome !== '— Sem zona —').length === 0 ? (
-            <div className="py-14 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
-              <div className="h-12 w-12 mx-auto rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2.5">
-                <MapPin className="h-6 w-6" />
-              </div>
-              <div className="text-[13px] font-bold text-neutral-700">Sem zonas importadas ainda</div>
-              <div className="text-[11.5px] text-neutral-500 mt-0.5">Use "Importar JSON zonas ML" para preencher aqui.</div>
-            </div>
-          ) : (
-            <>
-              <div className="h-[240px] sm:h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={(() => {
-                      const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
-                      return zs.map((z, idx) => ({
-                        nome: z.nome.length > 12 ? z.nome.slice(0, 11) + '…' : z.nome,
-                        nomeCompleto: z.nome,
-                        cor: PALETA_DASH[(idx + 3) % PALETA_DASH.length],
-                        normais: z.qtd - z.retornos,
-                        retornos: z.retornos,
-                        total: z.qtd,
-                      }));
-                    })()}
-                    margin={{ top: 8, right: 12, bottom: 8, left: -14 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                    <XAxis dataKey="nome" tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} />
-                    <YAxis tick={{ fontSize: 10.5, fontWeight: 600, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} width={40} />
-                    <Tooltip
-                      cursor={{ fill: '#f8fafc', opacity: 0.7 }}
-                      contentStyle={{
-                        borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                        fontSize: 12.5, fontWeight: 600, padding: '10px 12px',
-                      }}
-                      formatter={(value: any, name: any, _p: any, payload: any) => {
-                        const full = (payload as { payload?: { nomeCompleto?: string } })?.payload?.nomeCompleto;
-                        if (name === 'nome') return [String(value), full ?? 'Zona'];
-                        return [
-                          value.toLocaleString('pt-BR'),
-                          name === 'normais' ? 'Normais' : 'Retornos',
-                        ];
-                      }}
-                      labelFormatter={(label: any, payload: readonly any[]) => {
-                        const first = payload?.[0]?.payload as { nomeCompleto?: string } | undefined;
-                        return first?.nomeCompleto ?? String(label ?? 'Zona');
-                      }}
-                    />
-                    <Legend
-                      iconType="rect"
-                      wrapperStyle={{ fontSize: 11.5, fontWeight: 700, paddingTop: 8 }}
-                      formatter={(value) => <span className="text-neutral-600">{value === 'normais' ? 'Normais' : 'Retornos'}</span>}
-                    />
-                    <Bar dataKey="normais" stackId="a" fill="#f43f5e" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="retornos" stackId="a" fill="#f97316" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="mt-3 space-y-1.5 max-h-[230px] overflow-auto pr-1">
-                {(() => {
-                  const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
-                  const maxQtd = Math.max(1, ...zs.map((z) => z.qtd));
-                  return zs.map((z, idx) => {
-                    const cor = PALETA_DASH[(idx + 3) % PALETA_DASH.length];
-                    return (
-                      <div key={z.nome} className="group">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <MapPin className="h-3 w-3 shrink-0 text-rose-500" />
-                            <span className="text-[12px] font-bold text-neutral-700 truncate">{z.nome}</span>
-                            {z.entregadores > 0 && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo-50 ring-1 ring-indigo-200/60 text-[9.5px] font-black uppercase tracking-wider text-indigo-700">
-                                <Users className="h-2.5 w-2.5" />
-                                {z.entregadores}
-                              </span>
-                            )}
-                          </div>
-                          <div className="shrink-0 text-[11.5px] font-black tabular-nums text-neutral-600 flex items-center gap-1.5">
-                            <span>{z.qtd.toLocaleString('pt-BR')}</span>
-                            {z.retornos > 0 && (
-                              <span className="text-orange-600 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-orange-50 ring-1 ring-orange-200/60">
-                                <RefreshCw className="h-2.5 w-2.5" /> {z.retornos}
-                              </span>
-                            )}
-                            <span className="text-neutral-400 text-[10px]">
-                              {total > 0 ? ((z.qtd / total) * 100).toFixed(1) : 0}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${(z.qtd / maxQtd) * 100}%`,
-                              background: `linear-gradient(90deg, ${cor}dd, ${cor}aa)`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* RESUMO ZONAS + ENTREGADORES */}
-        <div className="space-y-3 sm:space-y-4">
-          <div className="rounded-2xl bg-white border border-neutral-200/70 shadow-sm p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center">
-                <MapPin className="h-3.5 w-3.5" />
-              </div>
-              <h3 className="text-[14px] font-black tracking-tight text-neutral-900">Resumo de zonas</h3>
-            </div>
-            {(() => {
-              const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
-              if (zs.length === 0) {
-                return (
-                  <div className="py-8 text-center rounded-xl bg-neutral-50/60 border border-dashed border-neutral-200">
-                    <div className="text-[13px] font-bold text-neutral-700">Sem zonas</div>
-                  </div>
-                );
-              }
-              const totalZonas = zs.reduce((acc, z) => acc + z.qtd, 0);
-              return (
-                <div className="grid grid-cols-3 gap-1.5 mb-3">
-                  {[
-                    { k: 'Zonas', v: zs.length, grad: 'from-rose-500 to-pink-500' },
-                    { k: 'Pacotes', v: totalZonas, grad: 'from-orange-500 to-amber-500' },
-                    {
-                      k: 'Entr. únicos',
-                      v: zs.reduce((acc, z) => acc + z.entregadores, 0),
-                      grad: 'from-violet-500 to-indigo-500',
-                    },
-                  ].map((kv, i) => (
-                    <div key={i} className={`rounded-xl bg-gradient-to-br ${kv.grad} p-[1px]`}>
-                      <div className="rounded-[10px] bg-white px-2 py-2 text-center">
-                        <div className="text-[15px] font-black tabular-nums leading-none text-neutral-900">{kv.v}</div>
-                        <div className="text-[8.5px] font-black uppercase tracking-wider text-neutral-500 mt-1">{kv.k}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-            <div className="space-y-1 max-h-[220px] overflow-auto pr-1">
-              {(() => {
-                const zs = contagensZonas.filter((z) => z.nome !== '— Sem zona —').sort((a, b) => b.qtd - a.qtd);
-                const tot = zs.reduce((acc, z) => acc + z.qtd, 0);
-                return zs.map((z) => {
-                  const pct = tot > 0 ? (z.qtd / tot) * 100 : 0;
-                  return (
-                    <div key={z.nome} className="flex items-center justify-between gap-2 py-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <MapPin className="h-3 w-3 shrink-0 text-rose-500" />
-                        <span className="text-[11px] font-bold text-neutral-700 truncate">{z.nome}</span>
-                      </div>
-                      <span className="text-[11px] font-black tabular-nums text-neutral-500 shrink-0">
-                        {pct.toFixed(1)}%
-                      </span>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== RODAPÉ DASHBOARD ===== */}
-      <div className="flex items-center justify-between px-1 pt-1">
-        <div className="text-[10.5px] font-bold uppercase tracking-wider text-neutral-400">
-          {hojeFormatado} · Dashboard
-        </div>
-        <div className="text-[10.5px] font-black uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 text-amber-500" />
-          Mercado Livre · Operações
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ContagemPage() {
   const pacotes = usePacoteStore((s) => s.pacotes);
   const carregando = usePacoteStore((s) => s.carregando);
@@ -2780,6 +1991,7 @@ export default function ContagemPage() {
   const ciclarStatus = usePacoteStore((s) => s.ciclarStatus);
   const definirStatus = usePacoteStore((s) => s.definirStatus);
   const definirStatusEmLote = usePacoteStore((s) => s.definirStatusEmLote);
+  const removerEmLote = usePacoteStore((s) => s.removerEmLote);
   const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
   const forcarSincronizacaoCompleta = usePacoteStore((s) => s.forcarSincronizacaoCompleta);
   const carregarEntregadoresBanco = usePacoteStore((s) => s.carregarEntregadoresBanco);
@@ -3201,6 +2413,20 @@ export default function ContagemPage() {
   const totalDaSaca = React.useMemo(() => pacotesDaSaca.length, [pacotesDaSaca]);
   const unicosDaSaca = React.useMemo(() => new Set(pacotesDaSaca.map((p) => p.codigo_pacote)).size, [pacotesDaSaca]);
 
+  const removerSelecionados = React.useCallback(() => {
+    const ids = Array.from(selecionados);
+    if (!ids.length) return;
+    if (!confirm(`Remover ${ids.length} pacote${ids.length !== 1 ? 's' : ''} selecionado${ids.length !== 1 ? 's' : ''}? Esta ação é definitiva.`)) return;
+    void removerEmLote(ids).then(() => limparSelecao());
+  }, [selecionados, removerEmLote, limparSelecao]);
+
+  const removerTodosDaSaca = React.useCallback(() => {
+    const ids = pacotesDaSaca.map((p) => p.id);
+    if (!ids.length) return;
+    if (!confirm(`Remover TODOS os ${ids.length} pacotes desta saca? Esta ação é definitiva e não pode ser desfeita.`)) return;
+    void removerEmLote(ids).then(() => limparSelecao());
+  }, [pacotesDaSaca, removerEmLote, limparSelecao]);
+
   const contagemEntregadores = React.useMemo(() => {
     const mapaQtd = new Map<string, number>();
     const mapaRetornos = new Map<string, number>();
@@ -3224,49 +2450,6 @@ export default function ContagemPage() {
         entregues: mapaEntregues.get(nome) ?? 0,
         devolucoes: mapaDevolucoes.get(nome) ?? 0,
         lidos: mapaLidos.get(nome) ?? 0,
-      });
-    }
-    return resultado.sort((a, b) => b.qtd - a.qtd);
-  }, [pacotesDaSaca]);
-
-  const contagemZonas = React.useMemo(() => {
-    const mapaQtd = new Map<string, number>();
-    const mapaRetornos = new Map<string, number>();
-    const mapaEntregues = new Map<string, number>();
-    const mapaDevolucoes = new Map<string, number>();
-    const mapaLidos = new Map<string, number>();
-    const mapaEntregadores = new Map<string, Set<string>>();
-    for (const p of pacotesDaSaca) {
-      const k = p.zona_ml ?? '— Sem zona —';
-      mapaQtd.set(k, (mapaQtd.get(k) ?? 0) + 1);
-      if (p.status === 'retorno') mapaRetornos.set(k, (mapaRetornos.get(k) ?? 0) + 1);
-      if (p.status === 'entregue') mapaEntregues.set(k, (mapaEntregues.get(k) ?? 0) + 1);
-      if (p.status === 'devolucao') mapaDevolucoes.set(k, (mapaDevolucoes.get(k) ?? 0) + 1);
-      if (p.status === 'lido') mapaLidos.set(k, (mapaLidos.get(k) ?? 0) + 1);
-      if (p.entregador) {
-        const s = mapaEntregadores.get(k) ?? new Set<string>();
-        s.add(p.entregador);
-        mapaEntregadores.set(k, s);
-      }
-    }
-    const resultado: Array<{
-      nome: string;
-      qtd: number;
-      retornos: number;
-      entregues: number;
-      devolucoes: number;
-      lidos: number;
-      entregadores: number;
-    }> = [];
-    for (const [nome, qtd] of mapaQtd.entries()) {
-      resultado.push({
-        nome,
-        qtd,
-        retornos: mapaRetornos.get(nome) ?? 0,
-        entregues: mapaEntregues.get(nome) ?? 0,
-        devolucoes: mapaDevolucoes.get(nome) ?? 0,
-        lidos: mapaLidos.get(nome) ?? 0,
-        entregadores: mapaEntregadores.get(nome)?.size ?? 0,
       });
     }
     return resultado.sort((a, b) => b.qtd - a.qtd);
@@ -3542,7 +2725,8 @@ export default function ContagemPage() {
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4 animate-fade-in">
         {/* ===== HEADER COMPACTO ===== */}
-        <header className="flex items-center gap-2 sm:gap-3 bg-white rounded-2xl px-3 sm:px-4 py-2.5 border border-neutral-200/70 shadow-sm">
+        <header className="relative overflow-hidden flex items-center gap-2 sm:gap-3 bg-white rounded-2xl px-3 sm:px-4 py-2.5 border border-neutral-200/70 shadow-sm">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-ml-blue via-violet-500 to-emerald-400" />
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-ml-blue to-emerald-400 text-white flex items-center justify-center shadow-sm">
               <Boxes className="h-4 w-4" />
@@ -3584,6 +2768,15 @@ export default function ContagemPage() {
             </div>
 
             <SeletorEntregador aoGerenciar={() => setGerenciarEntregadoresAberto(true)} />
+
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1 h-9 px-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[12px] font-black shadow-sm shadow-indigo-500/30 hover:from-indigo-600 hover:to-violet-600 transition"
+              title="Abrir dashboard em tela cheia"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </Link>
 
             <Button
               size="sm"
@@ -4004,8 +3197,14 @@ export default function ContagemPage() {
               ].map((card, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm"
+                  className="relative overflow-hidden bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-3 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
                 >
+                  <span
+                    aria-hidden
+                    className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${
+                      ['from-ml-blue to-violet-500', 'from-emerald-500 to-teal-500', 'from-violet-500 to-fuchsia-500', 'from-orange-500 to-amber-500'][i % 4]
+                    }`}
+                  />
                   <p className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${card.corLab}`}>
                     {card.lab}
                   </p>
@@ -4106,11 +3305,11 @@ export default function ContagemPage() {
                       onClick={() => setModo(m)}
                       className={`rounded-lg py-2.5 px-2 flex items-center justify-center gap-1.5 font-bold text-[12px] transition ${
                         ativo
-                          ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-black/5'
+                          ? 'bg-gradient-to-r from-ml-blue to-violet-500 text-white shadow-sm shadow-indigo-500/30'
                           : 'text-neutral-500 hover:text-neutral-700'
                       }`}
                     >
-                      <Icon className={`h-4 w-4 ${ativo ? 'text-ml-blue' : ''}`} />
+                      <Icon className={`h-4 w-4 ${ativo ? 'text-white' : ''}`} />
                       <span className="hidden sm:inline">{meta.label}</span>
                     </button>
                   );
@@ -4216,20 +3415,7 @@ export default function ContagemPage() {
               )}
             </div>
 
-            {modo === 'dashboard' ? (
-              <TelaDashboard
-                pacotes={pacotesDaSaca}
-                total={totalDaSaca}
-                unicos={unicosDaSaca}
-                contagensEntregadores={contagemEntregadores}
-                contagensZonas={contagemZonas}
-                entregadoresCadastrados={entregadores}
-                resumos={resumos}
-                hojeFormatado={hojeFormatado}
-                sacaAtiva={sacaAtiva ? { id: sacaAtiva.id, nome: sacaAtiva.nome, status: sacaAtiva.status } : null}
-              />
-            ) : (
-              <>
+            <>
                 {/* ===== FILTROS COMPACTOS ===== */}
                 <div className="flex items-center gap-2 flex-wrap bg-white rounded-2xl border border-neutral-200/70 px-3 sm:px-4 py-2.5 shadow-sm">
                   <label className="inline-flex items-center gap-1.5 cursor-pointer select-none shrink-0">
@@ -4289,6 +3475,16 @@ export default function ContagemPage() {
                   <div className="text-[10.5px] font-semibold text-neutral-500 shrink-0">
                     {filtrados.length}/{pacotesDaSaca.length}
                   </div>
+                  <button
+                    type="button"
+                    onClick={removerTodosDaSaca}
+                    disabled={!pacotesDaSaca.length}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black uppercase tracking-wider text-red-600 ring-1 ring-red-200 bg-red-50 hover:bg-red-100 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    title="Remover todos os pacotes desta saca (definitivo)"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    <span className="hidden sm:inline">Remover todos</span>
+                  </button>
                 </div>
 
                 {selecionados.size > 0 && (
@@ -4348,6 +3544,15 @@ export default function ContagemPage() {
                       >
                         <X className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:inline">Sem status</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removerSelecionados}
+                        className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-black shadow-sm transition"
+                        title="Remover os pacotes selecionados (definitivo)"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                        <span className="hidden sm:inline">Remover selecionados</span>
                       </button>
                     </div>
                     <button
@@ -4504,7 +3709,6 @@ export default function ContagemPage() {
                   </div>
                 )}
               </>
-            )}
           </>
         )}
 

@@ -68,6 +68,7 @@ type PacoteState = {
   alternarStatusRetorno: (id: string) => Promise<void>;
   ciclarStatus: (id: string) => Promise<void>;
   remover: (id: string) => Promise<void>;
+  removerEmLote: (ids: string[]) => Promise<{ removidos: number }>;
   limpar: () => Promise<void>;
   total: () => number;
   unicos: () => number;
@@ -645,6 +646,28 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
       entregadoresSaca: r.entregadoresSaca,
       contagensEntregadores: r.contagens,
     });
+  },
+
+  removerEmLote: async (ids) => {
+    if (!ids.length) return { removidos: 0 };
+    const idSet = new Set(ids);
+    const atual = get().pacotes;
+    const nova = atual.filter((p) => !idSet.has(p.id));
+    const removidos = atual.length - nova.length;
+    if (removidos === 0) return { removidos: 0 };
+    // estado local some imediatamente (banco é a fonte da verdade)
+    salvarCache(nova);
+    const r = recalcular(nova);
+    set({
+      pacotes: nova,
+      entregadoresSaca: r.entregadoresSaca,
+      contagensEntregadores: r.contagens,
+    });
+    // dispara delete em batch no banco em background
+    void (async () => {
+      try { await PacoteService.removerEmLote(ids); } catch { /* noop */ }
+    })();
+    return { removidos };
   },
 
   definirStatus: async (id, status) => {
