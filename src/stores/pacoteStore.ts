@@ -28,7 +28,7 @@ type PacoteState = {
   contagensEntregadores: ContagemEntregador[];
 
   carregar: () => Promise<void>;
-  carregarTodasSacas: () => Promise<void>;
+  carregarTodasSacas: () => Promise<boolean>;
   carregarSacas: () => Promise<void>;
   definirSacaAtiva: (sacaId: string) => Promise<void>;
   criarSaca: (nome: string, descricao?: string) => Promise<Saca>;
@@ -75,7 +75,7 @@ type PacoteState = {
   contarPorStatus: () => { lido: number; entregue: number; retorno: number; devolucao: number; semStatus: number };
   exportar: (listaFiltrada?: PacoteLidoLocal[], sufixoNomeArquivo?: string) => Promise<void>;
   limparFeedback: () => void;
-  inscreverRealtime: () => () => void;
+  inscreverRealtime: (todasSacas?: boolean) => () => void;
   forcarSincronizacaoCompleta: () => Promise<{
     sacas: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
     pacotes: { sincronizados: number; falhas: number; total: number; primeiroErro: string | null };
@@ -156,6 +156,7 @@ function salvarEntregadorAtivo(nome: string | null) {
 }
 
 const inicial = recalcular([]);
+let versaoCarregamentoTodasSacas = 0;
 
 export const usePacoteStore = create<PacoteState>((set, get) => ({
   pacotes: [],
@@ -328,24 +329,48 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
   },
 
   carregarTodasSacas: async () => {
+    const versaoAtual = ++versaoCarregamentoTodasSacas;
     set({ carregando: true });
     try {
-      if (!get().sacas.length) await get().carregarSacas();
-      const [lista, entregadores] = await Promise.all([
+      const [lista, sacas, ativa, entregadores] = await Promise.all([
         PacoteService.listarTodasSacas(),
+        SacaService.listar(),
+        SacaService.pegarAtiva(),
         listarEntregadores(false),
       ]);
+      if (versaoAtual !== versaoCarregamentoTodasSacas) return false;
+
+      const pacotesPorSaca = new Map<string, PacoteLidoLocal[]>();
+      for (const pacote of lista) {
+        if (!pacote.saca_id) continue;
+        const grupo = pacotesPorSaca.get(pacote.saca_id) ?? [];
+        grupo.push(pacote);
+        pacotesPorSaca.set(pacote.saca_id, grupo);
+      }
+      const resumos: ResumoSaca[] = sacas.map((saca) => {
+        const daSaca = pacotesPorSaca.get(saca.id) ?? [];
+        return {
+          saca,
+          total: daSaca.length,
+          unicos: new Set(daSaca.map((p) => p.codigo_pacote)).size,
+        };
+      });
       const r = recalcular(lista);
       const patch: Partial<PacoteState> = {
         pacotes: lista,
+        sacas,
+        resumos,
+        sacaAtiva: ativa,
         carregando: false,
         entregadoresSaca: r.entregadoresSaca,
         contagensEntregadores: r.contagens,
       };
       if (!arraysIguais(get().entregadores, entregadores)) patch.entregadores = entregadores;
       set(patch as PacoteState);
-    } catch {
-      set({ carregando: false });
+      return true;
+    } catch (error) {
+      if (versaoAtual === versaoCarregamentoTodasSacas) set({ carregando: false });
+      throw error;
     }
   },
 
@@ -816,22 +841,30 @@ export const usePacoteStore = create<PacoteState>((set, get) => ({
     });
   },
 
-  inscreverRealtime: () => {
+  inscreverRealtime: (todasSacas = false) => {
     let debounce: ReturnType<typeof setTimeout> | null = null;
     const disparar = (tipo: 'pacotes' | 'sacas' | 'entregadores') => {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => {
         const g = get();
-        if (tipo === 'sacas') void g.carregarSacas().then(() => void g.carregar());
+        if (tipo === 'sacas') {
+          if (todasSacas) void g.carregarTodasSacas().catch(() => {});
+          else void g.carregarSacas().then(() => void g.carregar());
+        }
         else if (tipo === 'entregadores') void g.carregarEntregadoresBanco();
+        else if (todasSacas) void g.carregarTodasSacas().catch(() => {});
         else void g.carregar();
       }, 120);
     };
-    return inscreverRealtimePacotes(
+    const pararRealtime = inscreverRealtimePacotes(
       () => disparar('pacotes'),
       () => disparar('sacas'),
       () => disparar('entregadores'),
     );
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      pararRealtime();
+    };
   },
 
   forcarSincronizacaoCompleta: async () => {

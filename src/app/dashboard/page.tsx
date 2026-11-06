@@ -184,46 +184,56 @@ function SeletorMulti({
 export default function DashboardPage() {
   const pacotes = usePacoteStore((s) => s.pacotes);
   const sacas = usePacoteStore((s) => s.sacas);
-  const sacaAtiva = usePacoteStore((s) => s.sacaAtiva);
   const resumos = usePacoteStore((s) => s.resumos);
-  const carregarSacas = usePacoteStore((s) => s.carregarSacas);
   const carregarTodasSacas = usePacoteStore((s) => s.carregarTodasSacas);
+  const inscreverRealtime = usePacoteStore((s) => s.inscreverRealtime);
 
   const [sacasSelecionadas, setSacasSelecionadas] = React.useState<string[]>([]);
   const [entregadoresSelecionados, setEntregadoresSelecionados] = React.useState<string[]>([]);
-  const [definido, setDefinido] = React.useState(false);
   const [atualizando, setAtualizando] = React.useState(false);
-  const jaDefiniuRef = React.useRef(false);
+  const [erroCarga, setErroCarga] = React.useState<string | null>(null);
+  const [sincronizado, setSincronizado] = React.useState(false);
 
   const recarregar = React.useCallback(
     async (comSpinner = false) => {
       if (comSpinner) setAtualizando(true);
       try {
-        await carregarSacas();
-        await carregarTodasSacas();
-      } catch {
-        /* noop */
+        const concluido = await carregarTodasSacas();
+        if (!concluido) return;
+        setErroCarga(null);
+        setSincronizado(true);
+      } catch (error) {
+        setErroCarga(error instanceof Error ? error.message : 'Não foi possível atualizar os dados do banco.');
       } finally {
         if (comSpinner) setAtualizando(false);
       }
     },
-    [carregarSacas, carregarTodasSacas],
+    [carregarTodasSacas],
   );
 
   React.useEffect(() => {
-    void (async () => {
-      await recarregar(false);
-      setDefinido(true);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let ativo = true;
+    const pararRealtime = inscreverRealtime(true);
+    const atualizar = () => {
+      if (ativo) void recarregar(false);
+    };
+    const aoVisivel = () => {
+      if (document.visibilityState === 'visible') atualizar();
+    };
 
-  // define a saca padrão (a ativa) após o primeiro carregamento
-  React.useEffect(() => {
-    if (!definido || jaDefiniuRef.current) return;
-    jaDefiniuRef.current = true;
-    setSacasSelecionadas(sacaAtiva?.id ? [sacaAtiva.id] : []);
-  }, [definido, sacaAtiva]);
+    atualizar();
+    const intervalo = window.setInterval(atualizar, 30_000);
+    document.addEventListener('visibilitychange', aoVisivel);
+    window.addEventListener('online', atualizar);
+
+    return () => {
+      ativo = false;
+      pararRealtime();
+      window.clearInterval(intervalo);
+      document.removeEventListener('visibilitychange', aoVisivel);
+      window.removeEventListener('online', atualizar);
+    };
+  }, [inscreverRealtime, recarregar]);
 
   const opcoesSacas = React.useMemo(() => {
     const porSaca = new Map<string, number>();
@@ -303,7 +313,7 @@ export default function DashboardPage() {
     return `${entregadoresSelecionados.length} entregadores`;
   }, [entregadoresSelecionados]);
 
-  const sacaParaCard = sacasEscopoSel.length === 1 ? sacasEscopoSel[0] : sacaAtiva;
+  const sacaParaCard = sacasEscopoSel.length === 1 ? sacasEscopoSel[0] : null;
 
   return (
     <div className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(5,8,15,0.92),rgba(9,16,29,0.92))] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
@@ -324,7 +334,9 @@ export default function DashboardPage() {
           <div className="min-w-0">
             <div className="text-[13.5px] font-black tracking-tight text-white leading-tight">Dashboard</div>
             <div className="text-[10.5px] font-semibold text-slate-400 truncate">
-              {pacotesFiltrados.length} pacote{pacotesFiltrados.length !== 1 ? 's' : ''} no escopo
+              {!sincronizado
+                ? erroCarga ? 'Banco indisponível' : 'Sincronizando com o banco...'
+                : `${pacotesFiltrados.length} pacote${pacotesFiltrados.length !== 1 ? 's' : ''} no escopo`}
             </div>
           </div>
         </div>
@@ -368,13 +380,28 @@ export default function DashboardPage() {
       </div>
 
       <div className="p-4 sm:p-5">
-        <TelaDashboard
-          pacotes={pacotesFiltrados}
-          resumos={resumos}
-          sacaAtiva={sacaParaCard ? { id: sacaParaCard.id, nome: sacaParaCard.nome, status: sacaParaCard.status } : null}
-          hojeFormatado={hojeFormatado}
-          escopoLabel={escopoLabel}
-        />
+        {erroCarga && (
+          <div role="alert" className="mb-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-[12px] font-semibold text-red-200">
+            Não foi possível sincronizar com o banco: {erroCarga}. Os indicadores podem estar desatualizados. Use “Atualizar” para tentar novamente.
+          </div>
+        )}
+        {!sincronizado ? (
+          !erroCarga && (
+            <div role="status" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-12 text-center">
+              <RefreshCw className="mx-auto mb-3 h-5 w-5 animate-spin text-sky-300" />
+              <p className="text-sm font-bold text-slate-200">Sincronizando com o banco</p>
+              <p className="mt-1 text-xs text-slate-400">Carregando sacas e pacotes antes de calcular os indicadores.</p>
+            </div>
+          )
+        ) : (
+          <TelaDashboard
+            pacotes={pacotesFiltrados}
+            resumos={resumos}
+            sacaAtiva={sacaParaCard ? { id: sacaParaCard.id, nome: sacaParaCard.nome, status: sacaParaCard.status } : null}
+            hojeFormatado={hojeFormatado}
+            escopoLabel={escopoLabel}
+          />
+        )}
       </div>
     </div>
   );

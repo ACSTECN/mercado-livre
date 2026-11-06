@@ -14,7 +14,7 @@ import { pegarIdSacaAtiva } from './SacaService';
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const LIMITE_LEITURA = 5000;
+const TAMANHO_PAGINA_LEITURA = 500;
 
 let _realtimeInscrito = false;
 let _realtimeCallback: ((tipo: 'pacotes' | 'sacas' | 'entregadores') => void) | null = null;
@@ -275,28 +275,51 @@ export const PacoteService = {
   async listarTodasSacas(): Promise<PacoteLidoLocal[]> {
     const sb = getSupabase();
     if (!isSupabaseConfigurado || !sb) return [];
-    const { data, error } = await sb
-      .from('pacotes_lidos')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(LIMITE_LEITURA);
-    if (error) throw new Error(error.message);
-    return deduplicarLidos((data ?? []) as PacoteLido[]);
+    const rows: PacoteLido[] = [];
+    let offset = 0;
+
+    while (true) {
+      const { data, error } = await sb
+        .from('pacotes_lidos')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + TAMANHO_PAGINA_LEITURA - 1);
+      if (error) throw new Error(error.message);
+
+      const pagina = (data ?? []) as PacoteLido[];
+      rows.push(...pagina);
+      if (pagina.length < TAMANHO_PAGINA_LEITURA) break;
+      offset += TAMANHO_PAGINA_LEITURA;
+    }
+
+    return deduplicarLidos(rows);
   },
 
   async listar(sacaIdArg?: string | null): Promise<PacoteLidoLocal[]> {
     const sacaId = sacaIdArg ?? pegarIdSacaAtiva();
     const sb = getSupabase();
     if (!isSupabaseConfigurado || !sb) return [];
-    let q = sb
-      .from('pacotes_lidos')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(LIMITE_LEITURA);
-    q = sacaId ? q.eq('saca_id', sacaId) : q.is('saca_id', null);
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
-    return deduplicarLidos((data ?? []) as PacoteLido[]);
+    const rows: PacoteLido[] = [];
+    let offset = 0;
+
+    while (true) {
+      let q = sb
+        .from('pacotes_lidos')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
+      q = sacaId ? q.eq('saca_id', sacaId) : q.is('saca_id', null);
+      const { data, error } = await q.range(offset, offset + TAMANHO_PAGINA_LEITURA - 1);
+      if (error) throw new Error(error.message);
+
+      const pagina = (data ?? []) as PacoteLido[];
+      rows.push(...pagina);
+      if (pagina.length < TAMANHO_PAGINA_LEITURA) break;
+      offset += TAMANHO_PAGINA_LEITURA;
+    }
+
+    return deduplicarLidos(rows);
   },
 
   async adicionar(
